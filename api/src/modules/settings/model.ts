@@ -1,14 +1,11 @@
 import { Schema, model } from "mongoose";
+import { DEFAULT_OPENING_HOURS, OpeningHoursDoc, TIME_PATTERN } from "./openingHours";
 
-export interface ScheduleLineDoc {
-  label: string;
-  hours: string;
-}
-
-const scheduleLineSchema = new Schema<ScheduleLineDoc>(
+const openingHoursSchema = new Schema<OpeningHoursDoc>(
   {
-    label: { type: String, required: true, trim: true },
-    hours: { type: String, required: true, trim: true },
+    weekday: { type: Number, required: true, min: 1, max: 7 },
+    open: { type: String, required: true, match: TIME_PATTERN },
+    close: { type: String, required: true, match: TIME_PATTERN },
   },
   { _id: false }
 );
@@ -16,7 +13,9 @@ const scheduleLineSchema = new Schema<ScheduleLineDoc>(
 export interface SiteSettingsDoc {
   address?: string;
   addressMapUrl?: string;
-  schedule: ScheduleLineDoc[];
+  // Un tramo por dia abierto; el dia que no aparece, la tienda esta cerrada. Las lineas de
+  // horario del pie de pagina se generan a partir de aqui (ver scheduleLines).
+  openingHours: OpeningHoursDoc[];
   phone?: string;
   email?: string;
   socialInstagram?: string;
@@ -31,13 +30,9 @@ export interface SiteSettingsDoc {
 const siteSettingsSchema = new Schema<SiteSettingsDoc>({
   address: { type: String, trim: true, default: "Calle 00 # 00-00\nBarrio Ejemplo, Ciudad" },
   addressMapUrl: { type: String, trim: true },
-  schedule: {
-    type: [scheduleLineSchema],
-    default: () => [
-      { label: "Lun – Vie", hours: "7:00 – 19:00" },
-      { label: "Sábados", hours: "8:00 – 20:00" },
-      { label: "Domingos", hours: "8:00 – 15:00" },
-    ],
+  openingHours: {
+    type: [openingHoursSchema],
+    default: () => DEFAULT_OPENING_HOURS.map((h) => ({ ...h })),
   },
   phone: { type: String, trim: true, default: "+57 300 000 0000" },
   email: { type: String, trim: true, default: "hola@laquinta.example" },

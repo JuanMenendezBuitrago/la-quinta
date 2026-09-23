@@ -4,7 +4,7 @@ import type { SheetsCell, SheetsExportKind } from "./model";
 
 // "2026-09-23 14:05": Google Sheets lo reconoce como fecha/hora en cualquier configuracion regional.
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", {
-  timeZone: env.googleSheets.timeZone,
+  timeZone: env.storeTimeZone,
   year: "numeric",
   month: "2-digit",
   day: "2-digit",

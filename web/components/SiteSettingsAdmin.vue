@@ -20,14 +20,18 @@
 
       <div class="field">
         <span class="muted">Horario</span>
-        <div v-for="(line, i) in form.schedule" :key="i" class="schedule-row">
-          <input v-model="line.label" type="text" placeholder="Días (ej. Lun – Vie)" />
-          <input v-model="line.hours" type="text" placeholder="Horas (ej. 7:00 – 19:00)" />
-          <button class="button secondary" type="button" aria-label="Quitar esta línea" @click="form.schedule.splice(i, 1)">✕</button>
+        <span class="muted">Los clientes solo pueden elegir recogida dentro de este horario. El pie de página lo muestra agrupando los días iguales.</span>
+        <div v-for="day in form.openingHours" :key="day.weekday" class="schedule-row">
+          <label class="day-toggle">
+            <input v-model="day.isOpen" type="checkbox" />
+            <span>{{ WEEKDAY_NAMES[day.weekday] }}</span>
+          </label>
+          <template v-if="day.isOpen">
+            <input v-model="day.open" type="time" required :aria-label="`${WEEKDAY_NAMES[day.weekday]}: abre`" />
+            <input v-model="day.close" type="time" required :aria-label="`${WEEKDAY_NAMES[day.weekday]}: cierra`" />
+          </template>
+          <span v-else class="muted closed-label">Cerrado</span>
         </div>
-        <button class="button secondary" type="button" @click="form.schedule.push({ label: '', hours: '' })">
-          + Añadir línea
-        </button>
       </div>
 
       <label class="field">
@@ -67,7 +71,25 @@
 </template>
 
 <script setup lang="ts">
-import { SITE_SETTINGS_QUERY, UPDATE_SITE_SETTINGS, type SiteSettings } from "~/composables/useSiteSettings";
+import {
+  SITE_SETTINGS_QUERY,
+  UPDATE_SITE_SETTINGS,
+  type OpeningHours,
+  type SiteSettings,
+} from "~/composables/useSiteSettings";
+
+const WEEKDAY_NAMES = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+// Siempre los 7 dias en el formulario. Un dia cerrado no guarda horas en la API: si se
+// reabre, se le proponen las del dia abierto anterior (lo mas habitual), editables.
+function openingHoursForm(hours: OpeningHours[]) {
+  let previous = { open: "08:00", close: "18:00" };
+  return [1, 2, 3, 4, 5, 6, 7].map((weekday) => {
+    const day = hours.find((h) => h.weekday === weekday);
+    if (day) previous = day;
+    return { weekday, isOpen: !!day, open: (day ?? previous).open, close: (day ?? previous).close };
+  });
+}
 
 const SOCIAL_FIELDS = [
   { key: "socialInstagram" as const, label: "Instagram", placeholder: "https://instagram.com/…" },
@@ -84,7 +106,7 @@ function emptyForm() {
   return {
     address: "",
     addressMapUrl: "",
-    schedule: [] as { label: string; hours: string }[],
+    openingHours: openingHoursForm([]),
     phone: "",
     email: "",
     socialInstagram: "",
@@ -104,7 +126,7 @@ watch(
     Object.assign(form, {
       address: val.address ?? "",
       addressMapUrl: val.addressMapUrl ?? "",
-      schedule: val.schedule.map((l) => ({ ...l })),
+      openingHours: openingHoursForm(val.openingHours),
       phone: val.phone ?? "",
       email: val.email ?? "",
       socialInstagram: val.socialInstagram ?? "",
@@ -131,9 +153,9 @@ async function submit() {
       input: {
         address: form.address.trim() || null,
         addressMapUrl: form.addressMapUrl.trim() || null,
-        schedule: form.schedule
-          .map((l) => ({ label: l.label.trim(), hours: l.hours.trim() }))
-          .filter((l) => l.label && l.hours),
+        openingHours: form.openingHours
+          .filter((d) => d.isOpen)
+          .map(({ weekday, open, close }) => ({ weekday, open, close })),
         phone: form.phone.trim() || null,
         email: form.email.trim() || null,
         socialInstagram: form.socialInstagram.trim() || null,
@@ -169,12 +191,19 @@ onBeforeUnmount(() => {
   gap: 8px;
   align-items: center;
 }
+/* minmax(0, …) + min-width: 0: los input type="time" tienen un ancho minimo intrinseco que,
+   si no, desborda la tarjeta en pantallas de movil. */
+.schedule-row { grid-template-columns: minmax(0, 7rem) minmax(0, 1fr) minmax(0, 1fr); }
+.schedule-row input[type="time"] { min-width: 0; padding: 8px; }
+.day-toggle { display: flex; align-items: center; justify-content: flex-start; gap: 8px; font-size: 14px; font-weight: 600; }
+.day-toggle input { width: auto; margin: 0; }
+.closed-label { grid-column: span 2; }
 .social-row { grid-template-columns: 90px 1fr auto; }
 .social-label { font-size: 13px; font-weight: 600; color: var(--text); }
 
 .form-actions { margin-top: 4px; }
 
-textarea, input[type="text"], input[type="url"], input[type="tel"], input[type="email"] {
+textarea, input[type="text"], input[type="url"], input[type="tel"], input[type="email"], input[type="time"] {
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;

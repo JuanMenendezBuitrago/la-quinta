@@ -20,6 +20,8 @@ export const env = {
   // Cadena de conexion SMTP completa, p. ej. "smtps://usuario%40gmail.com:contraseña@smtp.gmail.com:465".
   // Si no esta definida, el codigo se imprime en los logs (modo desarrollo) en vez de enviarse.
   smtpUrl: process.env.SMTP_URL || null,
+  // Zona horaria de la tienda: horario de apertura, horas de recogida y fechas exportadas.
+  storeTimeZone: process.env.STORE_TIME_ZONE || "America/Bogota",
   smtpFrom: process.env.SMTP_FROM ?? '"La Quinta" <no-reply@laquinta.local>',
   // Exportacion de pedidos entregados a Google Sheets. Si falta alguno de los tres primeros
   // valores, la exportacion queda desactivada (el resto de la API funciona igual).
@@ -30,6 +32,5 @@ export const env = {
     serviceAccountKey: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n") || null,
     sheetName: process.env.GOOGLE_SHEETS_TAB || "Pedidos", // pedidos entregados
     cancelledSheetName: process.env.GOOGLE_SHEETS_CANCELLED_TAB || "Cancelados",
-    timeZone: process.env.GOOGLE_SHEETS_TIMEZONE || "America/Bogota",
   },
 };

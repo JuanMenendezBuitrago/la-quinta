@@ -48,8 +48,15 @@
           <circle cx="12" cy="12" r="9" />
           <path d="M12 7v5l3.5 2" />
         </svg>
-        <input id="pickup" v-model="pickupSlot" type="datetime-local" :min="minPickupSlot" />
+        <input
+          id="pickup"
+          v-model="pickupSlot"
+          type="datetime-local"
+          :min="minPickupSlot"
+          @input="pickupTouched = true"
+        />
       </div>
+      <p v-if="pickupProblem" class="muted pickup-problem" role="alert">{{ pickupProblem }}</p>
 
       <template v-if="!customer">
         <p class="muted" style="margin-top: 16px">
@@ -84,6 +91,8 @@ import { gql } from "graphql-tag";
 import { useCart } from "~/composables/useCart";
 import { useAuth } from "~/composables/useAuth";
 import { useLightbox } from "~/composables/useLightbox";
+import { SITE_SETTINGS_QUERY, type SiteSettings } from "~/composables/useSiteSettings";
+import { firstPickupSlot, pickupOutsideHoursReason } from "~/composables/useStoreTime";
 import ImageLightbox from "~/components/ImageLightbox.vue";
 
 const CREATE_ORDER = gql`
@@ -102,9 +111,29 @@ const { customer } = useAuth();
 
 const { toStoreInput, fromStoreInput } = useStoreTime();
 
+// Mismo query que el pie de pagina: sale de la cache de Apollo, sin otra peticion.
+const { result: settingsResult } = useQuery<{ siteSettings: SiteSettings }>(SITE_SETTINGS_QUERY);
+const openingHours = computed(() => settingsResult.value?.siteSettings.openingHours ?? null);
+
 // El input muestra y recoge la hora de la tienda (ver useStoreTime), no la del navegador.
-const pickupSlot = ref(toStoreInput(new Date(Date.now() + 30 * 60 * 1000)));
+// Por defecto, dentro de media hora; si a esa hora la tienda esta cerrada, en la siguiente apertura.
+const earliestPickup = toStoreInput(new Date(Date.now() + 30 * 60 * 1000));
+const pickupSlot = ref(earliestPickup);
 const minPickupSlot = toStoreInput(new Date());
+// Si el cliente ya ha elegido una hora, no se le cambia aunque el horario llegue despues.
+const pickupTouched = ref(false);
+watch(
+  openingHours,
+  (hours) => {
+    if (!hours || pickupTouched.value) return;
+    pickupSlot.value = firstPickupSlot(earliestPickup, hours) ?? earliestPickup;
+  },
+  { immediate: true }
+);
+
+const pickupProblem = computed(() =>
+  openingHours.value && pickupSlot.value ? pickupOutsideHoursReason(pickupSlot.value, openingHours.value) : null
+);
 const submitting = ref(false);
 const orderError = ref("");
 // Codigo del pedido recien creado; vacio mientras no se haya confirmado.
@@ -120,6 +149,10 @@ function formatPrice(priceCents: number) {
 
 async function submitOrder() {
   if (lines.value.length === 0) return;
+  if (pickupProblem.value) {
+    orderError.value = pickupProblem.value;
+    return;
+  }
   submitting.value = true;
   orderError.value = "";
 
@@ -228,6 +261,8 @@ async function submitOrder() {
   font-size: 14px;
 }
 .pickup-field input:focus { outline: none; }
+
+.pickup-problem { margin-top: 8px; color: var(--danger); }
 
 .confirm-card { margin-top: 20px; border-color: var(--accent); background: rgba(201, 161, 90, 0.08); }
 .confirm-card .order-code {

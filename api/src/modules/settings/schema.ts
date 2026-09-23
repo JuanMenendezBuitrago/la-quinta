@@ -4,9 +4,20 @@ export const settingsTypeDefs = /* GraphQL */ `
     hours: String!
   }
 
-  input ScheduleLineInput {
-    label: String!
-    hours: String!
+  """Horario de un dia de la semana, en hora de la tienda."""
+  type OpeningHours {
+    """1 = lunes ... 7 = domingo."""
+    weekday: Int!
+    """HH:MM"""
+    open: String!
+    """HH:MM"""
+    close: String!
+  }
+
+  input OpeningHoursInput {
+    weekday: Int!
+    open: String!
+    close: String!
   }
 
   """Datos de contacto/redes que muestra el pie de pagina en toda la web."""
@@ -14,6 +25,9 @@ export const settingsTypeDefs = /* GraphQL */ `
     address: String
     """URL del enlace "Cómo llegar" (Google Maps u otro). Sin ella, el enlace no se muestra."""
     addressMapUrl: String
+    """Dias abiertos; el dia que no aparece, la tienda esta cerrada. Limita las horas de recogida."""
+    openingHours: [OpeningHours!]!
+    """Lineas para mostrar, generadas a partir de openingHours ("Lun – Vie", "7:00 – 19:00")."""
     schedule: [ScheduleLine!]!
     phone: String
     email: String
@@ -27,7 +41,7 @@ export const settingsTypeDefs = /* GraphQL */ `
   input SiteSettingsInput {
     address: String
     addressMapUrl: String
-    schedule: [ScheduleLineInput!]
+    openingHours: [OpeningHoursInput!]
     phone: String
     email: String
     socialInstagram: String

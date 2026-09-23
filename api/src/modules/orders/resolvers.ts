@@ -6,6 +6,8 @@ import { User } from "../users/model";
 import { EVENTS } from "../../config/pubsub";
 import { internalEvents, INTERNAL_EVENTS } from "../../config/events";
 import { buildClosedPayload } from "./closed";
+import { getOpeningHours } from "../settings/resolvers";
+import { pickupOutsideHoursReason } from "../settings/openingHours";
 
 const ACTIVE_STATUSES: OrderStatus[] = ["NUEVO", "EN_PREPARACION", "LISTO"];
 const MAX_CODE_ATTEMPTS = 5;
@@ -58,6 +60,8 @@ export const ordersResolvers = {
       if (pickupSlot.getTime() < Date.now() - PICKUP_PAST_TOLERANCE_MS) {
         throw new Error("La hora de recogida ya ha pasado: elige una hora a partir de ahora");
       }
+      const closedReason = pickupOutsideHoursReason(pickupSlot, await getOpeningHours());
+      if (closedReason) throw new Error(closedReason);
 
       const menuItems = await MenuItem.find({
         _id: { $in: args.items.map((i) => i.menuItemId) },

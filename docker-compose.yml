@@ -24,6 +24,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       API_PORT: ${API_PORT:-4000}
+      STORE_TIME_ZONE: ${STORE_TIME_ZONE:-America/Bogota}
       MONGO_URI: mongodb://mongo:27017/${MONGO_INITDB_DATABASE:-laquinta}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-cambia-esto-por-un-secreto-largo-y-aleatorio}
@@ -35,7 +36,6 @@ services:
       GOOGLE_SHEETS_SPREADSHEET_ID: ${GOOGLE_SHEETS_SPREADSHEET_ID:-}
       GOOGLE_SHEETS_TAB: ${GOOGLE_SHEETS_TAB:-Pedidos}
       GOOGLE_SHEETS_CANCELLED_TAB: ${GOOGLE_SHEETS_CANCELLED_TAB:-Cancelados}
-      GOOGLE_SHEETS_TIMEZONE: ${GOOGLE_SHEETS_TIMEZONE:-America/Bogota}
       GOOGLE_SERVICE_ACCOUNT_EMAIL: ${GOOGLE_SERVICE_ACCOUNT_EMAIL:-}
       GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY:-}
     volumes:
@@ -56,7 +56,7 @@ services:
       NUXT_PUBLIC_GRAPHQL_HTTP: ${NUXT_PUBLIC_GRAPHQL_HTTP:-http://localhost:4000/graphql}
       NUXT_PUBLIC_GRAPHQL_WS: ${NUXT_PUBLIC_GRAPHQL_WS:-ws://localhost:4000/graphql}
       GRAPHQL_HTTP_INTERNAL: ${GRAPHQL_HTTP_INTERNAL:-http://api:4000/graphql}
-      NUXT_PUBLIC_STORE_TIME_ZONE: ${NUXT_PUBLIC_STORE_TIME_ZONE:-America/Bogota}
+      NUXT_PUBLIC_STORE_TIME_ZONE: ${STORE_TIME_ZONE:-America/Bogota}
     volumes:
       - ./web:/app
       - web-node-modules:/app/node_modules

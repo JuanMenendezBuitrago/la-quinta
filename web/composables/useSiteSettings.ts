@@ -7,6 +7,11 @@ export const SITE_SETTINGS_QUERY = gql`
     siteSettings {
       address
       addressMapUrl
+      openingHours {
+        weekday
+        open
+        close
+      }
       schedule {
         label
         hours
@@ -26,6 +31,11 @@ export const UPDATE_SITE_SETTINGS = gql`
     updateSiteSettings(input: $input) {
       address
       addressMapUrl
+      openingHours {
+        weekday
+        open
+        close
+      }
       schedule {
         label
         hours
@@ -45,9 +55,19 @@ export interface ScheduleLine {
   hours: string;
 }
 
+/** Horario de un dia, en hora de la tienda. weekday: 1 = lunes ... 7 = domingo. */
+export interface OpeningHours {
+  weekday: number;
+  open: string;
+  close: string;
+}
+
 export interface SiteSettings {
   address: string | null;
   addressMapUrl: string | null;
+  /** Dias abiertos; el que no aparece, la tienda esta cerrada. */
+  openingHours: OpeningHours[];
+  /** Lineas para mostrar, generadas por la API a partir de openingHours. */
   schedule: ScheduleLine[];
   phone: string | null;
   email: string | null;
