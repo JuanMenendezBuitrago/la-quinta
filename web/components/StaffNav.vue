@@ -1,19 +1,25 @@
 <template>
   <nav ref="navEl" class="staff-nav" aria-label="Panel de personal">
-    <!-- Movil: un solo boton que despliega todo el menu agrupado -->
+    <!-- Movil: icono hamburguesa que abre el menu como panel lateral desde la derecha -->
     <button
       type="button"
       class="menu-toggle"
       :aria-expanded="open === 'mobile'"
       aria-controls="staff-menu"
+      :aria-label="`Abrir menú (sección actual: ${currentLabel})`"
       @click="toggle('mobile')"
     >
-      <span class="current">{{ currentLabel }}</span>
-      <span v-if="totalBadge" class="badge" :class="{ danger: badges.inventario }">{{ totalBadge }}</span>
-      <span class="burger" aria-hidden="true">☰</span>
+      <span class="burger" aria-hidden="true"><span /><span /><span /></span>
+      <span v-if="totalBadge" class="badge toggle-badge" :class="{ danger: badges.inventario }">{{ totalBadge }}</span>
     </button>
 
+    <div class="backdrop" :class="{ visible: open === 'mobile' }" aria-hidden="true" @click="open = null" />
+
     <div id="staff-menu" class="menu" :class="{ 'mobile-open': open === 'mobile' }">
+      <div class="panel-head">
+        <span>Panel de personal</span>
+        <button ref="closeBtn" type="button" class="close" aria-label="Cerrar menú" @click="open = null">×</button>
+      </div>
       <div v-for="group in groups" :key="group.id" class="group" :class="{ active: group.id === currentGroup }">
         <!-- Grupo con una sola entrada: enlace directo, sin desplegable -->
         <template v-if="group.entries.length === 1">
@@ -128,6 +134,20 @@ function entryAttrs(entry: Entry) {
 // --- Desplegables: uno abierto a la vez; se cierran al elegir, al pulsar fuera o con Escape ---
 const open = ref<string | null>(null);
 const navEl = ref<HTMLElement | null>(null);
+const closeBtn = ref<HTMLElement | null>(null);
+
+// Panel lateral abierto: la pagina de detras no se desplaza y el foco va al boton de cerrar.
+watch(open, async (value, previous) => {
+  if (!import.meta.client) return;
+  const mobileOpen = value === "mobile";
+  document.body.style.overflow = mobileOpen ? "hidden" : "";
+  if (mobileOpen) {
+    await nextTick();
+    closeBtn.value?.focus();
+  } else if (previous === "mobile") {
+    navEl.value?.querySelector<HTMLElement>(".menu-toggle")?.focus();
+  }
+});
 
 function toggle(id: string) {
   // En movil los grupos van siempre desplegados dentro del panel: el clic en un grupo no lo cierra.
@@ -164,6 +184,7 @@ onBeforeUnmount(() => {
   document.removeEventListener("pointerdown", onPointerDown);
   document.removeEventListener("keydown", onKeydown);
   mobileQuery?.removeEventListener("change", closeAll);
+  document.body.style.overflow = "";
 });
 </script>
 
@@ -251,34 +272,84 @@ onBeforeUnmount(() => {
 .who { padding: 8px 12px 6px; font-size: 13px; }
 
 /* --- Movil: boton "seccion actual ☰" y panel con todos los grupos desplegados --- */
+.backdrop, .panel-head { display: none; }
+
+/* --- Movil: hamburguesa y panel lateral que entra desde la derecha --- */
 @media (max-width: 760px) {
-  .menu-toggle { display: inline-flex; color: var(--text); }
-  .current { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .burger { font-size: 16px; }
+  .menu-toggle {
+    display: inline-flex;
+    position: relative;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: none;
+    color: var(--text);
+  }
+  .burger { display: flex; flex-direction: column; justify-content: space-between; width: 22px; height: 16px; }
+  .burger span { display: block; height: 2px; border-radius: 2px; background: currentColor; }
+  .toggle-badge { position: absolute; top: 2px; right: 0; }
+
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+    z-index: 90;
+  }
+  .backdrop.visible { opacity: 1; visibility: visible; transition: opacity 0.25s ease; }
 
   .menu {
-    display: none;
-    position: absolute;
-    top: calc(100% + 10px);
+    display: flex;
+    position: fixed;
+    top: 0;
     right: 0;
-    width: min(320px, calc(100vw - 32px));
-    max-height: calc(100vh - 90px);
+    bottom: 0;
+    width: min(320px, 85vw);
     overflow-y: auto;
+    overscroll-behavior: contain;
     flex-direction: column;
     align-items: stretch;
     gap: 4px;
-    padding: 8px;
+    padding: 8px 8px 24px;
     background: var(--bg);
-    border: 1px solid var(--border-strong);
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
-    z-index: 60;
+    border-left: 1px solid var(--border-strong);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.14);
+    transform: translateX(100%);
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0s linear 0.25s;
+    z-index: 100;
   }
-  .menu.mobile-open { display: flex; }
+  .menu.mobile-open { transform: translateX(0); visibility: visible; transition: transform 0.25s ease; }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 4px 8px 12px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-serif);
+    font-size: 17px;
+  }
+  .close {
+    width: 44px;
+    height: 44px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .close:hover { color: var(--text); }
+
   .group + .group { border-top: 1px solid var(--border); padding-top: 4px; }
   .group-title {
     display: block;
-    padding: 8px 12px 2px;
+    padding: 10px 12px 2px;
     color: var(--text-muted);
     font-size: 11.5px;
     font-weight: 700;
@@ -289,15 +360,16 @@ onBeforeUnmount(() => {
   .group-btn.single {
     width: 100%;
     justify-content: space-between;
-    padding: 10px 12px;
+    padding: 12px;
     color: var(--text);
-    font-size: 14.5px;
+    font-size: 15px;
     font-weight: 400;
     text-transform: none;
     letter-spacing: 0;
     border-bottom: none;
   }
-  .group-btn.single.current { font-weight: 600; }
+  .group-btn.single.current { color: var(--accent); font-weight: 600; }
+  .entry { padding: 12px; font-size: 15px; }
   .dropdown,
   .dropdown.align-right {
     display: block;
@@ -309,5 +381,9 @@ onBeforeUnmount(() => {
     background: transparent;
   }
   .account .who { display: none; }
+}
+
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .menu, .menu.mobile-open, .backdrop, .backdrop.visible { transition: none; }
 }
 </style>
