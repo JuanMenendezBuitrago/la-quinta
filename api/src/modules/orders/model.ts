@@ -69,6 +69,9 @@ const orderSchema = new Schema<OrderDoc>({
   updatedAt: { type: Date, default: () => new Date() },
 });
 
+// Historial de un cliente (Mis pedidos, ficha de cliente en el panel).
+orderSchema.index({ customerId: 1, createdAt: -1 });
+
 orderSchema.pre("save", function (next) {
   this.updatedAt = new Date();
   next();

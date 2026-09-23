@@ -8,6 +8,9 @@ export interface LoyaltyTransactionDoc {
   stamps: number; // positivo = ganados, negativo = canjeados
   reason: LoyaltyReason;
   orderId?: Types.ObjectId;
+  // Movimientos hechos por el personal (ajustes y canjes en mostrador): quien y por que.
+  staffId?: Types.ObjectId;
+  note?: string;
   createdAt: Date;
 }
 
@@ -19,6 +22,8 @@ const loyaltyTransactionSchema = new Schema<LoyaltyTransactionDoc>({
   stamps: { type: Number, required: true },
   reason: { type: String, enum: ["pedido", "canje", "ajuste"], required: true },
   orderId: { type: Schema.Types.ObjectId, ref: "Order" },
+  staffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
+  note: { type: String, trim: true, maxlength: 200 },
   createdAt: { type: Date, default: () => new Date() },
 });
 

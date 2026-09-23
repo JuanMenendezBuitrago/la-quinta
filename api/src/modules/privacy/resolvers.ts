@@ -50,6 +50,7 @@ export const privacyResolvers = {
           sellos: loyalty.map((t) => ({
             sellos: t.stamps,
             motivo: t.reason,
+            nota: t.note ?? null,
             pedido: t.orderId ? orderCodes.get(t.orderId.toString()) ?? null : null,
             fecha: t.createdAt,
           })),

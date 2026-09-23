@@ -122,6 +122,11 @@
         <MenuAdmin />
       </section>
 
+      <!-- Clientes (solo gestion) -->
+      <section v-else-if="activeTab === 'clientes'">
+        <CustomersAdmin />
+      </section>
+
       <!-- Personal (solo gestion) -->
       <section v-else-if="activeTab === 'personal'">
         <StaffAdmin />
@@ -210,6 +215,8 @@ async function doCancel(order: any) {
 const ALL_TABS = [
   { id: "cola", label: "Cola", roles: ["barra", "gestion"] },
   { id: "historial", label: "Historial", roles: ["barra", "gestion"] },
+  // Solo gestion: muestra datos personales (la politica de privacidad limita el acceso a quien lo necesita).
+  { id: "clientes", label: "Clientes", roles: ["gestion"] },
   { id: "carta", label: "Carta", roles: ["gestion"] },
   { id: "personal", label: "Personal", roles: ["gestion"] },
   { id: "pie", label: "Pie de página", roles: ["gestion"] },
