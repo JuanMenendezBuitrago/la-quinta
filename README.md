@@ -109,8 +109,11 @@ abiertas" en la propuesta de arquitectura):
   receta de cada producto (`api/src/modules/inventory/listeners.ts`); los
   productos sin receta no descuentan nada. El stock es un saldo cacheado del
   ledger `StockMovement`; si alguna vez no cuadra, `docker compose exec api
-  node dist/scripts/recalc-stock.js` lo recalcula. Falta cargar los insumos
-  y las recetas reales.
+  node dist/scripts/recalc-stock.js` lo recalcula. Los insumos y recetas de
+  la hoja de costeo están en `api/src/scripts/data/recetas-carta.ts` y se
+  cargan con `node dist/scripts/import-recipes.js` (solo crea lo que falta;
+  `--overwrite` sustituye recetas, `--dry-run` solo muestra). Falta el
+  primer conteo con el stock real y fijar los mínimos de aviso.
 - **Iconos de la PWA.** `web/public/icons/` está vacío; el manifest de
   `nuxt.config.ts` los referencia pero faltan los ficheros.
 - Tests automatizados, CI/CD y el despliegue a un VPS (la propuesta de
