@@ -91,10 +91,9 @@ abiertas" en la propuesta de arquitectura):
   consola de la API (`api/src/modules/users/auth.ts`, función
   `requestOtp`) para poder probar el flujo sin contratar un proveedor.
   Hay que conectar un proveedor de email o SMS.
-- **Regla de fidelización.** Está fijada en
-  `api/src/modules/loyalty/model.ts` (`LOYALTY_RULES`) como 1 sello por
-  cada 5€ y recompensa a los 10 sellos — ajustar cuando se decida la regla
-  definitiva.
+- **Regla de fidelización.** Decidida: 1 sello por cada producto de un
+  pedido entregado y recompensa a los 10 sellos
+  (`api/src/modules/loyalty/model.ts`, `LOYALTY_RULES`).
 - **Iconos de la PWA.** `web/public/icons/` está vacío; el manifest de
   `nuxt.config.ts` los referencia pero faltan los ficheros.
 - Tests automatizados, CI/CD y el despliegue a un VPS (la propuesta de

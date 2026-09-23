@@ -27,11 +27,10 @@ export const LoyaltyTransaction = model<LoyaltyTransactionDoc>(
   loyaltyTransactionSchema
 );
 
-// Reglas del programa (fase 1). Documentadas como decision abierta en la
-// propuesta de arquitectura: ajustar aqui cuando el negocio las cierre.
+// Reglas del programa: la tarjeta de cafeteria clasica. Cada producto de un pedido entregado
+// suma un sello (2 cafes = 2 sellos), sea cual sea su precio. Cambiar la regla solo afecta a
+// los pedidos entregados despues: los sellos ya ganados quedan en el ledger tal cual.
 export const LOYALTY_RULES = {
-  // Los precios de la carta estan en pesos colombianos (priceCents = pesos, sin decimales),
-  // asi que este valor son pesos: 1 sello por cada $10.000 COP de pedido entregado.
-  pesosPerStamp: 10000,
+  stampsPerUnit: 1,
   rewardThresholdStamps: 10, // a partir de 10 sellos, hay recompensa disponible
 };
