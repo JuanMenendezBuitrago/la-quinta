@@ -17,10 +17,10 @@
     <template v-else>
       <header class="account-hero staff-hero">
         <div>
-          <h1>Panel de personal</h1>
+          <p class="eyebrow">Panel de personal</p>
+          <h1>{{ sectionLabel }}</h1>
         </div>
-        <div class="staff-who">
-          <span class="muted">{{ staff.name }} · {{ staff.role }}</span>
+        <div v-if="activeTab === 'cola'" class="staff-who">
           <button
             v-if="notificationPermission === 'default'"
             class="button secondary"
@@ -35,23 +35,8 @@
           <span v-else-if="notificationPermission === 'denied'" class="muted notif-status">
             Notificaciones bloqueadas por el navegador
           </span>
-          <button class="button secondary" type="button" @click="logout">Salir</button>
         </div>
       </header>
-
-      <nav class="tabs" aria-label="Secciones">
-        <button
-          v-for="tab in visibleTabs"
-          :key="tab.id"
-          type="button"
-          class="tab-btn"
-          :class="{ active: activeTab === tab.id }"
-          @click="selectTab(tab.id)"
-        >
-          {{ tab.label }}
-          <span v-if="tab.id === 'inventario' && lowCount" class="tab-badge" :aria-label="`${lowCount} bajo mínimo`">{{ lowCount }}</span>
-        </button>
-      </nav>
 
       <p v-if="stockAlert && activeTab !== 'inventario'" class="stock-alert" role="alert">
         <span>
@@ -201,8 +186,9 @@ import HeroAdmin from "~/components/HeroAdmin.vue";
 import CustomerLookup from "~/components/CustomerLookup.vue";
 import InventoryAdmin from "~/components/InventoryAdmin.vue";
 import { formatQty, useInventoryAlerts } from "~/composables/useInventory";
+import { goToSection, STAFF_SECTIONS, useStaffBadges, useStaffSection } from "~/composables/useStaffSections";
 
-const { staff, login, logout } = useStaffAuth();
+const { staff, login } = useStaffAuth();
 const email = ref("");
 const password = ref("");
 const loggingIn = ref(false);
@@ -278,28 +264,29 @@ async function doCancel(order: any) {
   pendingCancelId.value = "";
 }
 
-const ALL_TABS = [
-  { id: "cola", label: "Cola", roles: ["barra", "gestion"] },
-  { id: "tomar", label: "Tomar pedido", roles: ["barra", "gestion"] },
-  { id: "historial", label: "Historial", roles: ["barra", "gestion"] },
-  { id: "inventario", label: "Inventario", roles: ["barra", "gestion"] },
-  // Solo gestion: muestra datos personales (la politica de privacidad limita el acceso a quien lo necesita).
-  { id: "clientes", label: "Clientes", roles: ["gestion"] },
-  { id: "carta", label: "Carta", roles: ["gestion"] },
-  { id: "portada", label: "Portada", roles: ["gestion"] },
-  { id: "personal", label: "Personal", roles: ["gestion"] },
-  { id: "pie", label: "Pie de página", roles: ["gestion"] },
-] as const;
+// Secciones y grupos del menu: composables/useStaffSections.ts. El menu (components/StaffNav.vue,
+// en la barra superior) cambia la seccion en la URL; aqui solo se lee.
+const activeTab = useStaffSection();
+const sectionLabel = computed(() => STAFF_SECTIONS.find((s) => s.id === activeTab.value)?.label ?? "");
+const selectTab = goToSection;
 
-type TabId = (typeof ALL_TABS)[number]["id"];
-const activeTab = ref<TabId>("cola");
-const visibleTabs = computed(() => ALL_TABS.filter((t) => t.roles.includes(staff.value?.role)));
+watch(
+  [activeTab, isLoggedIn],
+  ([id, loggedIn]) => {
+    if (id === "inventario") stockAlert.value = null;
+    if (id === "historial" && loggedIn) loadHistory();
+  },
+  { immediate: true }
+);
 
-function selectTab(id: TabId) {
-  activeTab.value = id;
-  if (id === "inventario") stockAlert.value = null;
-  if (id === "historial") loadHistory();
-}
+// Contadores del menu: pedidos en cola e insumos bajo minimo.
+const badges = useStaffBadges();
+watchEffect(() => {
+  badges.value = {
+    cola: groupedQueue.value.reduce((sum: number, g: { orders: unknown[] }) => sum + g.orders.length, 0),
+    inventario: lowCount.value,
+  };
+});
 </script>
 
 <style scoped>
@@ -334,39 +321,6 @@ function selectTab(id: TabId) {
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--accent);
-}
-
-.tabs { display: flex; gap: 4px; overflow-x: auto; margin-bottom: 22px; border-bottom: 1px solid var(--border-strong); }
-.tab-btn {
-  flex-shrink: 0;
-  /* el borde inferior se superpone al de .tabs para que la linea quede continua */
-  margin-bottom: -1px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--text-muted);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 10px 14px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-.tab-btn:hover { color: var(--text); }
-.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-.tab-badge {
-  display: inline-block;
-  min-width: 1.6em;
-  margin-left: 4px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--danger);
-  color: var(--bg);
-  font-size: 11px;
-  text-align: center;
 }
 
 .stock-alert {

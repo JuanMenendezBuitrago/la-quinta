@@ -1,7 +1,6 @@
 <template>
   <section class="hero-admin">
     <div class="hero-admin-header">
-      <h2>Portada</h2>
       <button class="button" type="button" :disabled="formOpen" @click="startCreate">+ Nueva diapositiva</button>
     </div>
     <p class="muted intro">

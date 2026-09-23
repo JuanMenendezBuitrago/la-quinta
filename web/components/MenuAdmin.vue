@@ -1,7 +1,6 @@
 <template>
   <section class="menu-admin">
     <div class="menu-admin-header">
-      <h2>Gestión de la carta</h2>
       <button class="button" :disabled="formOpen" @click="startCreate()">+ Nuevo producto</button>
     </div>
 

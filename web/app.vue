@@ -1,10 +1,15 @@
 <template>
   <div>
     <header class="topbar">
-      <NuxtLink to="/" class="brand" aria-label="La Quinta">
+      <NuxtLink :to="inStaff && staff ? '/staff' : '/'" class="brand" aria-label="La Quinta">
         <img src="/logo.png" alt="La Quinta" class="brand-logo" />
       </NuxtLink>
-      <nav>
+      <!-- En el panel de personal, su propio menu: carrito y "mi cuenta" son cosas del cliente -->
+      <StaffNav v-if="inStaff && staff" />
+      <nav v-else-if="inStaff">
+        <NuxtLink to="/">Ver carta</NuxtLink>
+      </nav>
+      <nav v-else>
         <NuxtLink to="/">Carta</NuxtLink>
         <NuxtLink to="/carrito">Carrito<span v-if="cartCount" class="badge">{{ cartCount }}</span></NuxtLink>
         <NuxtLink to="/cuenta">Mi cuenta</NuxtLink>
@@ -17,9 +22,13 @@
 
 <script setup lang="ts">
 import { useCart } from "~/composables/useCart";
-import { restoreSession } from "~/composables/useAuth";
+import { restoreSession, useStaffAuth } from "~/composables/useAuth";
+import StaffNav from "~/components/StaffNav.vue";
 
 const { cartCount } = useCart();
+const { staff } = useStaffAuth();
+const route = useRoute();
+const inStaff = computed(() => route.path === "/staff" || route.path.startsWith("/staff/"));
 
 // Recupera la sesion (cliente o personal) a partir de la cookie del token.
 await useAsyncData("session", async () => {

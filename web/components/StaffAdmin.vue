@@ -1,7 +1,6 @@
 <template>
   <section class="staff-admin">
     <div class="staff-admin-header">
-      <h2>Personal</h2>
       <button class="button" :disabled="formOpen" @click="startCreate()">+ Nueva cuenta</button>
     </div>
 

@@ -1,6 +1,5 @@
 <template>
   <section class="settings-admin">
-    <h2>Pie de página</h2>
     <p class="muted">Estos datos se muestran en el pie de página de toda la web.</p>
 
     <p v-if="loading" class="muted">Cargando…</p>
