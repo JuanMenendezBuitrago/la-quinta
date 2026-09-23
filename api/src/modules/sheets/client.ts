@@ -90,12 +90,27 @@ export function ensureSheet(kind: SheetsExportKind) {
  * columnas enteras hasta que coincidan: las filas ya escritas y el formato se conservan.
  * Si las columnas no son las mismas (renombradas a mano, etc.) no se toca nada y se avisa.
  */
-async function reorderColumns(tab: string, sheetId: number, current: string[], header: string[]) {
-  if (current.join("\t") === header.join("\t")) return;
-  if (current.length !== header.length || [...current].sort().join("\t") !== [...header].sort().join("\t")) {
-    console.warn(`[sheets] la cabecera de "${tab}" no coincide con la esperada; no se reordena`, { current, header });
+async function reorderColumns(tab: string, sheetId: number, currentHeader: string[], header: string[]) {
+  if (currentHeader.join("\t") === header.join("\t")) return;
+  const unknown = currentHeader.filter((title) => !header.includes(title));
+  if (unknown.length || new Set(currentHeader).size !== currentHeader.length) {
+    console.warn(`[sheets] la cabecera de "${tab}" no coincide con la esperada; no se reordena`, { currentHeader, header });
     return;
   }
+
+  // Columnas nuevas (p. ej. "Origen"): se añaden al final de la cabecera y luego se colocan en su
+  // sitio con el resto. Las filas ya escritas quedan con esa celda vacia.
+  const missing = header.filter((title) => !currentHeader.includes(title));
+  if (missing.length) {
+    await getClient().request({
+      url: spreadsheetUrl(`/values/${range(tab, `${columnLetter(currentHeader.length)}1`)}?valueInputOption=RAW`),
+      method: "PUT",
+      data: { values: [missing] },
+    });
+    console.log(`[sheets] columnas añadidas a "${tab}": ${missing.join(", ")}`);
+  }
+  const current = [...currentHeader, ...missing];
+  if (current.join("\t") === header.join("\t")) return;
 
   // De izquierda a derecha: la columna que toca en la posicion i siempre esta a su derecha (j > i),
   // asi que destinationIndex = i vale tambien en coordenadas previas al movimiento.
@@ -156,6 +171,38 @@ export async function replaceInRows(
       url: spreadsheetUrl("/values:batchUpdate"),
       method: "POST",
       data: { valueInputOption: "RAW", data: updates },
+    });
+  }
+  return updates.length;
+}
+
+/**
+ * Rellena las celdas vacias de la columna `targetTitle` con el valor que corresponda al
+ * "ID pedido" de cada fila (p. ej. una columna nueva en filas escritas antes de existir).
+ * Las filas cuyo pedido no esta en `valueByOrderId` se dejan como estan. Devuelve cuantas cambio.
+ */
+export async function fillEmptyCells(kind: SheetsExportKind, targetTitle: string, valueByOrderId: Map<string, string>) {
+  await ensureSheet(kind);
+  const tab = sheetTab(kind);
+  const { data } = await getClient().request<{ values?: SheetsCell[][] }>({
+    url: spreadsheetUrl(`/values/${range(tab, "A:ZZ")}`),
+  });
+  const [header = [], ...rows] = data.values ?? [];
+  const idCol = header.indexOf("ID pedido");
+  const targetCol = header.indexOf(targetTitle);
+  if (idCol < 0 || targetCol < 0) throw new Error(`"${tab}" no tiene las columnas "ID pedido" y "${targetTitle}"`);
+
+  const updates = rows.flatMap((row, i) => {
+    const value = valueByOrderId.get(String(row[idCol] ?? ""));
+    return value && !String(row[targetCol] ?? "")
+      ? [{ range: `'${tab.replace(/'/g, "''")}'!${columnLetter(targetCol)}${i + 2}`, values: [[value]] }]
+      : [];
+  });
+  if (updates.length) {
+    await getClient().request({
+      url: spreadsheetUrl("/values:batchUpdate"),
+      method: "POST",
+      data: { valueInputOption: "USER_ENTERED", data: updates },
     });
   }
   return updates.length;
