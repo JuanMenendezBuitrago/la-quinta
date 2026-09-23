@@ -8,7 +8,7 @@ import type { OrderDoc } from "./model";
  * la fecha del cambio de estado).
  */
 export async function buildClosedPayload<S extends OrderClosedPayload["status"]>(
-  order: Pick<OrderDoc, "_id" | "code" | "customerId" | "items" | "totalCents" | "pickupSlot">,
+  order: Pick<OrderDoc, "_id" | "code" | "customerId" | "items" | "totalCents" | "pickupSlot" | "source" | "serviceType" | "table">,
   status: S,
   closedAt: Date | null
 ): Promise<OrderClosedPayload & { status: S }> {
@@ -25,6 +25,9 @@ export async function buildClosedPayload<S extends OrderClosedPayload["status"]>
     customerCode: customer?.customerCode ?? "",
     items: order.items.map((i) => ({ name: i.name, quantity: i.quantity, priceCents: i.priceCents })),
     pickupSlot: order.pickupSlot.toISOString(),
+    source: order.source ?? "WEB",
+    serviceType: order.serviceType ?? null,
+    table: order.table ?? null,
     closedAt: closedAt?.toISOString() ?? null,
   };
 }

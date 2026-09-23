@@ -20,6 +20,14 @@ function text(value: string): string {
   return /^[=+\-@]/.test(value) ? `'${value}` : value;
 }
 
+/** "Web", "Mesa 7" o "Para llevar". Vacio en pedidos encolados antes de guardar el origen. */
+export function originLabel(p: Pick<OrderClosedPayload, "source" | "serviceType" | "table">): string {
+  if (p.serviceType === "MESA") return text(`Mesa ${p.table ?? ""}`.trim());
+  if (p.serviceType === "LLEVAR") return "Para llevar";
+  if (p.source === "WEB") return "Web";
+  return "";
+}
+
 interface Column {
   title: string;
   value: (p: OrderClosedPayload) => SheetsCell;
@@ -42,6 +50,7 @@ export function sheetColumns(kind: SheetsExportKind): Column[] {
     { title: "Código cliente", value: (p) => p.customerCode },
     { title: CLOSED_AT_TITLE[kind], value: (p) => (p.closedAt ? dateFormatter.format(new Date(p.closedAt)) : "") },
     { title: "Recogida", value: (p) => dateFormatter.format(new Date(p.pickupSlot)) },
+    { title: "Origen", value: originLabel },
     { title: "Cliente", value: (p) => text(p.customerName) },
     { title: "Productos", value: (p) => text(p.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")) },
     { title: "Unidades", value: (p) => p.items.reduce((sum, i) => sum + i.quantity, 0) },
