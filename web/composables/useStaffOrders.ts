@@ -71,7 +71,7 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
   // siempre se reemplaza por un array u objeto nuevo. Mutar un array congelado no avisa con
   // un error visible: la excepcion queda atrapada dentro del observable de Apollo y la unica
   // señal es que la cola deja de actualizarse en vivo sin explicacion.
-  const { onResult } = useQuery(QUEUE_QUERY, null, () => ({ enabled: enabled.value }));
+  const { onResult, refetch: refetchQueue } = useQuery(QUEUE_QUERY, null, () => ({ enabled: enabled.value }));
   onResult((r: any) => {
     if (r.data?.orderQueue) orders.value = [...r.data.orderQueue];
   });
@@ -151,13 +151,36 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
   function nextStatusLabel(status: string) {
     return NEXT_LABEL[status];
   }
+  // Pedido con un cambio de estado en curso: sus botones se desactivan para evitar el doble clic.
+  const busyOrderId = ref("");
+  const actionError = ref("");
+
+  /**
+   * La API rechaza las transiciones no validas (p. ej. si otra persona ya movio el pedido):
+   * se muestra el motivo y se recarga la cola para ver el estado real. Devuelve si se aplico.
+   */
+  async function changeStatus(order: any, status: string) {
+    if (busyOrderId.value) return false;
+    busyOrderId.value = order.id;
+    actionError.value = "";
+    try {
+      await setStatus({ id: order.id, status });
+      return true;
+    } catch (err: any) {
+      actionError.value = err?.message ?? "No se pudo cambiar el estado del pedido";
+      await refetchQueue()?.catch(() => {});
+      return false;
+    } finally {
+      busyOrderId.value = "";
+    }
+  }
   async function advance(order: any) {
     const status = nextStatus(order.status);
-    if (!status) return;
-    await setStatus({ id: order.id, status });
+    if (!status) return false;
+    return changeStatus(order, status);
   }
   async function cancelOrder(order: any) {
-    await setStatus({ id: order.id, status: "CANCELADO" });
+    return changeStatus(order, "CANCELADO");
   }
 
   function statusLabel(status: string) {
@@ -178,6 +201,8 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     loadHistory,
     advance,
     cancelOrder,
+    busyOrderId,
+    actionError,
     nextStatus,
     nextStatusLabel,
     statusLabel,

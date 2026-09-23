@@ -53,6 +53,10 @@
       </nav>
 
       <!-- Cola -->
+      <p v-if="activeTab === 'cola' && actionError" class="action-error" role="alert">
+        {{ actionError }}
+        <button class="button secondary" type="button" @click="actionError = ''">Cerrar</button>
+      </p>
       <section v-if="activeTab === 'cola'" class="queue-board">
         <div v-for="group in groupedQueue" :key="group.status" class="queue-column">
           <h2>{{ statusLabel(group.status) }} ({{ group.orders.length }})</h2>
@@ -72,14 +76,27 @@
 
             <div v-if="pendingCancelId === order.id" class="order-actions">
               <span class="muted">¿Cancelar?</span>
-              <button class="button secondary" type="button" @click="doCancel(order)">Sí</button>
+              <button class="button secondary" type="button" :disabled="busyOrderId === order.id" @click="doCancel(order)">Sí</button>
               <button class="button secondary" type="button" @click="pendingCancelId = ''">No</button>
             </div>
             <div v-else class="order-actions">
-              <button v-if="nextStatus(order.status)" class="button" type="button" @click="advance(order)">
+              <button
+                v-if="nextStatus(order.status)"
+                class="button"
+                type="button"
+                :disabled="busyOrderId === order.id"
+                @click="advance(order)"
+              >
                 {{ nextStatusLabel(order.status) }}
               </button>
-              <button class="button secondary" type="button" @click="pendingCancelId = order.id">Cancelar</button>
+              <button
+                class="button secondary"
+                type="button"
+                :disabled="busyOrderId === order.id"
+                @click="pendingCancelId = order.id"
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>
@@ -173,6 +190,8 @@ const {
   loadHistory,
   advance,
   cancelOrder,
+  busyOrderId,
+  actionError,
   nextStatus,
   nextStatusLabel,
   statusLabel,
@@ -215,6 +234,18 @@ function selectTab(id: TabId) {
 .notif-status { font-size: 12.5px; white-space: nowrap; }
 
 .login-card { max-width: 320px; }
+
+.action-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  color: var(--danger);
+}
 
 .order-code {
   display: block;

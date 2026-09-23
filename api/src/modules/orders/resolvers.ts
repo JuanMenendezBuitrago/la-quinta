@@ -1,6 +1,6 @@
 import { withFilter } from "graphql-subscriptions";
 import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
-import { Order, OrderStatus, generateOrderCode, isDuplicateCodeError } from "./model";
+import { ALLOWED_FROM, Order, OrderStatus, STATUS_LABELS, generateOrderCode, isDuplicateCodeError } from "./model";
 import { MenuItem } from "../menu/model";
 import { User } from "../users/model";
 import { EVENTS } from "../../config/pubsub";
@@ -97,13 +97,22 @@ export const ordersResolvers = {
     ) => {
       requireStaff(ctx, ["barra", "gestion"]);
 
-      const order = await Order.findByIdAndUpdate(
-        args.id,
-        // findByIdAndUpdate no pasa por el hook pre("save"): updatedAt se fija aqui a mano.
+      // La comprobacion del estado de origen va dentro del propio update: si dos personas
+      // actuan a la vez sobre el mismo pedido, solo una lo consigue (y solo se emite un evento,
+      // asi que no se suman sellos dos veces ni se exporta dos veces).
+      const order = await Order.findOneAndUpdate(
+        { _id: args.id, status: { $in: ALLOWED_FROM[args.status] } },
+        // findOneAndUpdate no pasa por el hook pre("save"): updatedAt se fija aqui a mano.
         { status: args.status, updatedAt: new Date() },
         { new: true }
       );
-      if (!order) throw new Error("Pedido no encontrado");
+      if (!order) {
+        const current = await Order.findById(args.id).select("status code").lean();
+        if (!current) throw new Error("Pedido no encontrado");
+        throw new Error(
+          `El pedido ${current.code} esta "${STATUS_LABELS[current.status]}" y no puede pasar a "${STATUS_LABELS[args.status]}"`
+        );
+      }
 
       await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
       await ctx.pubsub.publish(EVENTS.ORDER_STATUS_CHANGED, { orderStatusChanged: order });

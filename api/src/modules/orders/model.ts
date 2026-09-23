@@ -3,6 +3,27 @@ import { Schema, model, Types } from "mongoose";
 
 export type OrderStatus = "NUEVO" | "EN_PREPARACION" | "LISTO" | "ENTREGADO" | "CANCELADO";
 
+/**
+ * Desde que estados se puede llegar a cada uno. El flujo es lineal
+ * (NUEVO -> EN_PREPARACION -> LISTO -> ENTREGADO), se puede cancelar mientras el pedido
+ * este activo, y ENTREGADO y CANCELADO son finales: no se sale de ellos.
+ */
+export const ALLOWED_FROM: Record<OrderStatus, OrderStatus[]> = {
+  NUEVO: [],
+  EN_PREPARACION: ["NUEVO"],
+  LISTO: ["EN_PREPARACION"],
+  ENTREGADO: ["LISTO"],
+  CANCELADO: ["NUEVO", "EN_PREPARACION", "LISTO"],
+};
+
+export const STATUS_LABELS: Record<OrderStatus, string> = {
+  NUEVO: "nuevo",
+  EN_PREPARACION: "en preparacion",
+  LISTO: "listo",
+  ENTREGADO: "entregado",
+  CANCELADO: "cancelado",
+};
+
 export interface OrderLineDoc {
   menuItemId: Types.ObjectId;
   name: string; // snapshot: si el precio de la carta cambia despues, el pedido no se altera
