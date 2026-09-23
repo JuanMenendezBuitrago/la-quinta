@@ -12,7 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed": "ts-node-dev --transpile-only --exit-child src/scripts/seed.ts",
     "import-menu": "ts-node-dev --transpile-only --exit-child src/scripts/import-menu.ts",
-    "export-sheets": "ts-node-dev --transpile-only --exit-child src/scripts/export-orders-to-sheets.ts"
+    "export-sheets": "ts-node-dev --transpile-only --exit-child src/scripts/export-orders-to-sheets.ts",
+    "recalc-stock": "ts-node-dev --transpile-only --exit-child src/scripts/recalc-stock.ts"
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",

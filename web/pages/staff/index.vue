@@ -49,8 +49,20 @@
           @click="selectTab(tab.id)"
         >
           {{ tab.label }}
+          <span v-if="tab.id === 'inventario' && lowCount" class="tab-badge" :aria-label="`${lowCount} bajo mínimo`">{{ lowCount }}</span>
         </button>
       </nav>
+
+      <p v-if="stockAlert && activeTab !== 'inventario'" class="stock-alert" role="alert">
+        <span>
+          Queda poco <strong>{{ stockAlert.name }}</strong>: {{ formatQty(stockAlert.stock, stockAlert.unit) }}
+          (mínimo {{ formatQty(stockAlert.minStock, stockAlert.unit) }}).
+        </span>
+        <span class="stock-alert-actions">
+          <button class="button secondary" type="button" @click="selectTab('inventario')">Ver inventario</button>
+          <button class="button secondary" type="button" @click="stockAlert = null">Cerrar</button>
+        </span>
+      </p>
 
       <!-- Cola -->
       <p v-if="activeTab === 'cola' && actionError" class="action-error" role="alert">
@@ -143,6 +155,11 @@
         </div>
       </section>
 
+      <!-- Inventario (barra registra; gestion ademas administra) -->
+      <section v-else-if="activeTab === 'inventario'">
+        <InventoryAdmin />
+      </section>
+
       <!-- Carta (solo gestion) -->
       <section v-else-if="activeTab === 'carta'">
         <MenuAdmin />
@@ -182,6 +199,8 @@ import CustomersAdmin from "~/components/CustomersAdmin.vue";
 import StaffOrderTaker from "~/components/StaffOrderTaker.vue";
 import HeroAdmin from "~/components/HeroAdmin.vue";
 import CustomerLookup from "~/components/CustomerLookup.vue";
+import InventoryAdmin from "~/components/InventoryAdmin.vue";
+import { formatQty, useInventoryAlerts } from "~/composables/useInventory";
 
 const { staff, login, logout } = useStaffAuth();
 const email = ref("");
@@ -243,6 +262,12 @@ const {
   requestNotificationPermission,
 } = useStaffOrders(isLoggedIn);
 
+const { lowCount, lastAlert: stockAlert } = useInventoryAlerts(isLoggedIn);
+// En la propia pestaña de inventario el aviso sobra (ya se ve en rojo): no se guarda para despues.
+watch(stockAlert, (alert) => {
+  if (alert && activeTab.value === "inventario") stockAlert.value = null;
+});
+
 const pendingCancelId = ref("");
 const assigningId = ref("");
 async function doAssign(order: any, customer: CustomerMatch) {
@@ -257,6 +282,7 @@ const ALL_TABS = [
   { id: "cola", label: "Cola", roles: ["barra", "gestion"] },
   { id: "tomar", label: "Tomar pedido", roles: ["barra", "gestion"] },
   { id: "historial", label: "Historial", roles: ["barra", "gestion"] },
+  { id: "inventario", label: "Inventario", roles: ["barra", "gestion"] },
   // Solo gestion: muestra datos personales (la politica de privacidad limita el acceso a quien lo necesita).
   { id: "clientes", label: "Clientes", roles: ["gestion"] },
   { id: "carta", label: "Carta", roles: ["gestion"] },
@@ -271,6 +297,7 @@ const visibleTabs = computed(() => ALL_TABS.filter((t) => t.roles.includes(staff
 
 function selectTab(id: TabId) {
   activeTab.value = id;
+  if (id === "inventario") stockAlert.value = null;
   if (id === "historial") loadHistory();
 }
 </script>
@@ -330,6 +357,30 @@ function selectTab(id: TabId) {
 }
 .tab-btn:hover { color: var(--text); }
 .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-badge {
+  display: inline-block;
+  min-width: 1.6em;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--bg);
+  font-size: 11px;
+  text-align: center;
+}
+
+.stock-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+}
+.stock-alert-actions { display: flex; gap: 8px; }
 
 .queue-board { display: flex; flex-direction: column; gap: 28px; }
 @media (min-width: 640px) {

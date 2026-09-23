@@ -17,6 +17,8 @@ import { customersTypeDefs } from "../modules/customers/schema";
 import { customersResolvers } from "../modules/customers/resolvers";
 import { heroTypeDefs } from "../modules/hero/schema";
 import { heroResolvers } from "../modules/hero/resolvers";
+import { inventoryTypeDefs } from "../modules/inventory/schema";
+import { inventoryResolvers } from "../modules/inventory/resolvers";
 
 // Tipos raiz: cada modulo los extiende con "extend type Query { ... }" etc.
 const rootTypeDefs = /* GraphQL */ `
@@ -41,6 +43,7 @@ const typeDefs = mergeTypeDefs([
   privacyTypeDefs,
   customersTypeDefs,
   heroTypeDefs,
+  inventoryTypeDefs,
 ]);
 
 const resolvers = mergeResolvers([
@@ -53,6 +56,7 @@ const resolvers = mergeResolvers([
   privacyResolvers,
   customersResolvers,
   heroResolvers,
+  inventoryResolvers,
 ]);
 
 export const schema = makeExecutableSchema({ typeDefs, resolvers });

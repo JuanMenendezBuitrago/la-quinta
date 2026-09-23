@@ -23,7 +23,11 @@ export async function buildClosedPayload<S extends OrderClosedPayload["status"]>
     code: order.code,
     customerName: customer?.name ?? "",
     customerCode: customer?.customerCode ?? "",
-    items: order.items.map((i) => ({ name: i.name, quantity: i.quantity, priceCents: i.priceCents })),
+    items: order.items.map((i) => ({
+      menuItemId: i.menuItemId.toString(),
+      name: i.name, quantity: i.quantity,
+      priceCents: i.priceCents,
+    })),
     pickupSlot: order.pickupSlot.toISOString(),
     source: order.source ?? "WEB",
     serviceType: order.serviceType ?? null,

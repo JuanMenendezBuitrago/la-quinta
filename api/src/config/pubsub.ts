@@ -7,6 +7,8 @@ import { redisPub, redisSub } from "./redis";
 export const EVENTS = {
   ORDER_QUEUE_UPDATED: "ORDER_QUEUE_UPDATED",
   ORDER_STATUS_CHANGED: "ORDER_STATUS_CHANGED",
+  // Un insumo acaba de bajar a su stock minimo (o menos): aviso al personal.
+  INVENTORY_LOW: "INVENTORY_LOW",
 } as const;
 
 export const pubsub = new RedisPubSub({

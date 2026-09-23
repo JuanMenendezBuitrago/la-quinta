@@ -37,7 +37,7 @@ export interface OrderClosedPayload {
   code: string;
   customerName: string;
   customerCode: string;
-  items: { name: string; quantity: number; priceCents: number }[];
+  items: { menuItemId: string; name: string; quantity: number; priceCents: number }[];
   pickupSlot: string;
   // Origen del pedido: WEB (el cliente) o STAFF (el personal, en mesa o para llevar).
   source?: "WEB" | "STAFF";

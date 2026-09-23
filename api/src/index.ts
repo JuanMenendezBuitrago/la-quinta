@@ -13,6 +13,7 @@ import { connectMongo } from "./config/db";
 import { schema } from "./graphql/schema";
 import { buildHttpContext, buildWsContext, GraphQLContext } from "./graphql/context";
 import { registerLoyaltyListeners } from "./modules/loyalty/listeners";
+import { registerInventoryListeners } from "./modules/inventory/listeners";
 import { registerSheetsListeners } from "./modules/sheets/listeners";
 import { backfillOrderCodes } from "./modules/orders/model";
 import { seedHeroSlidesOnce } from "./modules/hero/model";
@@ -23,6 +24,7 @@ async function main() {
   await backfillOrderCodes();
   await seedHeroSlidesOnce();
   registerLoyaltyListeners();
+  registerInventoryListeners();
   await registerSheetsListeners();
 
   const app = express();

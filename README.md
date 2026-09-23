@@ -103,6 +103,14 @@ abiertas" en la propuesta de arquitectura):
   Si se cambia la política, actualizar `PRIVACY_POLICY_VERSION`
   (`api/src/modules/users/model.ts`) y `POLICY_VERSION`
   (`web/pages/privacidad.vue`).
+- **Inventario.** Pestaña «Inventario» del panel: Barra registra entradas,
+  mermas y conteos; Gestión además da de alta insumos, define las recetas
+  y hace ajustes. Al entregar un pedido se descuentan los insumos de la
+  receta de cada producto (`api/src/modules/inventory/listeners.ts`); los
+  productos sin receta no descuentan nada. El stock es un saldo cacheado del
+  ledger `StockMovement`; si alguna vez no cuadra, `docker compose exec api
+  node dist/scripts/recalc-stock.js` lo recalcula. Falta cargar los insumos
+  y las recetas reales.
 - **Iconos de la PWA.** `web/public/icons/` está vacío; el manifest de
   `nuxt.config.ts` los referencia pero faltan los ficheros.
 - Tests automatizados, CI/CD y el despliegue a un VPS (la propuesta de
