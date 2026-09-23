@@ -1,13 +1,15 @@
 <template>
-  <section class="carousel" aria-roledescription="carrusel" aria-label="Ofertas y novedades" @mouseenter="paused = true" @mouseleave="paused = false" @touchstart.passive="paused = true">
+  <section v-if="slides.length" class="carousel" aria-roledescription="carrusel" aria-label="Ofertas y novedades" @mouseenter="paused = true" @mouseleave="paused = false" @touchstart.passive="paused = true">
     <div ref="track" class="track" @scroll.passive="onScroll">
-      <article v-for="(slide, i) in slides" :key="slide.id" class="slide" :class="`tone-${slide.tone}`" :aria-label="`${i + 1} de ${slides.length}`">
-        <span class="tag">{{ slide.tag }}</span>
-        <h2 class="slide-title">{{ slide.title }}</h2>
-        <p class="slide-text">{{ slide.text }}</p>
-      </article>
+      <HeroSlideCard
+        v-for="(slide, i) in slides"
+        :key="slide.id"
+        :slide="slide"
+        class="track-slide"
+        :aria-label="`${i + 1} de ${slides.length}`"
+      />
     </div>
-    <div class="dots" role="tablist">
+    <div v-if="slides.length > 1" class="dots" role="tablist">
       <button
         v-for="(slide, i) in slides"
         :key="slide.id"
@@ -24,13 +26,11 @@
 </template>
 
 <script setup lang="ts">
-// Contenido de ejemplo: más adelante vendrá de la API (ofertas, novedades, noticias…).
-const slides = [
-  { id: 1, tag: "Oferta", title: "2x1 en cafés de filtro", text: "Todos los martes de 8:00 a 11:00.", tone: "teal" },
-  { id: 2, tag: "Novedad", title: "Nuevo café de origen Huila", text: "Notas a panela, cítricos y chocolate.", tone: "brown" },
-  { id: 3, tag: "Noticia", title: "Taller de cata este sábado", text: "Aprende a distinguir aromas y sabores. Plazas limitadas.", tone: "olive" },
-  { id: 4, tag: "Fidelización", title: "Suma sellos con cada pedido", text: "Al décimo café, el siguiente es cortesía de la casa.", tone: "teal" },
-];
+import { HERO_SLIDES_QUERY, type HeroSlide } from "~/composables/useHeroSlides";
+
+// Las gestiona el personal en el panel ("Portada"): solo llegan las activas y vigentes hoy.
+const { result } = useQuery<{ heroSlides: HeroSlide[] }>(HERO_SLIDES_QUERY);
+const slides = computed(() => result.value?.heroSlides ?? []);
 
 const track = ref<HTMLElement | null>(null);
 const current = ref(0);
@@ -53,8 +53,8 @@ if (import.meta.client) {
   onMounted(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     timer = setInterval(() => {
-      if (paused.value) return;
-      goTo((current.value + 1) % slides.length);
+      if (paused.value || slides.value.length < 2) return;
+      goTo((current.value + 1) % slides.value.length);
     }, 5000);
   });
   onBeforeUnmount(() => {
@@ -75,32 +75,12 @@ if (import.meta.client) {
 }
 .track::-webkit-scrollbar { display: none; }
 
-.slide {
+/* Dentro del carrusel las esquinas las redondea .track (mas especifico que .slide de la tarjeta). */
+.track > .track-slide {
   flex: 0 0 100%;
   scroll-snap-align: start;
-  min-height: 150px;
-  padding: 20px 22px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 6px;
+  border-radius: 0;
 }
-.tone-teal { background: var(--accent); color: #3d5f5e; }
-.tone-brown { background: var(--color4); color: var(--bg); }
-.tone-olive { background: var(--color5); color: var(--bg); }
-
-.tag {
-  align-self: flex-start;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid currentColor;
-}
-.slide-title { color: inherit; font-size: 24px; line-height: 1.1; }
-.slide-text { margin: 0; font-size: 13.5px; opacity: 0.9; }
 
 .dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
 .dot {

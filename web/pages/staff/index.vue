@@ -153,6 +153,11 @@
         <CustomersAdmin />
       </section>
 
+      <!-- Portada de la carta (solo gestion) -->
+      <section v-else-if="activeTab === 'portada'">
+        <HeroAdmin />
+      </section>
+
       <!-- Personal (solo gestion) -->
       <section v-else-if="activeTab === 'personal'">
         <StaffAdmin />
@@ -175,6 +180,7 @@ import StaffAdmin from "~/components/StaffAdmin.vue";
 import SiteSettingsAdmin from "~/components/SiteSettingsAdmin.vue";
 import CustomersAdmin from "~/components/CustomersAdmin.vue";
 import StaffOrderTaker from "~/components/StaffOrderTaker.vue";
+import HeroAdmin from "~/components/HeroAdmin.vue";
 import CustomerLookup from "~/components/CustomerLookup.vue";
 
 const { staff, login, logout } = useStaffAuth();
@@ -254,6 +260,7 @@ const ALL_TABS = [
   // Solo gestion: muestra datos personales (la politica de privacidad limita el acceso a quien lo necesita).
   { id: "clientes", label: "Clientes", roles: ["gestion"] },
   { id: "carta", label: "Carta", roles: ["gestion"] },
+  { id: "portada", label: "Portada", roles: ["gestion"] },
   { id: "personal", label: "Personal", roles: ["gestion"] },
   { id: "pie", label: "Pie de página", roles: ["gestion"] },
 ] as const;
