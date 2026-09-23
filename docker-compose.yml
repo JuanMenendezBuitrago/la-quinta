@@ -56,6 +56,7 @@ services:
       NUXT_PUBLIC_GRAPHQL_HTTP: ${NUXT_PUBLIC_GRAPHQL_HTTP:-http://localhost:4000/graphql}
       NUXT_PUBLIC_GRAPHQL_WS: ${NUXT_PUBLIC_GRAPHQL_WS:-ws://localhost:4000/graphql}
       GRAPHQL_HTTP_INTERNAL: ${GRAPHQL_HTTP_INTERNAL:-http://api:4000/graphql}
+      NUXT_PUBLIC_STORE_TIME_ZONE: ${NUXT_PUBLIC_STORE_TIME_ZONE:-America/Bogota}
     volumes:
       - ./web:/app
       - web-node-modules:/app/node_modules

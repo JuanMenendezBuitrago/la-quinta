@@ -48,7 +48,7 @@
           <circle cx="12" cy="12" r="9" />
           <path d="M12 7v5l3.5 2" />
         </svg>
-        <input id="pickup" v-model="pickupSlot" type="datetime-local" />
+        <input id="pickup" v-model="pickupSlot" type="datetime-local" :min="minPickupSlot" />
       </div>
 
       <template v-if="!customer">
@@ -100,7 +100,11 @@ const CREATE_ORDER = gql`
 const { lines, setQuantity, totalCents, clear } = useCart();
 const { customer } = useAuth();
 
-const pickupSlot = ref(defaultPickupSlot());
+const { toStoreInput, fromStoreInput } = useStoreTime();
+
+// El input muestra y recoge la hora de la tienda (ver useStoreTime), no la del navegador.
+const pickupSlot = ref(toStoreInput(new Date(Date.now() + 30 * 60 * 1000)));
+const minPickupSlot = toStoreInput(new Date());
 const submitting = ref(false);
 const orderError = ref("");
 // Codigo del pedido recien creado; vacio mientras no se haya confirmado.
@@ -109,11 +113,6 @@ const confirmedOrder = ref("");
 const showCheckoutBar = computed(() => lines.value.length > 0 && !!customer.value && !confirmedOrder.value);
 
 const { lightboxUrl, openLightbox, closeLightbox } = useLightbox();
-
-function defaultPickupSlot() {
-  const inHalfHour = new Date(Date.now() + 30 * 60 * 1000);
-  return inHalfHour.toISOString().slice(0, 16);
-}
 
 function formatPrice(priceCents: number) {
   return priceCents.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
@@ -128,7 +127,7 @@ async function submitOrder() {
     const { mutate } = useMutation(CREATE_ORDER);
     const result = await mutate({
       items: lines.value.map((l) => ({ menuItemId: l.menuItemId, quantity: l.quantity })),
-      pickupSlot: new Date(pickupSlot.value).toISOString(),
+      pickupSlot: fromStoreInput(pickupSlot.value).toISOString(),
     });
     confirmedOrder.value = result?.data?.createOrder.code ?? "";
     clear();

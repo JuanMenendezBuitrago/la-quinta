@@ -170,9 +170,7 @@ async function redeem() {
   }
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" });
-}
+const { formatDateTime: formatDate } = useStoreTime();
 
 const STATUS_LABELS: Record<string, string> = {
   NUEVO: "Recibido",

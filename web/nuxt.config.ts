@@ -8,6 +8,8 @@ export default defineNuxtConfig({
     public: {
       graphqlHttp: process.env.NUXT_PUBLIC_GRAPHQL_HTTP || "http://localhost:4000/graphql",
       graphqlWs: process.env.NUXT_PUBLIC_GRAPHQL_WS || "ws://localhost:4000/graphql",
+      // Zona horaria de la tienda: en ella se eligen y muestran las horas de recogida.
+      storeTimeZone: process.env.NUXT_PUBLIC_STORE_TIME_ZONE || "America/Bogota",
     },
   },
 

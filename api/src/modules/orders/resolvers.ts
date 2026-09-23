@@ -9,6 +9,8 @@ import { buildClosedPayload } from "./closed";
 
 const ACTIVE_STATUSES: OrderStatus[] = ["NUEVO", "EN_PREPARACION", "LISTO"];
 const MAX_CODE_ATTEMPTS = 5;
+// Margen para relojes algo desfasados y para el rato que el cliente pasa en el carrito.
+const PICKUP_PAST_TOLERANCE_MS = 5 * 60 * 1000;
 
 export const ordersResolvers = {
   Query: {
@@ -51,6 +53,12 @@ export const ordersResolvers = {
       const customerId = requireCustomer(ctx);
       if (args.items.length === 0) throw new Error("El pedido no puede estar vacio");
 
+      const pickupSlot = new Date(args.pickupSlot);
+      if (Number.isNaN(pickupSlot.getTime())) throw new Error("La hora de recogida no es valida");
+      if (pickupSlot.getTime() < Date.now() - PICKUP_PAST_TOLERANCE_MS) {
+        throw new Error("La hora de recogida ya ha pasado: elige una hora a partir de ahora");
+      }
+
       const menuItems = await MenuItem.find({
         _id: { $in: args.items.map((i) => i.menuItemId) },
       });
@@ -78,7 +86,7 @@ export const ordersResolvers = {
             customerId,
             items: lines,
             totalCents,
-            pickupSlot: new Date(args.pickupSlot),
+            pickupSlot,
             status: "NUEVO",
           });
         } catch (err) {

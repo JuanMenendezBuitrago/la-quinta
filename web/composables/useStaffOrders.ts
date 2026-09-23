@@ -186,12 +186,7 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
   function statusLabel(status: string) {
     return STATUS_LABELS[status] ?? status;
   }
-  function formatTime(iso: string) {
-    return new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-  }
-  function formatDateTime(iso: string) {
-    return new Date(iso).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" });
-  }
+  const { formatTime, formatDateTime } = useStoreTime();
 
   return {
     orders,
