@@ -62,7 +62,7 @@
           <div v-for="order in detail.orders" :key="order.id" class="card row">
             <div class="row-info">
               <span class="code">{{ order.code }}</span>
-              <p>{{ order.items.map((i: { name: string; quantity: number }) => `${i.quantity}× ${i.name}`).join(", ") }}</p>
+              <p>{{ itemsSummary(order.items) }}</p>
               <p class="muted">{{ formatDateTime(order.createdAt) }} · {{ formatPrice(order.totalCents) }}</p>
             </div>
             <span class="status-badge" :class="`status-${order.status}`">{{ STATUS_LABELS[order.status] ?? order.status }}</span>
@@ -203,6 +203,9 @@ const REASON_LABELS: Record<string, string> = { pedido: "Pedido", canje: "Canje"
 const { formatDateTime } = useStoreTime();
 function formatDate(iso: string) {
   return formatDateTime(iso).replace(/,.*$/, "");
+}
+function itemsSummary(items: { name: string; quantity: number }[]) {
+  return items.map((i) => `${i.quantity}× ${i.name}`).join(", ");
 }
 function formatPrice(priceCents: number) {
   return priceCents.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
