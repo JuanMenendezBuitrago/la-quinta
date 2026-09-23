@@ -60,6 +60,14 @@
         </div>
       </div>
 
+      <div class="field">
+        <span class="muted">Responsable del tratamiento de datos</span>
+        <span class="muted">Aparecen en la política de privacidad. La ley exige identificar al responsable.</span>
+        <input v-model="form.legalName" type="text" placeholder="Razón social o nombre del titular" />
+        <input v-model="form.taxId" type="text" placeholder="NIT o cédula" />
+        <input v-model="form.privacyEmail" type="email" placeholder="Email para solicitudes sobre datos (si vacío, el de contacto)" />
+      </div>
+
       <p v-if="formError" class="muted" style="color: var(--danger)">{{ formError }}</p>
       <p v-if="saved" class="muted" style="color: var(--accent-strong)">Guardado ✓</p>
 
@@ -113,6 +121,9 @@ function emptyForm() {
     socialFacebook: "",
     socialTiktok: "",
     socialWhatsapp: "",
+    legalName: "",
+    taxId: "",
+    privacyEmail: "",
   };
 }
 
@@ -133,6 +144,9 @@ watch(
       socialFacebook: val.socialFacebook ?? "",
       socialTiktok: val.socialTiktok ?? "",
       socialWhatsapp: val.socialWhatsapp ?? "",
+      legalName: val.legalName ?? "",
+      taxId: val.taxId ?? "",
+      privacyEmail: val.privacyEmail ?? "",
     });
   },
   { immediate: true }
@@ -162,6 +176,9 @@ async function submit() {
         socialFacebook: form.socialFacebook.trim() || null,
         socialTiktok: form.socialTiktok.trim() || null,
         socialWhatsapp: form.socialWhatsapp.trim() || null,
+        legalName: form.legalName.trim() || null,
+        taxId: form.taxId.trim() || null,
+        privacyEmail: form.privacyEmail.trim() || null,
       },
     });
     await refetch();

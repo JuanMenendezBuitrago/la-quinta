@@ -4,7 +4,7 @@ import nodemailer from "nodemailer";
 import { randomInt } from "crypto";
 import { env } from "../../config/env";
 import { redisClient } from "../../config/redis";
-import { User, StaffUser, StaffRole } from "./model";
+import { User, StaffUser, StaffRole, PRIVACY_POLICY_VERSION, hasCurrentConsent } from "./model";
 
 // Transporter perezoso y reutilizado entre peticiones: crearlo abre la conexion SMTP,
 // no hace falta una por cada codigo enviado.
@@ -67,9 +67,9 @@ function customerLookupQuery(identifier: string) {
   return isEmail ? { email: identifier.toLowerCase() } : { phone: identifier };
 }
 
-/** Si ya existe cuenta con ese identificador (para no volver a pedir el nombre en el login). */
+/** Cliente con ese identificador, si existe (para no volver a pedir nombre ni autorizacion). */
 export async function findExistingCustomer(identifier: string) {
-  return User.findOne(customerLookupQuery(identifier)).select("_id").lean();
+  return User.findOne(customerLookupQuery(identifier)).select("_id privacyConsent").lean();
 }
 
 /**
@@ -97,23 +97,35 @@ export async function requestOtp(identifier: string): Promise<void> {
 export async function verifyOtpAndIssueToken(
   identifier: string,
   code: string,
-  name?: string
+  name?: string,
+  acceptPrivacyPolicy = false
 ): Promise<{ token: string; user: InstanceType<typeof User> }> {
   const stored = await redisClient.get(otpKey(identifier));
   if (!stored || stored !== code) {
     throw new Error("Codigo invalido o caducado");
   }
-  await redisClient.del(otpKey(identifier));
 
   const query = customerLookupQuery(identifier);
-
   let user = await User.findOne(query);
+
+  // Sin autorizacion expresa no se crea la cuenta (ni se deja entrar a quien la tiene de una
+  // version anterior de la politica). El codigo no se consume, para poder reintentar.
+  if (!(user && hasCurrentConsent(user)) && !acceptPrivacyPolicy) {
+    throw new Error("Para continuar tienes que aceptar la politica de tratamiento de datos");
+  }
+  await redisClient.del(otpKey(identifier));
+
+  const consent = { acceptedAt: new Date(), policyVersion: PRIVACY_POLICY_VERSION };
   if (!user) {
     user = await User.create({
       ...query,
       name: name?.trim() || "Cliente La Quinta",
       customerCode: generateCustomerCode(),
+      privacyConsent: consent,
     });
+  } else if (!hasCurrentConsent(user)) {
+    user.privacyConsent = consent;
+    await user.save();
   }
 
   const token = signToken({ sub: user._id.toString(), kind: "customer" });

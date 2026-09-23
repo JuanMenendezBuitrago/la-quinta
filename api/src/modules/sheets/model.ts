@@ -42,6 +42,33 @@ sheetsExportSchema.index({ status: 1, nextAttemptAt: 1 });
 export const SheetsExport = model<SheetsExportDoc>("SheetsExport", sheetsExportSchema);
 
 /**
+ * Clientes que han suprimido su cuenta y cuyo nombre hay que sustituir en las filas ya
+ * escritas en la hoja. Se procesa con la misma cola y reintentos que la exportacion.
+ */
+export interface SheetsAnonymizationDoc {
+  _id: Types.ObjectId;
+  customerCode: string;
+  status: SheetsExportStatus;
+  attempts: number;
+  lastError?: string;
+  nextAttemptAt: Date;
+  doneAt?: Date;
+  createdAt: Date;
+}
+
+const sheetsAnonymizationSchema = new Schema<SheetsAnonymizationDoc>({
+  customerCode: { type: String, required: true, unique: true },
+  status: { type: String, enum: ["PENDIENTE", "EXPORTADO"], default: "PENDIENTE" },
+  attempts: { type: Number, default: 0 },
+  lastError: { type: String },
+  nextAttemptAt: { type: Date, default: () => new Date() },
+  doneAt: { type: Date },
+  createdAt: { type: Date, default: () => new Date() },
+});
+
+export const SheetsAnonymization = model<SheetsAnonymizationDoc>("SheetsAnonymization", sheetsAnonymizationSchema);
+
+/**
  * Las filas encoladas antes de exportar cancelados no tienen `kind` y el indice unico era solo
  * por orderId: se completan y se sustituye el indice. Idempotente.
  */

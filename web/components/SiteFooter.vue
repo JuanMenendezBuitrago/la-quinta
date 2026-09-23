@@ -38,6 +38,7 @@
 
       <p class="legal">
         © {{ year }} La Quinta · Café de Especialidad · Todos los derechos reservados ·
+        <NuxtLink to="/privacidad" class="staff-link">Política de privacidad</NuxtLink> ·
         <NuxtLink to="/staff" class="staff-link">Acceso personal</NuxtLink>
       </p>
     </div>

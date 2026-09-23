@@ -7,8 +7,8 @@ const REQUEST_OTP = gql`
 `;
 
 const VERIFY_OTP = gql`
-  mutation VerifyOtp($identifier: String!, $code: String!, $name: String) {
-    verifyOtp(identifier: $identifier, code: $code, name: $name) {
+  mutation VerifyOtp($identifier: String!, $code: String!, $name: String, $acceptPrivacyPolicy: Boolean) {
+    verifyOtp(identifier: $identifier, code: $code, name: $name, acceptPrivacyPolicy: $acceptPrivacyPolicy) {
       token
       customer {
         id
@@ -21,11 +21,19 @@ const VERIFY_OTP = gql`
   }
 `;
 
-const CUSTOMER_EXISTS = gql`
-  query CustomerExists($identifier: String!) {
-    customerExists(identifier: $identifier)
+const LOGIN_REQUIREMENTS = gql`
+  query LoginRequirements($identifier: String!) {
+    loginRequirements(identifier: $identifier) {
+      askName
+      askPrivacyConsent
+    }
   }
 `;
+
+export interface LoginRequirements {
+  askName: boolean;
+  askPrivacyConsent: boolean;
+}
 
 const STAFF_LOGIN = gql`
   mutation StaffLogin($email: String!, $password: String!) {
@@ -91,19 +99,19 @@ export function useAuth() {
   const { mutate: requestOtp } = useMutation(REQUEST_OTP);
   const { mutate: verifyOtp } = useMutation(VERIFY_OTP);
 
-  /** Devuelve si ya existia cuenta con ese identificador, para que el paso siguiente del
-   * login (introducir el codigo) no vuelva a pedir el nombre a quien ya se registro. */
-  async function requestCode(identifier: string): Promise<boolean> {
+  /** Envia el codigo y devuelve que hay que pedir en el paso siguiente: el nombre (solo a
+   * clientes nuevos) y la autorizacion de datos (nuevos o sin la version vigente de la politica). */
+  async function requestCode(identifier: string): Promise<LoginRequirements> {
     const { defaultClient } = useNuxtApp().$apollo;
-    const [, existsResult] = await Promise.all([
+    const [, requirementsResult] = await Promise.all([
       requestOtp({ identifier }),
-      defaultClient.query({ query: CUSTOMER_EXISTS, variables: { identifier }, fetchPolicy: "network-only" }),
+      defaultClient.query({ query: LOGIN_REQUIREMENTS, variables: { identifier }, fetchPolicy: "network-only" }),
     ]);
-    return !!existsResult?.data?.customerExists;
+    return requirementsResult?.data?.loginRequirements ?? { askName: true, askPrivacyConsent: true };
   }
 
-  async function verifyCode(identifier: string, code: string, name?: string) {
-    const result = await verifyOtp({ identifier, code, name });
+  async function verifyCode(identifier: string, code: string, name?: string, acceptPrivacyPolicy?: boolean) {
+    const result = await verifyOtp({ identifier, code, name, acceptPrivacyPolicy });
     const payload = result?.data?.verifyOtp;
     if (!payload) throw new Error("No se pudo verificar el codigo");
     await onLogin(payload.token);

@@ -22,6 +22,10 @@ export interface SiteSettingsDoc {
   socialFacebook?: string;
   socialTiktok?: string;
   socialWhatsapp?: string;
+  // Responsable del tratamiento de datos (Ley 1581): los muestra la politica de privacidad.
+  legalName?: string;
+  taxId?: string;
+  privacyEmail?: string;
 }
 
 // Documento unico (singleton): siempre se lee/escribe con un findOneAndUpdate sin filtro,
@@ -40,6 +44,9 @@ const siteSettingsSchema = new Schema<SiteSettingsDoc>({
   socialFacebook: { type: String, trim: true },
   socialTiktok: { type: String, trim: true },
   socialWhatsapp: { type: String, trim: true },
+  legalName: { type: String, trim: true },
+  taxId: { type: String, trim: true },
+  privacyEmail: { type: String, trim: true, lowercase: true },
 });
 
 export const SiteSettings = model<SiteSettingsDoc>("SiteSettings", siteSettingsSchema);

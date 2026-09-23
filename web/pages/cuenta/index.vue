@@ -5,6 +5,9 @@
         <p class="eyebrow">Mi cuenta</p>
         <h1>Bienvenido</h1>
       </header>
+      <p v-if="accountDeleted" class="card deleted-notice" role="status">
+        Tu cuenta se ha eliminado. Hemos borrado tu nombre, email y teléfono.
+      </p>
       <p class="muted">Inicia sesión con tu email o teléfono para ver tus sellos y tus pedidos.</p>
       <LoginInline @logged-in="onLoggedIn" />
     </template>
@@ -65,6 +68,8 @@
           <span class="status" :data-status="order.status">{{ statusLabel(order.status) }}</span>
         </div>
       </section>
+
+      <MyDataSection @deleted="accountDeleted = true" />
     </template>
 
     <ImageLightbox :url="lightboxUrl" @close="closeLightbox" />
@@ -124,6 +129,7 @@ const STATUS_SUBSCRIPTION = gql`
 
 const { customer, logout } = useAuth();
 const redeeming = ref(false);
+const accountDeleted = ref(false);
 
 const { result: loyaltyResult, refetch: refetchLoyalty } = useQuery(LOYALTY_QUERY, null, () => ({
   enabled: !!customer.value,
@@ -186,6 +192,7 @@ function statusLabel(status: string) {
 
 <style scoped>
 .account-hero { margin-bottom: 22px; }
+.deleted-notice { margin-bottom: 16px; font-size: 14px; }
 
 .customer-card {
   display: flex;

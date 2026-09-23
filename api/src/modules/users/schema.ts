@@ -24,6 +24,14 @@ export const usersTypeDefs = /* GraphQL */ `
     customer: Customer!
   }
 
+  """Lo que hay que pedir en el paso del codigo del login."""
+  type LoginRequirements {
+    """Cliente nuevo: se le pide el nombre."""
+    askName: Boolean!
+    """Cliente nuevo o sin autorizacion para la version vigente de la politica de datos."""
+    askPrivacyConsent: Boolean!
+  }
+
   type StaffAuthPayload {
     token: String!
     staff: Staff!
@@ -36,16 +44,18 @@ export const usersTypeDefs = /* GraphQL */ `
     myStaffProfile: Staff
     """Listado de personal del local (requiere rol gestion)."""
     staffUsers: [Staff!]!
-    """Si ya existe una cuenta de cliente con ese email/telefono (para no pedir el nombre
-    de nuevo a quien ya se registro la primera vez)."""
-    customerExists(identifier: String!): Boolean!
+    """Que datos pedir en el login a ese email/telefono (nombre, autorizacion de datos)."""
+    loginRequirements(identifier: String!): LoginRequirements!
   }
 
   extend type Mutation {
     """Paso 1 del login: envia un codigo de un solo uso a email o telefono."""
     requestOtp(identifier: String!): Boolean!
-    """Paso 2 del login: valida el codigo y devuelve un token de sesion."""
-    verifyOtp(identifier: String!, code: String!, name: String): AuthPayload!
+    """Paso 2 del login: valida el codigo y devuelve un token de sesion. acceptPrivacyPolicy es
+    obligatorio (true) si loginRequirements pidio la autorizacion."""
+    verifyOtp(identifier: String!, code: String!, name: String, acceptPrivacyPolicy: Boolean): AuthPayload!
+    """Derecho de actualizacion: el cliente corrige su nombre."""
+    updateMyProfile(name: String!): Customer!
     """Login del equipo del local (usuario/contraseña)."""
     staffLogin(email: String!, password: String!): StaffAuthPayload!
     """Alta de personal (requiere rol gestion)."""

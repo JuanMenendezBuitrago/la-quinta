@@ -22,6 +22,9 @@ export const SITE_SETTINGS_QUERY = gql`
       socialFacebook
       socialTiktok
       socialWhatsapp
+      legalName
+      taxId
+      privacyEmail
     }
   }
 `;
@@ -46,6 +49,9 @@ export const UPDATE_SITE_SETTINGS = gql`
       socialFacebook
       socialTiktok
       socialWhatsapp
+      legalName
+      taxId
+      privacyEmail
     }
   }
 `;
@@ -75,4 +81,7 @@ export interface SiteSettings {
   socialFacebook: string | null;
   socialTiktok: string | null;
   socialWhatsapp: string | null;
+  legalName: string | null;
+  taxId: string | null;
+  privacyEmail: string | null;
 }

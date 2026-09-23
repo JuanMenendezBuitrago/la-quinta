@@ -1,5 +1,5 @@
-import { GraphQLContext, requireStaff } from "../../graphql/context";
-import { User, StaffUser } from "./model";
+import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
+import { User, StaffUser, hasCurrentConsent } from "./model";
 import { requestOtp, verifyOtpAndIssueToken, loginStaff, hashPassword, findExistingCustomer } from "./auth";
 
 export const usersResolvers = {
@@ -16,8 +16,9 @@ export const usersResolvers = {
       requireStaff(ctx, ["gestion"]);
       return StaffUser.find().sort({ name: 1 }).exec();
     },
-    customerExists: async (_: unknown, args: { identifier: string }) => {
-      return !!(await findExistingCustomer(args.identifier));
+    loginRequirements: async (_: unknown, args: { identifier: string }) => {
+      const existing = await findExistingCustomer(args.identifier);
+      return { askName: !existing, askPrivacyConsent: !(existing && hasCurrentConsent(existing)) };
     },
   },
   Mutation: {
@@ -27,14 +28,22 @@ export const usersResolvers = {
     },
     verifyOtp: async (
       _: unknown,
-      args: { identifier: string; code: string; name?: string }
+      args: { identifier: string; code: string; name?: string; acceptPrivacyPolicy?: boolean }
     ) => {
       const { token, user } = await verifyOtpAndIssueToken(
         args.identifier,
         args.code,
-        args.name
+        args.name,
+        args.acceptPrivacyPolicy === true
       );
       return { token, customer: user };
+    },
+    updateMyProfile: async (_: unknown, args: { name: string }, ctx: GraphQLContext) => {
+      const customerId = requireCustomer(ctx);
+      const name = args.name.trim();
+      if (!name) throw new Error("El nombre no puede estar vacio");
+      if (name.length > 80) throw new Error("El nombre es demasiado largo");
+      return User.findByIdAndUpdate(customerId, { name }, { new: true }).exec();
     },
     staffLogin: async (_: unknown, args: { email: string; password: string }) => {
       const { token, staff } = await loginStaff(args.email, args.password);

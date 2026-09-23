@@ -94,6 +94,15 @@ abiertas" en la propuesta de arquitectura):
 - **Regla de fidelización.** Decidida: 1 sello por cada producto de un
   pedido entregado y recompensa a los 10 sellos
   (`api/src/modules/loyalty/model.ts`, `LOYALTY_RULES`).
+- **Protección de datos (Ley 1581 de 2012).** Hay autorización en el login,
+  política en `/privacidad` y, en «Mi cuenta → Mis datos», corrección del
+  nombre, descarga de datos y supresión de la cuenta. Falta: completar la
+  razón social y el NIT del responsable (panel de personal → «Pie de
+  página»), revisar el texto de la política con un abogado y comprobar si
+  aplica la inscripción en el Registro Nacional de Bases de Datos de la SIC.
+  Si se cambia la política, actualizar `PRIVACY_POLICY_VERSION`
+  (`api/src/modules/users/model.ts`) y `POLICY_VERSION`
+  (`web/pages/privacidad.vue`).
 - **Iconos de la PWA.** `web/public/icons/` está vacío; el manifest de
   `nuxt.config.ts` los referencia pero faltan los ficheros.
 - Tests automatizados, CI/CD y el despliegue a un VPS (la propuesta de

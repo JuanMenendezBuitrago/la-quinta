@@ -114,6 +114,53 @@ async function reorderColumns(tab: string, sheetId: number, current: string[], h
   console.log(`[sheets] columnas de "${tab}" reordenadas: ${header.join(", ")}`);
 }
 
+function columnLetter(index: number) {
+  let n = index + 1;
+  let letters = "";
+  while (n > 0) {
+    letters = String.fromCharCode(65 + ((n - 1) % 26)) + letters;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letters;
+}
+
+/**
+ * Sustituye el valor de la columna `targetTitle` en las filas cuya columna `matchTitle` vale
+ * `matchValue` (p. ej. el nombre de un cliente, buscando por su codigo). Devuelve cuantas cambio.
+ * Las columnas se buscan por su titulo en la cabecera, no por posicion.
+ */
+export async function replaceInRows(
+  kind: SheetsExportKind,
+  matchTitle: string,
+  matchValue: string,
+  targetTitle: string,
+  replacement: string
+) {
+  await ensureSheet(kind);
+  const tab = sheetTab(kind);
+  const { data } = await getClient().request<{ values?: SheetsCell[][] }>({
+    url: spreadsheetUrl(`/values/${range(tab, "A:ZZ")}`),
+  });
+  const [header = [], ...rows] = data.values ?? [];
+  const matchCol = header.indexOf(matchTitle);
+  const targetCol = header.indexOf(targetTitle);
+  if (matchCol < 0 || targetCol < 0) throw new Error(`"${tab}" no tiene las columnas "${matchTitle}" y "${targetTitle}"`);
+
+  const updates = rows.flatMap((row, i) =>
+    String(row[matchCol] ?? "") === matchValue && row[targetCol] !== replacement
+      ? [{ range: `'${tab.replace(/'/g, "''")}'!${columnLetter(targetCol)}${i + 2}`, values: [[replacement]] }]
+      : []
+  );
+  if (updates.length) {
+    await getClient().request({
+      url: spreadsheetUrl("/values:batchUpdate"),
+      method: "POST",
+      data: { valueInputOption: "RAW", data: updates },
+    });
+  }
+  return updates.length;
+}
+
 /** Añade las filas al final de la pestaña correspondiente, en el mismo orden en que llegan. */
 export async function appendRows(kind: SheetsExportKind, rows: SheetsCell[][]) {
   await ensureSheet(kind);

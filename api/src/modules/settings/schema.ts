@@ -36,6 +36,12 @@ export const settingsTypeDefs = /* GraphQL */ `
     socialFacebook: String
     socialTiktok: String
     socialWhatsapp: String
+    """Responsable del tratamiento de datos: razon social o nombre del titular del negocio."""
+    legalName: String
+    """NIT o cedula del responsable."""
+    taxId: String
+    """Email donde los clientes ejercen sus derechos sobre sus datos (si falta, se usa email)."""
+    privacyEmail: String
   }
 
   input SiteSettingsInput {
@@ -48,6 +54,9 @@ export const settingsTypeDefs = /* GraphQL */ `
     socialFacebook: String
     socialTiktok: String
     socialWhatsapp: String
+    legalName: String
+    taxId: String
+    privacyEmail: String
   }
 
   extend type Query {

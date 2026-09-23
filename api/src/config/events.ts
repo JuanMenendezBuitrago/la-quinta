@@ -14,7 +14,17 @@ export const internalEvents = new EventEmitter();
 export const INTERNAL_EVENTS = {
   ORDER_DELIVERED: "order.delivered",
   ORDER_CANCELLED: "order.cancelled",
+  CUSTOMER_DELETED: "customer.deleted",
 } as const;
+
+/** Nombre que sustituye al del titular en todo lo que se conserva tras suprimir su cuenta. */
+export const DELETED_CUSTOMER_NAME = "Cliente eliminado";
+
+/** El titular ha suprimido su cuenta: cada modulo borra o anonimiza lo que tenga suyo. */
+export interface CustomerDeletedPayload {
+  customerId: string;
+  customerCode: string;
+}
 
 /** Pedido que ha llegado a un estado final (ENTREGADO o CANCELADO). */
 export interface OrderClosedPayload {
