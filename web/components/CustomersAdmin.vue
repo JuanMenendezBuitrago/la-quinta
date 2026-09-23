@@ -62,7 +62,7 @@
           <div v-for="order in detail.orders" :key="order.id" class="card row">
             <div class="row-info">
               <span class="code">{{ order.code }}</span>
-              <p>{{ order.items.map((i) => `${i.quantity}× ${i.name}`).join(", ") }}</p>
+              <p>{{ order.items.map((i: { name: string; quantity: number }) => `${i.quantity}× ${i.name}`).join(", ") }}</p>
               <p class="muted">{{ formatDateTime(order.createdAt) }} · {{ formatPrice(order.totalCents) }}</p>
             </div>
             <span class="status-badge" :class="`status-${order.status}`">{{ STATUS_LABELS[order.status] ?? order.status }}</span>

@@ -30,7 +30,7 @@ export interface CustomerDeletedPayload {
 export interface OrderClosedPayload {
   status: "ENTREGADO" | "CANCELADO";
   orderId: string;
-  customerId: string;
+  customerId: string | null; // null: pedido del personal sin cliente registrado
   totalCents: number;
   // Instantanea del pedido para los modulos que necesitan registrarlo (p. ej. "sheets")
   // sin tener que importar los modelos de "orders" o "users".

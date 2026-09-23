@@ -73,28 +73,11 @@
 </template>
 
 <script setup lang="ts">
-import { gql } from "graphql-tag";
 import { useCart } from "~/composables/useCart";
+import { MENU_QUERY } from "~/composables/useMenu";
 import { useLightbox } from "~/composables/useLightbox";
 import { useImageUrl } from "~/composables/useImageUrl";
 import ImageLightbox from "~/components/ImageLightbox.vue";
-
-const MENU_QUERY = gql`
-  query Menu {
-    menu {
-      id
-      name
-      items {
-        id
-        name
-        description
-        priceCents
-        allergens
-        imageUrl
-      }
-    }
-  }
-`;
 
 const { result, loading, error } = useQuery(MENU_QUERY);
 const menu = computed(() => result.value?.menu ?? []);

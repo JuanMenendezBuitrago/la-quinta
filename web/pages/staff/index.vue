@@ -69,9 +69,18 @@
           >
             <div class="order-info">
               <span class="order-code">{{ order.code }}</span>
-              <strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}
+              <template v-if="order.customer">
+                <strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}
+              </template>
+              <strong v-else class="muted">Sin cliente</strong>
               <p class="muted">{{ order.items.map((i: any) => `${i.quantity}× ${i.name}`).join(", ") }}</p>
-              <p class="muted">Recogida: {{ formatTime(order.pickupSlot) }}</p>
+              <p class="service">{{ serviceLabel(order) }}</p>
+              <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
+            </div>
+
+            <div v-if="assigningId === order.id" class="assign-box">
+              <CustomerLookup @found="doAssign(order, $event)" />
+              <button class="button secondary" type="button" @click="assigningId = ''">No asignar</button>
             </div>
 
             <div v-if="pendingCancelId === order.id" class="order-actions">
@@ -97,9 +106,23 @@
               >
                 Cancelar
               </button>
+              <button
+                v-if="!order.customer && assigningId !== order.id"
+                class="button secondary"
+                type="button"
+                :disabled="busyOrderId === order.id"
+                @click="assigningId = order.id"
+              >
+                Asignar cliente
+              </button>
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- Tomar pedido (mesero / barra) -->
+      <section v-else-if="activeTab === 'tomar'">
+        <StaffOrderTaker />
       </section>
 
       <!-- Historial -->
@@ -109,9 +132,12 @@
         <div v-for="order in historyOrders" :key="order.id" class="card history-row">
           <div class="order-info">
             <span class="order-code">{{ order.code }}</span>
+            <template v-if="order.customer">
               <strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}
+            </template>
+            <strong v-else class="muted">Sin cliente</strong>
             <p class="muted">{{ order.items.map((i: any) => `${i.quantity}× ${i.name}`).join(", ") }}</p>
-            <p class="muted">{{ formatDateTime(order.updatedAt) }}</p>
+            <p class="muted">{{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}</p>
           </div>
           <span class="status-badge" :class="`status-${order.status}`">{{ statusLabel(order.status) }}</span>
         </div>
@@ -142,11 +168,14 @@
 
 <script setup lang="ts">
 import { useStaffAuth } from "~/composables/useAuth";
-import { useStaffOrders } from "~/composables/useStaffOrders";
+import { useStaffOrders, type CustomerMatch } from "~/composables/useStaffOrders";
 import { primeAudio } from "~/composables/useOrderChime";
 import MenuAdmin from "~/components/MenuAdmin.vue";
 import StaffAdmin from "~/components/StaffAdmin.vue";
 import SiteSettingsAdmin from "~/components/SiteSettingsAdmin.vue";
+import CustomersAdmin from "~/components/CustomersAdmin.vue";
+import StaffOrderTaker from "~/components/StaffOrderTaker.vue";
+import CustomerLookup from "~/components/CustomerLookup.vue";
 
 const { staff, login, logout } = useStaffAuth();
 const email = ref("");
@@ -195,11 +224,13 @@ const {
   loadHistory,
   advance,
   cancelOrder,
+  assignCustomer,
   busyOrderId,
   actionError,
   nextStatus,
   nextStatusLabel,
   statusLabel,
+  serviceLabel,
   formatTime,
   formatDateTime,
   notificationPermission,
@@ -207,6 +238,10 @@ const {
 } = useStaffOrders(isLoggedIn);
 
 const pendingCancelId = ref("");
+const assigningId = ref("");
+async function doAssign(order: any, customer: CustomerMatch) {
+  if (await assignCustomer(order, customer)) assigningId.value = "";
+}
 async function doCancel(order: any) {
   await cancelOrder(order);
   pendingCancelId.value = "";
@@ -214,6 +249,7 @@ async function doCancel(order: any) {
 
 const ALL_TABS = [
   { id: "cola", label: "Cola", roles: ["barra", "gestion"] },
+  { id: "tomar", label: "Tomar pedido", roles: ["barra", "gestion"] },
   { id: "historial", label: "Historial", roles: ["barra", "gestion"] },
   // Solo gestion: muestra datos personales (la politica de privacidad limita el acceso a quien lo necesita).
   { id: "clientes", label: "Clientes", roles: ["gestion"] },
@@ -241,6 +277,9 @@ function selectTab(id: TabId) {
 .notif-status { font-size: 12.5px; white-space: nowrap; }
 
 .login-card { max-width: 320px; }
+
+.service { margin: 4px 0 0; font-weight: 600; color: var(--accent-strong); }
+.assign-box { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 
 .action-error {
   display: flex;

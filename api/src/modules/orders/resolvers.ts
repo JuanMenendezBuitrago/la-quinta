@@ -1,6 +1,7 @@
 import { withFilter } from "graphql-subscriptions";
 import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
-import { ALLOWED_FROM, Order, OrderStatus, STATUS_LABELS, generateOrderCode, isDuplicateCodeError } from "./model";
+import { ALLOWED_FROM, Order, OrderStatus, STATUS_LABELS, ServiceType } from "./model";
+import { buildOrderLines, createWithUniqueCode } from "./create";
 import { MenuItem } from "../menu/model";
 import { User } from "../users/model";
 import { EVENTS } from "../../config/pubsub";
@@ -10,9 +11,12 @@ import { getOpeningHours } from "../settings/resolvers";
 import { pickupOutsideHoursReason } from "../settings/openingHours";
 
 const ACTIVE_STATUSES: OrderStatus[] = ["NUEVO", "EN_PREPARACION", "LISTO"];
-const MAX_CODE_ATTEMPTS = 5;
 // Margen para relojes algo desfasados y para el rato que el cliente pasa en el carrito.
 const PICKUP_PAST_TOLERANCE_MS = 5 * 60 * 1000;
+
+async function activeCustomerExists(customerId: string) {
+  return !!(await User.exists({ _id: customerId, deletedAt: { $exists: false } }));
+}
 
 export const ordersResolvers = {
   Query: {
@@ -34,7 +38,7 @@ export const ordersResolvers = {
   },
   Order: {
     id: (doc: any) => doc._id.toString(),
-    customer: (doc: any) => User.findById(doc.customerId).exec(),
+    customer: (doc: any) => (doc.customerId ? User.findById(doc.customerId).exec() : null),
     // Por Redis los eventos viajan como JSON: las fechas llegan como string, no como Date.
     pickupSlot: (doc: any) => new Date(doc.pickupSlot).toISOString(),
     createdAt: (doc: any) => new Date(doc.createdAt).toISOString(),
@@ -63,39 +67,78 @@ export const ordersResolvers = {
       const closedReason = pickupOutsideHoursReason(pickupSlot, await getOpeningHours());
       if (closedReason) throw new Error(closedReason);
 
-      const menuItems = await MenuItem.find({
-        _id: { $in: args.items.map((i) => i.menuItemId) },
+      const { lines, totalCents } = await buildOrderLines(args.items);
+      const order = await createWithUniqueCode({
+        customerId: customerId as any,
+        source: "WEB",
+        items: lines,
+        totalCents,
+        pickupSlot,
+        status: "NUEVO",
       });
 
-      const lines = args.items.map((line) => {
-        const item = menuItems.find((m) => m._id.toString() === line.menuItemId);
-        if (!item) throw new Error(`Producto no encontrado: ${line.menuItemId}`);
-        if (!item.available) throw new Error(`"${item.name}" no esta disponible ahora`);
-        return {
-          menuItemId: item._id,
-          name: item.name,
-          priceCents: item.priceCents,
-          quantity: line.quantity,
+      await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
+      return order;
+    },
+
+    createStaffOrder: async (
+      _: unknown,
+      args: {
+        input: {
+          items: { menuItemId: string; quantity: number }[];
+          serviceType: ServiceType;
+          table?: string | null;
+          customerId?: string | null;
+          note?: string | null;
         };
+      },
+      ctx: GraphQLContext
+    ) => {
+      const staff = requireStaff(ctx, ["barra", "gestion"]);
+      const { input } = args;
+      const table = input.table?.trim() || undefined;
+      if (input.serviceType === "MESA" && !table) throw new Error("Indica el numero de mesa");
+      if (input.customerId && !(await activeCustomerExists(input.customerId))) throw new Error("Cliente no encontrado");
+
+      const { lines, totalCents } = await buildOrderLines(input.items);
+      // Lo toma el personal en el local: la recogida es ahora y no se valida contra el horario.
+      const order = await createWithUniqueCode({
+        customerId: (input.customerId || null) as any,
+        source: "STAFF",
+        serviceType: input.serviceType,
+        table: input.serviceType === "MESA" ? table : undefined,
+        note: input.note?.trim() || undefined,
+        createdByStaffId: staff.id as any,
+        items: lines,
+        totalCents,
+        pickupSlot: new Date(),
+        status: "NUEVO",
       });
 
-      const totalCents = lines.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
+      await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
+      return order;
+    },
 
-      // El indice unico de `code` es la garantia real; si coincide con uno existente se reintenta.
-      let order;
-      for (let attempt = 1; !order; attempt++) {
-        try {
-          order = await Order.create({
-            code: generateOrderCode(),
-            customerId,
-            items: lines,
-            totalCents,
-            pickupSlot,
-            status: "NUEVO",
-          });
-        } catch (err) {
-          if (!isDuplicateCodeError(err) || attempt >= MAX_CODE_ATTEMPTS) throw err;
-        }
+    assignOrderCustomer: async (
+      _: unknown,
+      args: { orderId: string; customerId: string },
+      ctx: GraphQLContext
+    ) => {
+      requireStaff(ctx, ["barra", "gestion"]);
+      if (!(await activeCustomerExists(args.customerId))) throw new Error("Cliente no encontrado");
+
+      // Solo pedidos activos y sin cliente: asi los sellos van a su cuenta al entregarlo, y no se
+      // puede "robar" un pedido que ya es de otro cliente.
+      const order = await Order.findOneAndUpdate(
+        { _id: args.orderId, status: { $in: ACTIVE_STATUSES }, customerId: null },
+        { customerId: args.customerId, updatedAt: new Date() },
+        { new: true }
+      );
+      if (!order) {
+        const current = await Order.findById(args.orderId).select("status customerId").lean();
+        if (!current) throw new Error("Pedido no encontrado");
+        if (current.customerId) throw new Error("El pedido ya tiene un cliente asignado");
+        throw new Error("Solo se puede asignar cliente a un pedido que no se ha entregado ni cancelado");
       }
 
       await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
@@ -158,6 +201,7 @@ export const ordersResolvers = {
         // Solo llegan los pedidos del cliente autenticado (se filtra por el token, no por un
         // argumento que el cliente podria falsear).
         (payload, _variables, ctx: GraphQLContext) =>
+          !!payload.orderStatusChanged.customerId &&
           payload.orderStatusChanged.customerId.toString() === ctx.customerId
       ),
     },

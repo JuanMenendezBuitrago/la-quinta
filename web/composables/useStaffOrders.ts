@@ -3,10 +3,21 @@ import type { ComputedRef, Ref } from "vue";
 import { playNewOrderChime } from "./useOrderChime";
 import { useOrderNotifications } from "./useOrderNotifications";
 
+/** Cliente identificado por el personal (lookupCustomer): solo nombre y codigo, sin contacto. */
+export interface CustomerMatch {
+  id: string;
+  name: string;
+  customerCode: string;
+}
+
 // Campos compartidos por la cola en vivo y el historial: mismo tipo `Order` en ambos casos.
 const ORDER_FIELDS = `
   id
   code
+  source
+  serviceType
+  table
+  note
   status
   pickupSlot
   updatedAt
@@ -29,6 +40,18 @@ const SET_STATUS = gql`
     setOrderStatus(id: $id, status: $status) {
       id
       status
+    }
+  }
+`;
+
+const ASSIGN_CUSTOMER = gql`
+  mutation AssignOrderCustomer($orderId: ID!, $customerId: ID!) {
+    assignOrderCustomer(orderId: $orderId, customerId: $customerId) {
+      id
+      customer {
+        name
+        customerCode
+      }
     }
   }
 `;
@@ -183,6 +206,32 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     return changeStatus(order, "CANCELADO");
   }
 
+  // Asociar cliente a un pedido tomado sin el (para que los sellos vayan a su cuenta). La cola
+  // se actualiza sola con la suscripcion; si falla, mismo aviso que un cambio de estado rechazado.
+  const { mutate: assignCustomerMutation } = useMutation(ASSIGN_CUSTOMER);
+  async function assignCustomer(order: any, customer: CustomerMatch) {
+    if (busyOrderId.value) return false;
+    busyOrderId.value = order.id;
+    actionError.value = "";
+    try {
+      await assignCustomerMutation({ orderId: order.id, customerId: customer.id });
+      return true;
+    } catch (err: any) {
+      actionError.value = err?.message ?? "No se pudo asignar el cliente";
+      await refetchQueue()?.catch(() => {});
+      return false;
+    } finally {
+      busyOrderId.value = "";
+    }
+  }
+
+  /** Donde va el pedido: mesa o para llevar si lo tomo el personal; hora de recogida si es web. */
+  function serviceLabel(order: any) {
+    if (order.serviceType === "MESA") return `Mesa ${order.table}`;
+    if (order.serviceType === "LLEVAR") return "Para llevar";
+    return `Recogida: ${formatTime(order.pickupSlot)}`;
+  }
+
   function statusLabel(status: string) {
     return STATUS_LABELS[status] ?? status;
   }
@@ -196,11 +245,13 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     loadHistory,
     advance,
     cancelOrder,
+    assignCustomer,
     busyOrderId,
     actionError,
     nextStatus,
     nextStatusLabel,
     statusLabel,
+    serviceLabel,
     formatTime,
     formatDateTime,
     notificationPermission,

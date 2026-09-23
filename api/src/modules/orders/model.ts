@@ -31,10 +31,20 @@ export interface OrderLineDoc {
   quantity: number;
 }
 
+export type OrderSource = "WEB" | "STAFF";
+export type ServiceType = "MESA" | "LLEVAR";
+
 export interface OrderDoc {
   _id: Types.ObjectId;
   code: string; // codigo corto y unico para identificar el pedido en el mostrador
-  customerId: Types.ObjectId;
+  // Sin cliente: pedido tomado por el personal a alguien sin cuenta (se puede asignar despues).
+  customerId?: Types.ObjectId | null;
+  source: OrderSource;
+  // Solo pedidos tomados por el personal: en mesa (con su numero) o para llevar.
+  serviceType?: ServiceType;
+  table?: string;
+  note?: string;
+  createdByStaffId?: Types.ObjectId;
   items: OrderLineDoc[];
   totalCents: number;
   pickupSlot: Date;
@@ -56,7 +66,12 @@ const orderLineSchema = new Schema<OrderLineDoc>(
 const orderSchema = new Schema<OrderDoc>({
   // sparse: los pedidos anteriores a este campo no lo tienen hasta que corre backfillOrderCodes
   code: { type: String, unique: true, sparse: true },
-  customerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  customerId: { type: Schema.Types.ObjectId, ref: "User" },
+  source: { type: String, enum: ["WEB", "STAFF"], default: "WEB" },
+  serviceType: { type: String, enum: ["MESA", "LLEVAR"] },
+  table: { type: String, trim: true, maxlength: 20 },
+  note: { type: String, trim: true, maxlength: 200 },
+  createdByStaffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
   items: { type: [orderLineSchema], required: true, validate: (v: unknown[]) => v.length > 0 },
   totalCents: { type: Number, required: true, min: 0 },
   pickupSlot: { type: Date, required: true },

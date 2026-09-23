@@ -16,11 +16,28 @@ export const ordersTypeDefs = /* GraphQL */ `
     imageUrl: String
   }
 
+  enum OrderSource {
+    WEB
+    STAFF
+  }
+
+  enum ServiceType {
+    MESA
+    LLEVAR
+  }
+
   type Order {
     id: ID!
     """Codigo corto y unico del pedido (p. ej. P-7K3F9Q)."""
     code: String!
-    customer: Customer!
+    """Null si lo tomo el personal para alguien sin cuenta (se puede asignar despues)."""
+    customer: Customer
+    """WEB: lo hizo el cliente; STAFF: lo tomo el personal."""
+    source: OrderSource!
+    """Solo pedidos del personal: en mesa o para llevar."""
+    serviceType: ServiceType
+    table: String
+    note: String
     items: [OrderLine!]!
     totalCents: Int!
     pickupSlot: String!
@@ -32,6 +49,16 @@ export const ordersTypeDefs = /* GraphQL */ `
   input OrderLineInput {
     menuItemId: ID!
     quantity: Int!
+  }
+
+  input StaffOrderInput {
+    items: [OrderLineInput!]!
+    serviceType: ServiceType!
+    """Obligatoria si serviceType es MESA."""
+    table: String
+    """Cliente registrado, si da su codigo o telefono (ver lookupCustomer)."""
+    customerId: ID
+    note: String
   }
 
   extend type Query {
@@ -46,6 +73,10 @@ export const ordersTypeDefs = /* GraphQL */ `
   extend type Mutation {
     createOrder(items: [OrderLineInput!]!, pickupSlot: String!): Order!
     setOrderStatus(id: ID!, status: OrderStatus!): Order!
+    """Personal: pedido tomado en el local (mesero o barra). La recogida es ahora."""
+    createStaffOrder(input: StaffOrderInput!): Order!
+    """Personal: asocia un cliente a un pedido activo que no tenia."""
+    assignOrderCustomer(orderId: ID!, customerId: ID!): Order!
   }
 
   extend type Subscription {

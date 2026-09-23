@@ -12,11 +12,13 @@ export async function buildClosedPayload<S extends OrderClosedPayload["status"]>
   status: S,
   closedAt: Date | null
 ): Promise<OrderClosedPayload & { status: S }> {
-  const customer = await User.findById(order.customerId).select("name customerCode").lean();
+  const customer = order.customerId
+    ? await User.findById(order.customerId).select("name customerCode").lean()
+    : null;
   return {
     status,
     orderId: order._id.toString(),
-    customerId: order.customerId.toString(),
+    customerId: order.customerId?.toString() ?? null,
     totalCents: order.totalCents,
     code: order.code,
     customerName: customer?.name ?? "",

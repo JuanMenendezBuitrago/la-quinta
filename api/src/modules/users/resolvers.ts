@@ -12,6 +12,21 @@ export const usersResolvers = {
       if (!ctx.staff) return null;
       return StaffUser.findById(ctx.staff.id).exec();
     },
+    lookupCustomer: async (_: unknown, args: { query: string }, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["barra", "gestion"]);
+      const query = args.query.trim();
+      if (!query) return null;
+      const byCode = /^(lq-?)?\d{4}$/i.test(query) ? `LQ-${query.replace(/\D/g, "")}` : null;
+      const or: Record<string, string>[] = byCode
+        ? [{ customerCode: byCode }]
+        : query.includes("@")
+          ? [{ email: query.toLowerCase() }]
+          : [{ phone: query }, { phone: query.replace(/[\s-]/g, "") }];
+      const user = await User.findOne({ $or: or, deletedAt: { $exists: false } })
+        .select("name customerCode")
+        .lean();
+      return user ? { id: user._id.toString(), name: user.name, customerCode: user.customerCode } : null;
+    },
     staffUsers: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireStaff(ctx, ["gestion"]);
       return StaffUser.find().sort({ name: 1 }).exec();

@@ -8,8 +8,10 @@ export interface CartLine {
 
 // useState de Nuxt: estado reactivo compartido entre componentes,
 // aislado por request en SSR (no se filtra entre clientes distintos).
-export function useCart() {
-  const lines = useState<CartLine[]>("cart-lines", () => []);
+// `key` separa carritos independientes: el publico ("cart-lines") y el ticket que monta el
+// personal en "Tomar pedido", que no deben mezclarse aunque se usen en el mismo navegador.
+export function useCart(key = "cart-lines") {
+  const lines = useState<CartLine[]>(key, () => []);
 
   function add(item: { id: string; name: string; priceCents: number; imageUrl?: string | null }) {
     const existing = lines.value.find((l) => l.menuItemId === item.id);

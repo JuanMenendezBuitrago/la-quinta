@@ -7,6 +7,7 @@ import { LoyaltyTransaction, LOYALTY_RULES } from "./model";
  */
 export function registerLoyaltyListeners() {
   internalEvents.on(INTERNAL_EVENTS.ORDER_DELIVERED, async (payload: OrderDeliveredPayload) => {
+    if (!payload.customerId) return; // pedido sin cliente registrado: no hay a quien sumar sellos
     const units = payload.items.reduce((sum, item) => sum + item.quantity, 0);
     const stamps = units * LOYALTY_RULES.stampsPerUnit;
     if (stamps <= 0) return;

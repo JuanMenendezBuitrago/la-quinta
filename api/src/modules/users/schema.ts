@@ -24,6 +24,13 @@ export const usersTypeDefs = /* GraphQL */ `
     customer: Customer!
   }
 
+  """Datos minimos de un cliente para asociarlo a un pedido desde el panel (sin contacto)."""
+  type CustomerMatch {
+    id: ID!
+    name: String!
+    customerCode: String!
+  }
+
   """Lo que hay que pedir en el paso del codigo del login."""
   type LoginRequirements {
     """Cliente nuevo: se le pide el nombre."""
@@ -42,6 +49,9 @@ export const usersTypeDefs = /* GraphQL */ `
     me: Customer
     """Miembro del equipo autenticado actualmente (null si no hay sesion)."""
     myStaffProfile: Staff
+    """Personal (barra y gestion): busca un cliente por su codigo, telefono o email EXACTOS, para
+    asociarlo a un pedido. No lista ni busca por partes: el listado de clientes es solo de gestion."""
+    lookupCustomer(query: String!): CustomerMatch
     """Listado de personal del local (requiere rol gestion)."""
     staffUsers: [Staff!]!
     """Que datos pedir en el login a ese email/telefono (nombre, autorizacion de datos)."""
