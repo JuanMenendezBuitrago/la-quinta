@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.output/
+.nuxt/
+.nitro/
+.cache/
+*.log
+.env
+# Cualquier .env.* lleva secretos (p. ej. .env.gemini), salvo las plantillas
+.env.*
+!.env.example
+.DS_Store
+coverage/
+
+# Credenciales de la cuenta de servicio de Google (exportacion a Sheets)
+google-sa.json
+
+# Imagenes generadas para la carta (pesadas, no van al repositorio)
+api/generated-images/

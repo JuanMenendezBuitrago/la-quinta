@@ -1,0 +1,140 @@
+@import url("https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@400;500;600&family=Work+Sans:wght@400;500;600&display=swap");
+
+@font-face {
+  font-family: "Futura Now Condensed";
+  src: url("/fonts/futura-now-text-condensed-xbd.otf") format("opentype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Futura Now Condensed";
+  src: url("/fonts/futura-now-text-condensed-blk.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Futura Now Condensed";
+  src: url("/fonts/futura-now-text-condensed-xblk.otf") format("opentype");
+  font-weight: 950;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #faf6ce;
+  --surface: #fffdf5;
+  --surface-alt: #f0e8c8;
+  --text: #9f714d;
+  --text-muted: #9b8533;
+  --accent: #9ad2d0;
+  --accent-strong: #6cc3c0;
+  --danger: #e2725b;
+  --border: rgba(243, 236, 225, 0.08);
+  --border-strong: rgba(243, 236, 225, 0.16);
+  --font-serif: "Bodoni Moda", serif;
+  --font-futura: "Futura Now Condensed", "Arial Narrow", sans-serif;
+  --font-sans: "Work Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color1: #9ad2d0;
+  --color2: #6cc3c0;
+  --color3: #faf6ce;
+  --color4: #9f714d;
+  --color5: #9b8533;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); }
+
+h1, h2, h3 {
+  font-family: var(--font-futura);
+  font-weight: 950;
+  margin: 0;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+h1 { font-size: 30px; }
+h2 { font-size: 20px; }
+h3 { font-size: 17px; }
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 12px 20px 80px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0 0 8px;
+  font-family: var(--font-sans);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 4px;
+  padding: 12px 20px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.button:hover:not(:disabled) { background: var(--accent-strong); }
+.button:disabled { opacity: 0.45; cursor: not-allowed; }
+.button.secondary {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border-strong);
+}
+.button.secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); }
+
+input, select, textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+}
+input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 0.8; }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.muted { color: var(--text-muted); font-size: 14px; }
+
+.price, .tabular-nums { font-variant-numeric: tabular-nums; }

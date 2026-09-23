@@ -1,0 +1,36 @@
+import { EventEmitter } from "events";
+
+/**
+ * Bus de eventos interno del monolito modular.
+ *
+ * Los modulos NO se importan directamente entre si (p. ej. "orders" no
+ * conoce el modelo de "loyalty"): cuando algo relevante ocurre, publican
+ * un evento aqui y el modulo interesado se suscribe por su cuenta. Es lo
+ * que permite, mas adelante, extraer un modulo a su propio servicio sin
+ * tener que desenredar imports cruzados.
+ */
+export const internalEvents = new EventEmitter();
+
+export const INTERNAL_EVENTS = {
+  ORDER_DELIVERED: "order.delivered",
+  ORDER_CANCELLED: "order.cancelled",
+} as const;
+
+/** Pedido que ha llegado a un estado final (ENTREGADO o CANCELADO). */
+export interface OrderClosedPayload {
+  status: "ENTREGADO" | "CANCELADO";
+  orderId: string;
+  customerId: string;
+  totalCents: number;
+  // Instantanea del pedido para los modulos que necesitan registrarlo (p. ej. "sheets")
+  // sin tener que importar los modelos de "orders" o "users".
+  code: string;
+  customerName: string;
+  customerCode: string;
+  items: { name: string; quantity: number; priceCents: number }[];
+  pickupSlot: string;
+  closedAt: string | null; // null si no se conoce (pedidos antiguos exportados a posteriori)
+}
+
+export type OrderDeliveredPayload = OrderClosedPayload & { status: "ENTREGADO" };
+export type OrderCancelledPayload = OrderClosedPayload & { status: "CANCELADO" };
