@@ -7,7 +7,8 @@ import { LoyaltyTransaction, LOYALTY_RULES } from "./model";
  */
 export function registerLoyaltyListeners() {
   internalEvents.on(INTERNAL_EVENTS.ORDER_DELIVERED, async (payload: OrderDeliveredPayload) => {
-    const stamps = Math.floor(payload.totalCents / LOYALTY_RULES.pesosPerStamp);
+    const units = payload.items.reduce((sum, item) => sum + item.quantity, 0);
+    const stamps = units * LOYALTY_RULES.stampsPerUnit;
     if (stamps <= 0) return;
 
     await LoyaltyTransaction.create({

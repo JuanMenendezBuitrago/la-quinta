@@ -45,7 +45,7 @@ export function sheetColumns(kind: SheetsExportKind): Column[] {
     { title: "Cliente", value: (p) => text(p.customerName) },
     { title: "Productos", value: (p) => text(p.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")) },
     { title: "Unidades", value: (p) => p.items.reduce((sum, i) => sum + i.quantity, 0) },
-    // pesos colombianos sin decimales (ver LOYALTY_RULES)
+    // pesos colombianos sin decimales: en la carta, priceCents son pesos
     { title: "Total (COP)", value: (p) => p.totalCents },
   ];
 }
