@@ -14,7 +14,7 @@
         type="button"
         class="chip"
         :class="{ active: activeCategoryId === category.id }"
-        @click="activeCategoryId = category.id"
+        @click="chosenCategoryId = category.id"
       >
         {{ category.name }}
       </button>
@@ -24,19 +24,17 @@
     <p v-if="error" class="muted" style="color: var(--danger)">No se pudo cargar la carta.</p>
     <p v-if="menu.length && !visibleItems.length" class="muted">Ningún producto coincide con la búsqueda.</p>
 
-    <ul class="product-list">
-      <li v-for="item in visibleItems" :key="item.id" class="product-row">
-        <div class="product-info">
-          <span class="product-name">{{ item.name }}</span>
-          <span class="muted">{{ formatPrice(item.priceCents) }}</span>
-        </div>
-        <div class="qty">
-          <template v-if="quantityOf(item.id)">
-            <button type="button" class="qty-btn" :aria-label="`Quitar un ${item.name}`" @click="setQuantity(item.id, quantityOf(item.id) - 1)">−</button>
-            <span class="qty-value">{{ quantityOf(item.id) }}</span>
-          </template>
-          <button type="button" class="qty-btn add" :aria-label="`Añadir ${item.name}`" @click="addItem(item)">+</button>
-        </div>
+    <!-- Cuadricula: un toque en la tarjeta suma una unidad; "−" resta -->
+    <ul class="product-grid">
+      <li v-for="item in visibleItems" :key="item.id" class="tile" :class="{ selected: quantityOf(item.id) }">
+        <button type="button" class="tile-add" :aria-label="`Añadir ${item.name}`" @click="addItem(item)">
+          <span class="tile-name">{{ item.name }}</span>
+          <span class="tile-price">{{ formatPrice(item.priceCents) }}</span>
+        </button>
+        <template v-if="quantityOf(item.id)">
+          <span class="tile-qty" aria-live="polite">{{ quantityOf(item.id) }}</span>
+          <button type="button" class="tile-minus" :aria-label="`Quitar un ${item.name}`" @click="setQuantity(item.id, quantityOf(item.id) - 1)">−</button>
+        </template>
       </li>
     </ul>
 
@@ -122,13 +120,11 @@ const menu = computed(() => result.value?.menu ?? []);
 const { lines, add, setQuantity, clear, cartCount, totalCents } = useCart("staff-ticket-lines");
 
 const search = ref("");
-const activeCategoryId = ref<string | null>(null);
-watch(
-  menu,
-  (val) => {
-    if (val.length && !val.some((c) => c.id === activeCategoryId.value)) activeCategoryId.value = val[0].id;
-  },
-  { immediate: true }
+// Calculada (no asignada al cargar): asi el servidor ya pinta la primera categoria marcada y la
+// hidratacion no deja la clase "active" desincronizada.
+const chosenCategoryId = ref<string | null>(null);
+const activeCategoryId = computed(() =>
+  menu.value.some((c) => c.id === chosenCategoryId.value) ? chosenCategoryId.value : menu.value[0]?.id ?? null
 );
 
 function normalize(text: string) {
@@ -239,32 +235,78 @@ input {
 }
 .chip.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
-.product-list { list-style: none; padding: 0; margin: 0 0 20px; }
-.product-row {
+.product-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+.tile { position: relative; min-width: 0; }
+.tile-add {
+  width: 100%;
+  height: 100%;
+  min-height: 76px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 10px 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.12s ease, transform 0.08s ease;
+}
+.tile-add:active { transform: scale(0.97); }
+.tile.selected .tile-add { border: 2px solid var(--accent); padding: 9px 9px 7px; }
+.tile-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tile-price { font-size: 12.5px; color: var(--text-muted); }
+.tile-qty {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 700;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
+  justify-content: center;
+  pointer-events: none;
 }
-.product-info { display: flex; flex-direction: column; min-width: 0; }
-.product-name { font-weight: 600; overflow-wrap: anywhere; }
-.qty { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.qty-value { min-width: 1.5em; text-align: center; font-weight: 700; }
-/* Botones grandes: se usan de pie y con prisa */
-.qty-btn {
-  width: 40px;
-  height: 40px;
+.tile-minus {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 1px solid var(--accent);
-  background: transparent;
+  background: var(--bg);
   color: var(--accent);
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
   cursor: pointer;
 }
-.qty-btn.add { background: var(--accent); color: var(--bg); }
 
 .ticket { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 80px; }
 .ticket h3 { margin: 0; }
