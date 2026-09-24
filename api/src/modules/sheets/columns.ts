@@ -22,7 +22,8 @@ function text(value: string): string {
 
 /** "Web", "Mesa 7" o "Para llevar". Vacio en pedidos encolados antes de guardar el origen. */
 export function originLabel(p: Pick<OrderClosedPayload, "source" | "serviceType" | "table">): string {
-  if (p.serviceType === "MESA") return text(`Mesa ${p.table ?? ""}`.trim());
+  // Las sillas de la barra se guardan como servicio en mesa con table = "Barra".
+  if (p.serviceType === "MESA") return text(p.table === "Barra" ? "Barra" : `Mesa ${p.table ?? ""}`.trim());
   if (p.serviceType === "LLEVAR") return "Para llevar";
   if (p.source === "WEB") return "Web";
   return "";

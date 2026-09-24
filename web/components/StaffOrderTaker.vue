@@ -53,12 +53,20 @@
       </ul>
 
       <div class="field">
-        <span class="muted">Servicio</span>
-        <div class="segmented" role="radiogroup" aria-label="Servicio">
-          <button type="button" role="radio" :aria-checked="serviceType === 'MESA'" :class="{ active: serviceType === 'MESA' }" @click="serviceType = 'MESA'">Mesa</button>
-          <button type="button" role="radio" :aria-checked="serviceType === 'LLEVAR'" :class="{ active: serviceType === 'LLEVAR' }" @click="serviceType = 'LLEVAR'">Para llevar</button>
+        <span class="muted">¿Dónde?</span>
+        <div class="places" role="radiogroup" aria-label="Mesa, barra o para llevar">
+          <button
+            v-for="p in PLACES"
+            :key="p.id"
+            type="button"
+            role="radio"
+            :aria-checked="place === p.id"
+            :class="{ active: place === p.id, wide: p.id === 'LLEVAR' || p.id === BAR }"
+            @click="place = p.id"
+          >
+            {{ p.label }}
+          </button>
         </div>
-        <input v-if="serviceType === 'MESA'" v-model="table" type="text" inputmode="numeric" maxlength="20" placeholder="Número de mesa" aria-label="Número de mesa" />
       </div>
 
       <div class="field">
@@ -96,7 +104,7 @@
 import { gql } from "graphql-tag";
 import { useCart } from "~/composables/useCart";
 import { MENU_QUERY, type MenuCategory, type MenuItem } from "~/composables/useMenu";
-import type { CustomerMatch } from "~/composables/useStaffOrders";
+import { BAR_TABLE, type CustomerMatch } from "~/composables/useStaffOrders";
 
 const CREATE_STAFF_ORDER = gql`
   mutation CreateStaffOrder($input: StaffOrderInput!) {
@@ -141,8 +149,16 @@ function addItem(item: MenuItem) {
   add({ id: item.id, name: item.name, priceCents: item.priceCents });
 }
 
-const serviceType = ref<"MESA" | "LLEVAR">("MESA");
-const table = ref("");
+// El local: 6 mesas y la barra. La barra se guarda como servicio en mesa con table = "Barra".
+const TABLE_COUNT = 6;
+const BAR = BAR_TABLE;
+const PLACES = [
+  ...Array.from({ length: TABLE_COUNT }, (_, i) => ({ id: String(i + 1), label: `Mesa ${i + 1}` })),
+  { id: BAR, label: "Barra" },
+  { id: "LLEVAR", label: "Para llevar" },
+];
+// Sin valor por defecto: obliga a elegir, para que ningun pedido acabe en la mesa equivocada.
+const place = ref("");
 const customer = ref<CustomerMatch | null>(null);
 const note = ref("");
 const ticketEl = ref<HTMLElement | null>(null);
@@ -152,12 +168,12 @@ const submitError = ref("");
 const lastCode = ref("");
 
 const canSubmit = computed(
-  () => !submitting.value && lines.value.length > 0 && (serviceType.value !== "MESA" || !!table.value.trim())
+  () => !submitting.value && lines.value.length > 0 && !!place.value
 );
 
 function reset() {
   clear();
-  table.value = "";
+  place.value = "";
   customer.value = null;
   note.value = "";
   search.value = "";
@@ -172,8 +188,8 @@ async function submit() {
     const res = await mutate({
       input: {
         items: lines.value.map((l) => ({ menuItemId: l.menuItemId, quantity: l.quantity })),
-        serviceType: serviceType.value,
-        table: serviceType.value === "MESA" ? table.value.trim() : null,
+        serviceType: place.value === "LLEVAR" ? "LLEVAR" : "MESA",
+        table: place.value === "LLEVAR" ? null : place.value,
         customerId: customer.value?.id ?? null,
         note: note.value.trim() || null,
       },
@@ -256,9 +272,21 @@ input {
 .ticket-lines li { display: flex; justify-content: space-between; gap: 12px; }
 .ticket-total { border-top: 1px solid var(--border); padding-top: 6px; font-weight: 700; }
 .field { display: flex; flex-direction: column; gap: 6px; }
-.segmented { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--accent); border-radius: 8px; overflow: hidden; }
-.segmented button { border: none; background: transparent; color: var(--accent); padding: 10px; font: inherit; font-weight: 600; cursor: pointer; }
-.segmented button.active { background: var(--accent); color: var(--bg); }
+/* Botones grandes: 3 mesas por fila en movil; barra y para llevar ocupan media fila cada uno */
+.places { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.places button {
+  grid-column: span 2;
+  min-height: 48px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.places button.wide { grid-column: span 3; }
+.places button.active { background: var(--accent); color: var(--bg); }
 .customer-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ticket-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 

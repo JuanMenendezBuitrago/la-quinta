@@ -4,6 +4,9 @@ import { playNewOrderChime } from "./useOrderChime";
 import { useOrderNotifications } from "./useOrderNotifications";
 
 /** Cliente identificado por el personal (lookupCustomer): solo nombre y codigo, sin contacto. */
+/** Valor de `table` para los pedidos servidos en la barra (servicio MESA, sin numero de mesa). */
+export const BAR_TABLE = "Barra";
+
 export interface CustomerMatch {
   id: string;
   name: string;
@@ -227,7 +230,7 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
 
   /** Donde va el pedido: mesa o para llevar si lo tomo el personal; hora de recogida si es web. */
   function serviceLabel(order: any) {
-    if (order.serviceType === "MESA") return `Mesa ${order.table}`;
+    if (order.serviceType === "MESA") return order.table === BAR_TABLE ? "Barra" : `Mesa ${order.table}`;
     if (order.serviceType === "LLEVAR") return "Para llevar";
     return `Recogida: ${formatTime(order.pickupSlot)}`;
   }
