@@ -12,7 +12,10 @@ import { EventEmitter } from "events";
 export const internalEvents = new EventEmitter();
 
 export const INTERNAL_EVENTS = {
+  // Al entregar: sale la mercancia (inventario).
   ORDER_DELIVERED: "order.delivered",
+  // Al cerrar: entregado y, si es de mesa o barra, cobrado (sellos y hoja de Google).
+  ORDER_COMPLETED: "order.completed",
   ORDER_CANCELLED: "order.cancelled",
   CUSTOMER_DELETED: "customer.deleted",
 } as const;
@@ -26,7 +29,10 @@ export interface CustomerDeletedPayload {
   customerCode: string;
 }
 
-/** Pedido que ha llegado a un estado final (ENTREGADO o CANCELADO). */
+/**
+ * Instantanea de un pedido entregado o cancelado. Viaja en ORDER_DELIVERED (al entregar),
+ * ORDER_COMPLETED (al cerrar) y ORDER_CANCELLED.
+ */
 export interface OrderClosedPayload {
   status: "ENTREGADO" | "CANCELADO";
   orderId: string;
@@ -43,7 +49,9 @@ export interface OrderClosedPayload {
   source?: "WEB" | "STAFF";
   serviceType?: "MESA" | "LLEVAR" | null;
   table?: string | null;
-  closedAt: string | null; // null si no se conoce (pedidos antiguos exportados a posteriori)
+  closedAt: string | null; // hora de entrega o cancelacion; null si no se conoce (pedidos antiguos)
+  paidAt?: string | null; // solo pedidos de mesa y barra
+  paymentMethod?: "EFECTIVO" | "TARJETA" | "TRANSFERENCIA" | null;
 }
 
 export type OrderDeliveredPayload = OrderClosedPayload & { status: "ENTREGADO" };

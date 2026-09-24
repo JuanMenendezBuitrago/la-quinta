@@ -28,11 +28,13 @@ async function exportClosedOrders() {
   await migrateSheetsExports();
 
   for (const status of ["ENTREGADO", "CANCELADO"] as const) {
-    const orders = await Order.find({ status }).sort({ updatedAt: 1 }).exec();
+    // Entregados: solo los cerrados (en mesa y barra, tambien cobrados), como en la exportacion en vivo.
+    const filter = status === "ENTREGADO" ? { status, completedAt: { $exists: true } } : { status };
+    const orders = await Order.find(filter).sort({ updatedAt: 1 }).exec();
     let queued = 0;
     for (const order of orders) {
       const known = order.updatedAt.getTime() - order.createdAt.getTime() > MIN_CLOSE_GAP_MS;
-      const closedAt = known ? order.updatedAt : null;
+      const closedAt = status === "ENTREGADO" && order.deliveredAt ? order.deliveredAt : known ? order.updatedAt : null;
       const payload = await buildClosedPayload(order, status, closedAt);
       if (await enqueueClosedOrder(payload, closedAt ?? order.createdAt)) queued++;
     }

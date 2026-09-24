@@ -26,6 +26,13 @@ export const ordersTypeDefs = /* GraphQL */ `
     LLEVAR
   }
 
+  enum PaymentMethod {
+    EFECTIVO
+    TARJETA
+    """Transferencia o Nequi."""
+    TRANSFERENCIA
+  }
+
   type Order {
     id: ID!
     """Codigo corto y unico del pedido (p. ej. P-7K3F9Q)."""
@@ -42,6 +49,12 @@ export const ordersTypeDefs = /* GraphQL */ `
     totalCents: Int!
     pickupSlot: String!
     status: OrderStatus!
+    deliveredAt: String
+    """Solo pedidos de mesa y barra, que se cobran aparte (antes o despues de entregar)."""
+    paidAt: String
+    paymentMethod: PaymentMethod
+    """De mesa o barra, sin cobrar y no cancelado."""
+    awaitingPayment: Boolean!
     createdAt: String!
     updatedAt: String!
   }
@@ -64,15 +77,17 @@ export const ordersTypeDefs = /* GraphQL */ `
   extend type Query {
     """Historial de pedidos del cliente autenticado."""
     myOrders: [Order!]!
-    """Cola de pedidos activos, para el panel de personal."""
+    """Cola del panel de personal: pedidos activos y los de mesa servidos sin cobrar."""
     orderQueue: [Order!]!
-    """Pedidos entregados o cancelados, mas recientes primero. Para el panel de personal."""
+    """Pedidos cerrados (entregados y, si son de mesa, cobrados) o cancelados, mas recientes primero."""
     orderHistory(limit: Int): [Order!]!
   }
 
   extend type Mutation {
     createOrder(items: [OrderLineInput!]!, pickupSlot: String!): Order!
     setOrderStatus(id: ID!, status: OrderStatus!): Order!
+    """Personal: cobra un pedido de mesa o barra (antes o despues de entregarlo)."""
+    markOrderPaid(id: ID!, method: PaymentMethod!): Order!
     """Personal: pedido tomado en el local (mesero o barra). La recogida es ahora."""
     createStaffOrder(input: StaffOrderInput!): Order!
     """Personal: asocia un cliente a un pedido activo que no tenia."""

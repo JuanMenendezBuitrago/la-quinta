@@ -73,6 +73,7 @@
               <p class="muted">{{ order.items.map((i: any) => `${i.quantity}× ${i.name}`).join(", ") }}</p>
               <p class="service">{{ serviceLabel(order) }}</p>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
+              <p v-if="order.paidAt" class="paid-badge">Cobrado · {{ paymentLabel(order.paymentMethod) }}</p>
             </div>
 
             <div v-if="assigningId === order.id" class="assign-box">
@@ -85,7 +86,33 @@
               <button class="button secondary" type="button" :disabled="busyOrderId === order.id" @click="doCancel(order)">Sí</button>
               <button class="button secondary" type="button" @click="pendingCancelId = ''">No</button>
             </div>
+            <!-- Cobro (mesa y barra): un toque en el metodo de pago -->
+            <div v-else-if="payingId === order.id" class="pay-box">
+              <span class="muted">Cobrar {{ formatPrice(order.totalCents) }} con:</span>
+              <div class="pay-methods">
+                <button
+                  v-for="(label, method) in PAYMENT_LABELS"
+                  :key="method"
+                  class="button"
+                  type="button"
+                  :disabled="busyOrderId === order.id"
+                  @click="doPay(order, method)"
+                >
+                  {{ label }}
+                </button>
+              </div>
+              <button class="button secondary" type="button" @click="payingId = ''">Volver</button>
+            </div>
             <div v-else class="order-actions">
+              <button
+                v-if="order.awaitingPayment"
+                :class="group.status === 'POR_COBRAR' ? 'button' : 'button secondary'"
+                type="button"
+                :disabled="busyOrderId === order.id"
+                @click="payingId = order.id"
+              >
+                Cobrar
+              </button>
               <button
                 v-if="nextStatus(order.status)"
                 class="button"
@@ -134,7 +161,11 @@
             </template>
             <strong v-else class="muted">Sin cliente</strong>
             <p class="muted">{{ order.items.map((i: any) => `${i.quantity}× ${i.name}`).join(", ") }}</p>
-            <p class="muted">{{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}</p>
+            <p class="muted">
+              {{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}{{
+                order.paidAt ? ` · Cobrado con ${paymentLabel(order.paymentMethod)}` : ""
+              }}
+            </p>
           </div>
           <span class="status-badge" :class="`status-${order.status}`">{{ statusLabel(order.status) }}</span>
         </div>
@@ -175,7 +206,7 @@
 
 <script setup lang="ts">
 import { useStaffAuth } from "~/composables/useAuth";
-import { useStaffOrders, type CustomerMatch } from "~/composables/useStaffOrders";
+import { PAYMENT_LABELS, useStaffOrders, type CustomerMatch, type PaymentMethod } from "~/composables/useStaffOrders";
 import { primeAudio } from "~/composables/useOrderChime";
 import MenuAdmin from "~/components/MenuAdmin.vue";
 import StaffAdmin from "~/components/StaffAdmin.vue";
@@ -236,6 +267,7 @@ const {
   advance,
   cancelOrder,
   assignCustomer,
+  markPaid,
   busyOrderId,
   actionError,
   nextStatus,
@@ -255,6 +287,16 @@ watch(stockAlert, (alert) => {
 });
 
 const pendingCancelId = ref("");
+const payingId = ref("");
+async function doPay(order: any, method: PaymentMethod) {
+  if (await markPaid(order, method)) payingId.value = "";
+}
+function paymentLabel(method: PaymentMethod | null) {
+  return method ? PAYMENT_LABELS[method] : "";
+}
+function formatPrice(priceCents: number) {
+  return priceCents.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+}
 const assigningId = ref("");
 async function doAssign(order: any, customer: CustomerMatch) {
   if (await assignCustomer(order, customer)) assigningId.value = "";
@@ -337,8 +379,20 @@ watchEffect(() => {
 .stock-alert-actions { display: flex; gap: 8px; }
 
 .queue-board { display: flex; flex-direction: column; gap: 28px; }
+/* 4 columnas no caben en los 720 px del panel: en escritorio el tablero usa mas ancho que la pagina */
+@media (min-width: 900px) {
+  .queue-board {
+    width: min(1160px, calc(100vw - 40px));
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
 @media (min-width: 640px) {
-  .queue-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
+  .queue-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+}
+@media (min-width: 900px) {
+  .queue-board { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 .order-card {
@@ -355,6 +409,20 @@ watchEffect(() => {
 .order-card.status-NUEVO { border-left-color: var(--color4); }
 .order-card.status-EN_PREPARACION { border-left-color: var(--color5); }
 .order-card.status-LISTO { border-left-color: var(--accent-strong); }
+.order-card.status-ENTREGADO { border-left-color: var(--danger); }
+.paid-badge {
+  display: inline-block;
+  margin: 6px 0 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 700;
+}
+.pay-box { display: flex; flex-direction: column; gap: 8px; }
+.pay-methods { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.pay-methods .button { min-height: 44px; }
 
 @keyframes order-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(154, 210, 208, 0); }

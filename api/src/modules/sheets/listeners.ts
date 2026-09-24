@@ -138,7 +138,7 @@ async function onOrderClosed(payload: OrderClosedPayload) {
 }
 
 /**
- * Suscripcion del modulo de exportacion a los eventos internos "pedido entregado" y
+ * Suscripcion del modulo de exportacion a los eventos internos "pedido cerrado" y
  * "pedido cancelado". Se registra una vez al arrancar el servidor (ver src/index.ts).
  *
  * Los pedidos se encolan siempre, aunque la exportacion no este configurada todavia:
@@ -146,7 +146,8 @@ async function onOrderClosed(payload: OrderClosedPayload) {
  */
 export async function registerSheetsListeners() {
   await migrateSheetsExports();
-  internalEvents.on(INTERNAL_EVENTS.ORDER_DELIVERED, onOrderClosed);
+  // Entregados: al cerrarse (en mesa y barra, ademas cobrados), asi la hoja solo recoge ventas pagadas.
+  internalEvents.on(INTERNAL_EVENTS.ORDER_COMPLETED, onOrderClosed);
   internalEvents.on(INTERNAL_EVENTS.ORDER_CANCELLED, onOrderClosed);
   internalEvents.on(INTERNAL_EVENTS.CUSTOMER_DELETED, onCustomerDeleted);
 

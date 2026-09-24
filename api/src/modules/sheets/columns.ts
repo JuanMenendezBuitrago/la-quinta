@@ -34,6 +34,12 @@ interface Column {
   value: (p: OrderClosedPayload) => SheetsCell;
 }
 
+const PAYMENT_LABELS: Record<string, string> = {
+  EFECTIVO: "Efectivo",
+  TARJETA: "Tarjeta",
+  TRANSFERENCIA: "Transferencia/Nequi",
+};
+
 const CLOSED_AT_TITLE: Record<SheetsExportKind, string> = {
   ENTREGADO: "Entregado",
   CANCELADO: "Cancelado",
@@ -50,6 +56,9 @@ export function sheetColumns(kind: SheetsExportKind): Column[] {
     { title: "Código pedido", value: (p) => p.code },
     { title: "Código cliente", value: (p) => p.customerCode },
     { title: CLOSED_AT_TITLE[kind], value: (p) => (p.closedAt ? dateFormatter.format(new Date(p.closedAt)) : "") },
+    // Solo mesa y barra se cobran aparte; en web y para llevar quedan vacias.
+    { title: "Cobrado", value: (p) => (p.paidAt ? dateFormatter.format(new Date(p.paidAt)) : "") },
+    { title: "Método de pago", value: (p) => (p.paymentMethod ? PAYMENT_LABELS[p.paymentMethod] ?? "" : "") },
     { title: "Recogida", value: (p) => dateFormatter.format(new Date(p.pickupSlot)) },
     { title: "Origen", value: originLabel },
     { title: "Cliente", value: (p) => text(p.customerName) },

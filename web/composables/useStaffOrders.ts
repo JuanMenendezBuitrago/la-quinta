@@ -3,10 +3,17 @@ import type { ComputedRef, Ref } from "vue";
 import { playNewOrderChime } from "./useOrderChime";
 import { useOrderNotifications } from "./useOrderNotifications";
 
-/** Cliente identificado por el personal (lookupCustomer): solo nombre y codigo, sin contacto. */
 /** Valor de `table` para los pedidos servidos en la barra (servicio MESA, sin numero de mesa). */
 export const BAR_TABLE = "Barra";
 
+export type PaymentMethod = "EFECTIVO" | "TARJETA" | "TRANSFERENCIA";
+export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
+  EFECTIVO: "Efectivo",
+  TARJETA: "Tarjeta",
+  TRANSFERENCIA: "Transferencia/Nequi",
+};
+
+/** Cliente identificado por el personal (lookupCustomer): solo nombre y codigo, sin contacto. */
 export interface CustomerMatch {
   id: string;
   name: string;
@@ -22,8 +29,12 @@ const ORDER_FIELDS = `
   table
   note
   status
+  totalCents
   pickupSlot
   updatedAt
+  paidAt
+  paymentMethod
+  awaitingPayment
   customer {
     name
     customerCode
@@ -43,6 +54,19 @@ const SET_STATUS = gql`
     setOrderStatus(id: $id, status: $status) {
       id
       status
+      awaitingPayment
+    }
+  }
+`;
+
+const MARK_PAID = gql`
+  mutation MarkOrderPaid($id: ID!, $method: PaymentMethod!) {
+    markOrderPaid(id: $id, method: $method) {
+      id
+      status
+      paidAt
+      paymentMethod
+      awaitingPayment
     }
   }
 `;
@@ -59,11 +83,13 @@ const ASSIGN_CUSTOMER = gql`
   }
 `;
 
-const STATUS_ORDER = ["NUEVO", "EN_PREPARACION", "LISTO"] as const;
+// Columnas de la cola. POR_COBRAR no es un estado: son los de mesa o barra ya servidos y sin cobrar.
+const QUEUE_COLUMNS = ["NUEVO", "EN_PREPARACION", "LISTO", "POR_COBRAR"] as const;
 const STATUS_LABELS: Record<string, string> = {
   NUEVO: "Nuevos",
   EN_PREPARACION: "En preparación",
-  LISTO: "Listos para recoger",
+  LISTO: "Listos",
+  POR_COBRAR: "Por cobrar",
   ENTREGADO: "Entregado",
   CANCELADO: "Cancelado",
 };
@@ -114,7 +140,8 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     if (!updated) return;
     const idx = orders.value.findIndex((o) => o.id === updated.id);
 
-    if (["ENTREGADO", "CANCELADO"].includes(updated.status)) {
+    // Sale de la cola al cancelarse o al cerrarse (entregado y, si es de mesa, cobrado).
+    if (updated.status === "CANCELADO" || (updated.status === "ENTREGADO" && !updated.awaitingPayment)) {
       if (idx >= 0) orders.value = orders.value.filter((o) => o.id !== updated.id);
       return;
     }
@@ -124,6 +151,11 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
       const next = orders.value.slice();
       next[idx] = { ...updated, _isNew: orders.value[idx]._isNew };
       orders.value = next;
+      return;
+    }
+    // No estaba en la cola y no es nuevo (p. ej. se perdio un evento): se añade sin avisar.
+    if (updated.status !== "NUEVO") {
+      orders.value = [...orders.value, updated];
       return;
     }
     // Alta real (el id no estaba en la cola): aviso sonoro + notificacion + pulso visual temporal.
@@ -140,9 +172,11 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
   });
 
   const groupedQueue = computed(() =>
-    STATUS_ORDER.map((status) => ({
+    QUEUE_COLUMNS.map((status) => ({
       status,
-      orders: orders.value.filter((o) => o.status === status),
+      orders: orders.value.filter((o) =>
+        status === "POR_COBRAR" ? o.status === "ENTREGADO" && o.awaitingPayment : o.status === status
+      ),
     }))
   );
 
@@ -228,6 +262,24 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     }
   }
 
+  // Cobro de pedidos de mesa o barra (antes o despues de entregar).
+  const { mutate: markPaidMutation } = useMutation(MARK_PAID);
+  async function markPaid(order: any, method: PaymentMethod) {
+    if (busyOrderId.value) return false;
+    busyOrderId.value = order.id;
+    actionError.value = "";
+    try {
+      await markPaidMutation({ id: order.id, method });
+      return true;
+    } catch (err: any) {
+      actionError.value = err?.message ?? "No se pudo cobrar el pedido";
+      await refetchQueue()?.catch(() => {});
+      return false;
+    } finally {
+      busyOrderId.value = "";
+    }
+  }
+
   /** Donde va el pedido: mesa o para llevar si lo tomo el personal; hora de recogida si es web. */
   function serviceLabel(order: any) {
     if (order.serviceType === "MESA") return order.table === BAR_TABLE ? "Barra" : `Mesa ${order.table}`;
@@ -249,6 +301,7 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     advance,
     cancelOrder,
     assignCustomer,
+    markPaid,
     busyOrderId,
     actionError,
     nextStatus,

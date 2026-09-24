@@ -26,9 +26,10 @@ async function statsFor(customerIds: Types.ObjectId[]) {
         $group: {
           _id: "$customerId",
           ordersCount: { $sum: 1 },
-          deliveredCount: { $sum: { $cond: [{ $eq: ["$status", "ENTREGADO"] }, 1, 0] } },
+          // Cerrados: entregados y, si son de mesa, cobrados (lo servido sin cobrar no cuenta como gastado).
+          deliveredCount: { $sum: { $cond: [{ $gt: ["$completedAt", null] }, 1, 0] } },
           cancelledCount: { $sum: { $cond: [{ $eq: ["$status", "CANCELADO"] }, 1, 0] } },
-          spentCents: { $sum: { $cond: [{ $eq: ["$status", "ENTREGADO"] }, "$totalCents", 0] } },
+          spentCents: { $sum: { $cond: [{ $gt: ["$completedAt", null] }, "$totalCents", 0] } },
           lastOrderAt: { $max: "$createdAt" },
         },
       },

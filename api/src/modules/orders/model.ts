@@ -33,6 +33,17 @@ export interface OrderLineDoc {
 
 export type OrderSource = "WEB" | "STAFF";
 export type ServiceType = "MESA" | "LLEVAR";
+export type PaymentMethod = "EFECTIVO" | "TARJETA" | "TRANSFERENCIA";
+export const PAYMENT_METHODS: PaymentMethod[] = ["EFECTIVO", "TARJETA", "TRANSFERENCIA"];
+
+/**
+ * Cobro: en mesa y barra (serviceType MESA) se sirve y se cobra por separado, en cualquier orden,
+ * y el pedido solo se cierra (completedAt) cuando esta entregado Y cobrado. En los pedidos web y
+ * para llevar se entrega y se cobra a la vez, asi que se cierran al entregar.
+ */
+export function requiresPayment(order: Pick<OrderDoc, "serviceType">) {
+  return order.serviceType === "MESA";
+}
 
 export interface OrderDoc {
   _id: Types.ObjectId;
@@ -49,6 +60,12 @@ export interface OrderDoc {
   totalCents: number;
   pickupSlot: Date;
   status: OrderStatus;
+  deliveredAt?: Date;
+  paidAt?: Date;
+  paymentMethod?: PaymentMethod;
+  paidByStaffId?: Types.ObjectId;
+  // Cierre: entregado y, si es de mesa, cobrado. Es lo que suma sellos y escribe la fila en la hoja.
+  completedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -80,6 +97,11 @@ const orderSchema = new Schema<OrderDoc>({
     enum: ["NUEVO", "EN_PREPARACION", "LISTO", "ENTREGADO", "CANCELADO"],
     default: "NUEVO",
   },
+  deliveredAt: { type: Date },
+  paidAt: { type: Date },
+  paymentMethod: { type: String, enum: PAYMENT_METHODS },
+  paidByStaffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
+  completedAt: { type: Date },
   createdAt: { type: Date, default: () => new Date() },
   updatedAt: { type: Date, default: () => new Date() },
 });
@@ -122,4 +144,15 @@ export async function backfillOrderCodes() {
     }
   }
   if (pending.length) console.log(`[orders] codigo asignado a ${pending.length} pedidos existentes`);
+}
+
+/**
+ * Los pedidos entregados antes de que existiera el cobro se dan por cerrados (y su entrega, en
+ * updatedAt): asi no aparecen de golpe como "por cobrar" en la cola. Idempotente.
+ */
+export async function backfillCompletedOrders() {
+  const result = await Order.updateMany({ status: "ENTREGADO", completedAt: { $exists: false } }, [
+    { $set: { completedAt: "$updatedAt", deliveredAt: { $ifNull: ["$deliveredAt", "$updatedAt"] } } },
+  ]);
+  if (result.modifiedCount) console.log(`[orders] ${result.modifiedCount} pedidos entregados marcados como cerrados`);
 }

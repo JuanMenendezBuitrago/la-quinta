@@ -3,12 +3,15 @@ import { User } from "../users/model";
 import type { OrderDoc } from "./model";
 
 /**
- * Instantanea de un pedido cerrado para los eventos internos ORDER_DELIVERED / ORDER_CANCELLED.
+ * Instantanea de un pedido para los eventos internos ORDER_DELIVERED / ORDER_COMPLETED / ORDER_CANCELLED.
  * `closedAt` es null cuando no se conoce (pedidos cerrados antes de que se registrara
  * la fecha del cambio de estado).
  */
 export async function buildClosedPayload<S extends OrderClosedPayload["status"]>(
-  order: Pick<OrderDoc, "_id" | "code" | "customerId" | "items" | "totalCents" | "pickupSlot" | "source" | "serviceType" | "table">,
+  order: Pick<
+    OrderDoc,
+    "_id" | "code" | "customerId" | "items" | "totalCents" | "pickupSlot" | "source" | "serviceType" | "table" | "paidAt" | "paymentMethod"
+  >,
   status: S,
   closedAt: Date | null
 ): Promise<OrderClosedPayload & { status: S }> {
@@ -33,5 +36,7 @@ export async function buildClosedPayload<S extends OrderClosedPayload["status"]>
     serviceType: order.serviceType ?? null,
     table: order.table ?? null,
     closedAt: closedAt?.toISOString() ?? null,
+    paidAt: order.paidAt?.toISOString() ?? null,
+    paymentMethod: order.paymentMethod ?? null,
   };
 }

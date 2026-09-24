@@ -1,6 +1,7 @@
 import { withFilter } from "graphql-subscriptions";
 import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
-import { ALLOWED_FROM, Order, OrderStatus, STATUS_LABELS, ServiceType } from "./model";
+import { ALLOWED_FROM, Order, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
+import { tryComplete } from "./complete";
 import { buildOrderLines, createWithUniqueCode } from "./create";
 import { MenuItem } from "../menu/model";
 import { User } from "../users/model";
@@ -11,6 +12,19 @@ import { getOpeningHours } from "../settings/resolvers";
 import { pickupOutsideHoursReason } from "../settings/openingHours";
 
 const ACTIVE_STATUSES: OrderStatus[] = ["NUEVO", "EN_PREPARACION", "LISTO"];
+// De mesa o barra, ya servido pero sin cobrar: sigue en la cola, en "Por cobrar".
+const AWAITING_PAYMENT = {
+  status: "ENTREGADO",
+  serviceType: "MESA",
+  paidAt: { $exists: false },
+  completedAt: { $exists: false },
+};
+// Aun no cerrado: se le puede asignar cliente (los sellos se suman al cerrar).
+const OPEN_ORDER = { $or: [{ status: { $in: ACTIVE_STATUSES } }, AWAITING_PAYMENT] };
+
+function iso(value: unknown) {
+  return value ? new Date(value as string).toISOString() : null;
+}
 // Margen para relojes algo desfasados y para el rato que el cliente pasa en el carrito.
 const PICKUP_PAST_TOLERANCE_MS = 5 * 60 * 1000;
 
@@ -26,11 +40,12 @@ export const ordersResolvers = {
     },
     orderQueue: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireStaff(ctx, ["barra", "gestion"]);
-      return Order.find({ status: { $in: ACTIVE_STATUSES } }).sort({ createdAt: 1 }).exec();
+      return Order.find(OPEN_ORDER).sort({ createdAt: 1 }).exec();
     },
     orderHistory: async (_: unknown, args: { limit?: number }, ctx: GraphQLContext) => {
       requireStaff(ctx, ["barra", "gestion"]);
-      return Order.find({ status: { $in: ["ENTREGADO", "CANCELADO"] } })
+      // Cerrados o cancelados: lo servido sin cobrar sigue en la cola, no aqui.
+      return Order.find({ $or: [{ status: "CANCELADO" }, { status: "ENTREGADO", completedAt: { $exists: true } }] })
         .sort({ updatedAt: -1 })
         .limit(args.limit ?? 50)
         .exec();
@@ -43,6 +58,11 @@ export const ordersResolvers = {
     pickupSlot: (doc: any) => new Date(doc.pickupSlot).toISOString(),
     createdAt: (doc: any) => new Date(doc.createdAt).toISOString(),
     updatedAt: (doc: any) => new Date(doc.updatedAt).toISOString(),
+    deliveredAt: (doc: any) => iso(doc.deliveredAt),
+    paidAt: (doc: any) => iso(doc.paidAt),
+    paymentMethod: (doc: any) => doc.paymentMethod ?? null,
+    awaitingPayment: (doc: any) =>
+      doc.serviceType === "MESA" && !doc.paidAt && !doc.completedAt && doc.status !== "CANCELADO",
   },
   OrderLine: {
     imageUrl: async (line: any) => {
@@ -127,10 +147,10 @@ export const ordersResolvers = {
       requireStaff(ctx, ["barra", "gestion"]);
       if (!(await activeCustomerExists(args.customerId))) throw new Error("Cliente no encontrado");
 
-      // Solo pedidos activos y sin cliente: asi los sellos van a su cuenta al entregarlo, y no se
+      // Solo pedidos sin cerrar y sin cliente: asi los sellos van a su cuenta al cerrarlo, y no se
       // puede "robar" un pedido que ya es de otro cliente.
       const order = await Order.findOneAndUpdate(
-        { _id: args.orderId, status: { $in: ACTIVE_STATUSES }, customerId: null },
+        { _id: args.orderId, customerId: null, ...OPEN_ORDER },
         { customerId: args.customerId, updatedAt: new Date() },
         { new: true }
       );
@@ -138,10 +158,38 @@ export const ordersResolvers = {
         const current = await Order.findById(args.orderId).select("status customerId").lean();
         if (!current) throw new Error("Pedido no encontrado");
         if (current.customerId) throw new Error("El pedido ya tiene un cliente asignado");
-        throw new Error("Solo se puede asignar cliente a un pedido que no se ha entregado ni cancelado");
+        throw new Error("Solo se puede asignar cliente a un pedido que no se ha cerrado ni cancelado");
       }
 
       await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
+      return order;
+    },
+
+    markOrderPaid: async (
+      _: unknown,
+      args: { id: string; method: PaymentMethod },
+      ctx: GraphQLContext
+    ) => {
+      const staff = requireStaff(ctx, ["barra", "gestion"]);
+      if (!PAYMENT_METHODS.includes(args.method)) throw new Error("Metodo de pago no valido");
+
+      // Atomico, como setOrderStatus: si dos personas cobran a la vez, solo una lo consigue.
+      const now = new Date();
+      const order = await Order.findOneAndUpdate(
+        { _id: args.id, serviceType: "MESA", paidAt: { $exists: false }, status: { $ne: "CANCELADO" } },
+        { $set: { paidAt: now, paymentMethod: args.method, paidByStaffId: staff.id, updatedAt: now } },
+        { new: true }
+      );
+      if (!order) {
+        const current = await Order.findById(args.id).select("code serviceType paidAt status").lean();
+        if (!current) throw new Error("Pedido no encontrado");
+        if (current.serviceType !== "MESA") throw new Error("Solo los pedidos de mesa o barra se cobran aparte");
+        if (current.paidAt) throw new Error(`El pedido ${current.code} ya esta cobrado`);
+        throw new Error(`El pedido ${current.code} esta cancelado`);
+      }
+
+      await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
+      await tryComplete(order._id.toString());
       return order;
     },
 
@@ -155,10 +203,17 @@ export const ordersResolvers = {
       // La comprobacion del estado de origen va dentro del propio update: si dos personas
       // actuan a la vez sobre el mismo pedido, solo una lo consigue (y solo se emite un evento,
       // asi que no se suman sellos dos veces ni se exporta dos veces).
+      const now = new Date();
+      const filter: Record<string, unknown> = { _id: args.id, status: { $in: ALLOWED_FROM[args.status] } };
+      if (args.status === "CANCELADO") {
+        // Ademas de lo activo, lo servido en mesa sin cobrar (p. ej. se fue sin pagar).
+        delete filter.status;
+        filter.$or = [{ status: { $in: ALLOWED_FROM.CANCELADO } }, AWAITING_PAYMENT];
+      }
       const order = await Order.findOneAndUpdate(
-        { _id: args.id, status: { $in: ALLOWED_FROM[args.status] } },
+        filter,
         // findOneAndUpdate no pasa por el hook pre("save"): updatedAt se fija aqui a mano.
-        { status: args.status, updatedAt: new Date() },
+        { status: args.status, updatedAt: now, ...(args.status === "ENTREGADO" ? { deliveredAt: now } : {}) },
         { new: true }
       );
       if (!order) {
@@ -172,11 +227,13 @@ export const ordersResolvers = {
       await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
       await ctx.pubsub.publish(EVENTS.ORDER_STATUS_CHANGED, { orderStatusChanged: order });
 
-      // Fidelizacion y la exportacion a Google Sheets escuchan estos eventos por su cuenta:
-      // "orders" no conoce ni importa nada de esos modulos.
+      // Inventario, fidelizacion y la exportacion a Google Sheets escuchan estos eventos por su
+      // cuenta: "orders" no conoce ni importa nada de esos modulos. Al entregar sale la mercancia
+      // (inventario); los sellos y la hoja esperan al cierre, que en mesa exige ademas el cobro.
       if (args.status === "ENTREGADO") {
-        const payload = await buildClosedPayload(order, "ENTREGADO", order.updatedAt);
+        const payload = await buildClosedPayload(order, "ENTREGADO", now);
         internalEvents.emit(INTERNAL_EVENTS.ORDER_DELIVERED, payload);
+        await tryComplete(order._id.toString());
       } else if (args.status === "CANCELADO") {
         const payload = await buildClosedPayload(order, "CANCELADO", order.updatedAt);
         internalEvents.emit(INTERNAL_EVENTS.ORDER_CANCELLED, payload);
