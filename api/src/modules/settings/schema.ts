@@ -42,6 +42,11 @@ export const settingsTypeDefs = /* GraphQL */ `
     taxId: String
     """Email donde los clientes ejercen sus derechos sobre sus datos (si falta, se usa email)."""
     privacyEmail: String
+    """
+    Solo el personal crea pedidos: los clientes pueden ver la carta y sus pedidos, pero no
+    anadir productos ni pedir (createOrder lo rechaza).
+    """
+    staffOnlyOrders: Boolean!
   }
 
   input SiteSettingsInput {
@@ -57,6 +62,7 @@ export const settingsTypeDefs = /* GraphQL */ `
     legalName: String
     taxId: String
     privacyEmail: String
+    staffOnlyOrders: Boolean
   }
 
   extend type Query {

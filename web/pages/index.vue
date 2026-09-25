@@ -40,10 +40,11 @@
             <span class="item-price price">{{ formatPrice(item.priceCents) }}</span>
           </div>
           <button
+            v-if="canOrder"
             class="add-btn"
             type="button"
             aria-label="Añadir al carrito"
-            @click="add({ id: item.id, name: item.name, priceCents: item.priceCents, imageUrl: resolveImageUrl(item.imageUrl) })"
+            @click="add({ id: item.id, name: item.name, priceCents: item.priceCents, imageUrl: resolveImageUrl(item.imageUrl) }, defaultCartOptions(item))"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
               <line x1="12" y1="5" x2="12" y2="19" />
@@ -54,7 +55,7 @@
       </div>
     </section>
 
-    <div v-if="cartCount" class="cart-bar">
+    <div v-if="canOrder && cartCount" class="cart-bar">
       <span class="cart-summary">{{ cartCount }} {{ cartCount === 1 ? "producto" : "productos" }} · <span class="price">{{ formatPrice(totalCents) }}</span></span>
       <NuxtLink to="/carrito" class="button">Ver pedido</NuxtLink>
     </div>
@@ -74,7 +75,8 @@
 
 <script setup lang="ts">
 import { useCart } from "~/composables/useCart";
-import { MENU_QUERY, type MenuCategory } from "~/composables/useMenu";
+import { useCustomerOrdering } from "~/composables/useSiteSettings";
+import { MENU_QUERY, defaultCartOptions, type MenuCategory } from "~/composables/useMenu";
 import { useLightbox } from "~/composables/useLightbox";
 import { useImageUrl } from "~/composables/useImageUrl";
 import ImageLightbox from "~/components/ImageLightbox.vue";
@@ -82,6 +84,7 @@ import ImageLightbox from "~/components/ImageLightbox.vue";
 const { result, loading, error } = useQuery<{ menu: MenuCategory[] }>(MENU_QUERY);
 const menu = computed(() => result.value?.menu ?? []);
 const { add, cartCount, totalCents } = useCart();
+const canOrder = useCustomerOrdering();
 
 const activeCategoryId = ref<string | null>(null);
 const pillsNav = ref<HTMLElement | null>(null);

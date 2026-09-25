@@ -52,6 +52,14 @@ export const inventoryTypeDefs = /* GraphQL */ `
     lines: [RecipeLine!]!
   }
 
+  """Insumo que es una opcion de la carta (p. ej. Leche "Avena" = "Leche de avena")."""
+  type OptionSupply {
+    optionId: ID!
+    supply: Supply!
+    """Cantidad por unidad cuando la opcion se anade (no sustituye a un insumo de la receta)."""
+    qty: Float
+  }
+
   type SupplyAlert {
     supplyId: ID!
     name: String!
@@ -85,6 +93,8 @@ export const inventoryTypeDefs = /* GraphQL */ `
     supplyMovements(supplyId: ID!, limit: Int, offset: Int): [StockMovement!]!
     """Gestion: recetas de todos los productos que tienen una."""
     recipes: [Recipe!]!
+    """Gestion: que insumo es cada opcion de la carta (solo las que tienen uno asignado)."""
+    optionSupplies: [OptionSupply!]!
   }
 
   extend type Mutation {
@@ -98,6 +108,12 @@ export const inventoryTypeDefs = /* GraphQL */ `
     adjustStock(supplyId: ID!, delta: Float!, note: String!): Supply!
     """Gestion: lines vacio borra la receta."""
     setRecipe(menuItemId: ID!, lines: [RecipeLineInput!]!): Recipe
+    """
+    Gestion: el insumo que es una opcion de la carta. Al pedirla en lugar de la de por defecto,
+    la receta cambia un insumo por otro en la misma cantidad; si no hay nada que cambiar, se
+    anade qty de este insumo. supplyId null quita la relacion.
+    """
+    setOptionSupply(optionId: ID!, supplyId: ID, qty: Float): OptionSupply
 
     """Barra y Gestion: entrada de mercancia."""
     recordStockEntry(supplyId: ID!, qty: Float!, note: String): Supply!

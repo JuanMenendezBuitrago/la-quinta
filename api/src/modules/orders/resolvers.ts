@@ -1,14 +1,14 @@
 import { withFilter } from "graphql-subscriptions";
 import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
-import { ALLOWED_FROM, Order, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
+import { ALLOWED_FROM, CUSTOMER_TABLES, Order, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
 import { tryComplete } from "./complete";
-import { buildOrderLines, createWithUniqueCode } from "./create";
+import { buildOrderLines, createWithUniqueCode, type OrderLineRequest } from "./create";
 import { MenuItem } from "../menu/model";
 import { User } from "../users/model";
 import { EVENTS } from "../../config/pubsub";
 import { internalEvents, INTERNAL_EVENTS } from "../../config/events";
 import { buildClosedPayload } from "./closed";
-import { getOpeningHours } from "../settings/resolvers";
+import { getOpeningHours, staffOnlyOrders } from "../settings/resolvers";
 import { pickupOutsideHoursReason } from "../settings/openingHours";
 
 const ACTIVE_STATUSES: OrderStatus[] = ["NUEVO", "EN_PREPARACION", "LISTO"];
@@ -65,6 +65,8 @@ export const ordersResolvers = {
       doc.serviceType === "MESA" && !doc.paidAt && !doc.completedAt && doc.status !== "CANCELADO",
   },
   OrderLine: {
+    // Pedidos anteriores a las personalizaciones: sin opciones.
+    options: (line: any) => line.options ?? [],
     imageUrl: async (line: any) => {
       const item = await MenuItem.findById(line.menuItemId).select("imageUrl").lean();
       return item?.imageUrl ?? null;
@@ -73,24 +75,42 @@ export const ordersResolvers = {
   Mutation: {
     createOrder: async (
       _: unknown,
-      args: { items: { menuItemId: string; quantity: number }[]; pickupSlot: string },
+      args: { items: OrderLineRequest[]; pickupSlot?: string | null; table?: string | null },
       ctx: GraphQLContext
     ) => {
       const customerId = requireCustomer(ctx);
+      if (await staffOnlyOrders()) {
+        throw new Error("Ahora mismo los pedidos se hacen con el personal del local, no desde la web");
+      }
       if (args.items.length === 0) throw new Error("El pedido no puede estar vacio");
 
-      const pickupSlot = new Date(args.pickupSlot);
-      if (Number.isNaN(pickupSlot.getTime())) throw new Error("La hora de recogida no es valida");
-      if (pickupSlot.getTime() < Date.now() - PICKUP_PAST_TOLERANCE_MS) {
-        throw new Error("La hora de recogida ya ha pasado: elige una hora a partir de ahora");
+      const table = args.table?.trim() || null;
+      let pickupSlot: Date;
+      if (table) {
+        // Pide desde el local: se sirve en su mesa ahora mismo, siempre que la tienda este abierta
+        // (que no se pueda "pedir a la mesa 3" desde casa con la tienda cerrada).
+        if (!CUSTOMER_TABLES.includes(table)) throw new Error("Esa mesa no existe");
+        pickupSlot = new Date();
+        if (pickupOutsideHoursReason(pickupSlot, await getOpeningHours())) {
+          throw new Error("Ahora la tienda esta cerrada: no se pueden hacer pedidos en mesa");
+        }
+      } else {
+        if (!args.pickupSlot) throw new Error("Elige la hora de recogida");
+        pickupSlot = new Date(args.pickupSlot);
+        if (Number.isNaN(pickupSlot.getTime())) throw new Error("La hora de recogida no es valida");
+        if (pickupSlot.getTime() < Date.now() - PICKUP_PAST_TOLERANCE_MS) {
+          throw new Error("La hora de recogida ya ha pasado: elige una hora a partir de ahora");
+        }
+        const closedReason = pickupOutsideHoursReason(pickupSlot, await getOpeningHours());
+        if (closedReason) throw new Error(closedReason);
       }
-      const closedReason = pickupOutsideHoursReason(pickupSlot, await getOpeningHours());
-      if (closedReason) throw new Error(closedReason);
 
       const { lines, totalCents } = await buildOrderLines(args.items);
       const order = await createWithUniqueCode({
         customerId: customerId as any,
         source: "WEB",
+        // En mesa se cobra aparte, como los pedidos de mesa que toma el personal (requiresPayment).
+        ...(table ? { serviceType: "MESA" as const, table } : {}),
         items: lines,
         totalCents,
         pickupSlot,
@@ -105,7 +125,7 @@ export const ordersResolvers = {
       _: unknown,
       args: {
         input: {
-          items: { menuItemId: string; quantity: number }[];
+          items: OrderLineRequest[];
           serviceType: ServiceType;
           table?: string | null;
           customerId?: string | null;

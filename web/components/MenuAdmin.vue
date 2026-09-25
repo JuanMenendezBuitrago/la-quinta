@@ -46,6 +46,73 @@
       </div>
     </section>
 
+    <!-- Personalizaciones: grupos reutilizables (p. ej. Leche) que se asignan a los productos -->
+    <section class="groups-admin">
+      <div class="categories-header">
+        <h3>Personalizaciones</h3>
+        <button class="button secondary" :disabled="groupFormOpen" @click="startCreateGroup">+ Nueva personalización</button>
+      </div>
+      <p class="muted">Opciones que se eligen al pedir, como el tipo de leche. Se asignan a cada producto al editarlo.</p>
+
+      <form v-if="groupFormOpen" class="card group-form" @submit.prevent="submitGroup">
+        <label class="field">
+          <span class="muted">Nombre</span>
+          <input v-model="groupForm.name" type="text" required maxlength="60" placeholder="Ej. Leche" />
+        </label>
+        <label class="field-inline">
+          <input v-model="groupForm.required" type="checkbox" style="width: auto" />
+          <span>Obligatoria: siempre se elige una (como el tipo de leche)</span>
+        </label>
+        <span class="muted">Sin marcar, es opcional: se puede pedir sin ninguna (como una adición).</span>
+        <div class="field">
+          <span class="muted">Opciones — se elige una como máximo</span>
+          <div v-for="(option, i) in groupForm.options" :key="i" class="option-row">
+            <input v-model="option.name" type="text" required maxlength="60" placeholder="Ej. Avena" aria-label="Nombre de la opción" />
+            <input v-model.number="option.priceDeltaCents" type="number" min="0" step="100" required aria-label="Suplemento (COP)" />
+            <label class="field-inline">
+              <input v-model="option.available" type="checkbox" style="width: auto" />
+              <span class="muted">Hay</span>
+            </label>
+            <button class="button secondary" type="button" :disabled="groupForm.options.length === 1" @click="groupForm.options.splice(i, 1)">
+              Quitar
+            </button>
+          </div>
+          <span class="muted">Segunda columna: suplemento en COP (0 = sin recargo). Desmarca "Hay" cuando se agote.</span>
+          <button class="button secondary" type="button" @click="groupForm.options.push(emptyOption())">+ Añadir opción</button>
+        </div>
+        <p v-if="groupFormError" class="muted" style="color: var(--danger)">{{ groupFormError }}</p>
+        <div class="form-actions">
+          <button class="button" type="submit" :disabled="savingGroup">{{ savingGroup ? "Guardando…" : "Guardar" }}</button>
+          <button class="button secondary" type="button" :disabled="savingGroup" @click="groupFormOpen = false">Cancelar</button>
+        </div>
+      </form>
+
+      <p v-if="!groups.length && !groupFormOpen" class="muted">Todavía no hay personalizaciones.</p>
+      <div v-for="group in groups" :key="group.id" class="card category-row">
+        <div class="item-info">
+          <span class="category-name">{{ group.name }}</span>
+          <span class="muted"> · {{ group.minSelect ? "obligatoria" : "opcional" }}</span>
+          <p class="muted">
+            <template v-for="(o, i) in group.options" :key="o.id">
+              <span v-if="i"> · </span>
+              <span :class="{ 'option-out': !o.available }">{{ o.name }}{{ o.priceDeltaCents ? ` +${formatPrice(o.priceDeltaCents)}` : "" }}{{ o.available ? "" : " (agotada)" }}</span>
+            </template>
+          </p>
+          <p class="muted">{{ productsUsing(group.id) }}</p>
+          <p v-if="groupDeleteError === group.id" class="muted" style="color: var(--danger)">No se pudo borrar</p>
+        </div>
+        <div v-if="pendingGroupDeleteId === group.id" class="category-actions">
+          <span class="muted">¿Borrar? Se quitará de los productos</span>
+          <button class="button secondary" type="button" @click="confirmRemoveGroup(group)">Sí</button>
+          <button class="button secondary" type="button" @click="pendingGroupDeleteId = ''">No</button>
+        </div>
+        <div v-else class="category-actions">
+          <button class="button secondary" type="button" :disabled="groupFormOpen" @click="startEditGroup(group)">Editar</button>
+          <button class="button secondary" type="button" @click="pendingGroupDeleteId = group.id">Borrar</button>
+        </div>
+      </div>
+    </section>
+
     <form v-if="formOpen" class="card item-form" @submit.prevent="submitForm">
       <h3>{{ form.id ? "Editar producto" : "Nuevo producto" }}</h3>
 
@@ -82,6 +149,33 @@
         <img v-if="form.imageUrl" :src="resolveImageUrl(form.imageUrl) ?? undefined" alt="" class="image-preview" />
       </label>
 
+      <div v-if="groups.length" class="field">
+        <span class="muted">Personalizaciones</span>
+        <div v-for="group in groups" :key="group.id" class="modifier-row">
+          <label class="field-inline">
+            <input
+              type="checkbox"
+              style="width: auto"
+              :checked="form.modifiers.some((m) => m.groupId === group.id)"
+              @change="toggleModifier(group, ($event.target as HTMLInputElement).checked)"
+            />
+            <span>{{ group.name }}</span>
+          </label>
+          <select
+            v-if="modifierOf(group.id)"
+            v-model="modifierOf(group.id)!.defaultOptionId"
+            :required="group.minSelect > 0"
+            :aria-label="`${group.name} por defecto`"
+          >
+            <option value="" :disabled="group.minSelect > 0">
+              {{ group.minSelect > 0 ? "¿Cuál lleva normalmente?" : "Normalmente: ninguna" }}
+            </option>
+            <option v-for="o in group.options" :key="o.id" :value="o.id">Normalmente: {{ o.name }}</option>
+          </select>
+        </div>
+        <span class="muted">La opción "normal" es la de la receta: se sirve si no piden otra y no suma suplemento aparte del suyo. En las opcionales suele ser "ninguna".</span>
+      </div>
+
       <label class="field-inline">
         <input v-model="form.available" type="checkbox" style="width: auto" />
         <span class="muted">Disponible en la carta</span>
@@ -107,7 +201,10 @@
           <strong>{{ item.name }}</strong>
           <span v-if="!item.available" class="muted"> · oculto</span>
           <p v-if="item.description" class="muted">{{ item.description }}</p>
-          <p class="muted">{{ formatPrice(item.priceCents) }}</p>
+          <p class="muted">
+            {{ formatPrice(item.priceCents)
+            }}{{ item.modifiers.length ? ` · ${item.modifiers.map((m) => m.group.name).join(", ")}` : "" }}
+          </p>
           <p v-if="deleteError === item.id" class="muted" style="color: var(--danger)">No se pudo borrar el producto</p>
         </div>
         <div v-if="pendingDeleteId === item.id" class="item-actions">
@@ -128,6 +225,21 @@
 <script setup lang="ts">
 import { gql } from "graphql-tag";
 
+interface ModifierOptionAdmin {
+  id: string;
+  name: string;
+  priceDeltaCents: number;
+  available: boolean;
+}
+
+interface ModifierGroupAdmin {
+  id: string;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  options: ModifierOptionAdmin[];
+}
+
 interface MenuItemAdmin {
   id: string;
   name: string;
@@ -135,6 +247,7 @@ interface MenuItemAdmin {
   priceCents: number;
   imageUrl: string | null;
   available: boolean;
+  modifiers: { defaultOptionId: string | null; group: { id: string; name: string } }[];
 }
 
 interface MenuCategoryAdmin {
@@ -157,8 +270,49 @@ const ADMIN_MENU_QUERY = gql`
         priceCents
         imageUrl
         available
+        modifiers {
+          defaultOptionId
+          group {
+            id
+            name
+          }
+        }
       }
     }
+    modifierGroups {
+      id
+      name
+      minSelect
+      maxSelect
+      options(includeUnavailable: true) {
+        id
+        name
+        priceDeltaCents
+        available
+      }
+    }
+  }
+`;
+
+const CREATE_MODIFIER_GROUP = gql`
+  mutation CreateModifierGroup($input: ModifierGroupInput!) {
+    createModifierGroup(input: $input) {
+      id
+    }
+  }
+`;
+
+const UPDATE_MODIFIER_GROUP = gql`
+  mutation UpdateModifierGroup($id: ID!, $input: ModifierGroupInput!) {
+    updateModifierGroup(id: $id, input: $input) {
+      id
+    }
+  }
+`;
+
+const DELETE_MODIFIER_GROUP = gql`
+  mutation DeleteModifierGroup($id: ID!) {
+    deleteModifierGroup(id: $id)
   }
 `;
 
@@ -200,8 +354,11 @@ const DELETE_MENU_ITEM = gql`
   }
 `;
 
-const { result, loading, error, refetch } = useQuery<{ menu: MenuCategoryAdmin[] }>(ADMIN_MENU_QUERY);
+const { result, loading, error, refetch } = useQuery<{ menu: MenuCategoryAdmin[]; modifierGroups: ModifierGroupAdmin[] }>(
+  ADMIN_MENU_QUERY
+);
 const categories = computed(() => result.value?.menu ?? []);
+const groups = computed(() => result.value?.modifierGroups ?? []);
 const loadError = computed(() => (error.value ? "No se pudo cargar la carta." : ""));
 const { resolveImageUrl } = useImageUrl();
 
@@ -262,6 +419,86 @@ async function moveCategory(index: number, delta: number) {
   await refetch();
 }
 
+// --- Personalizaciones de una opcion como maximo: obligatorias (Leche) u opcionales (Adicion) ---
+const groupFormOpen = ref(false);
+const savingGroup = ref(false);
+const groupFormError = ref("");
+
+function emptyOption() {
+  return { id: "" as string, name: "", priceDeltaCents: 0, available: true };
+}
+
+const groupForm = reactive({ id: "", name: "", required: true, options: [emptyOption()] });
+
+function startCreateGroup() {
+  Object.assign(groupForm, { id: "", name: "", required: true, options: [emptyOption(), emptyOption()] });
+  groupFormError.value = "";
+  groupFormOpen.value = true;
+}
+
+function startEditGroup(group: ModifierGroupAdmin) {
+  Object.assign(groupForm, {
+    id: group.id,
+    name: group.name,
+    required: group.minSelect > 0,
+    options: group.options.map((o) => ({ ...o })),
+  });
+  groupFormError.value = "";
+  groupFormOpen.value = true;
+}
+
+async function submitGroup() {
+  savingGroup.value = true;
+  groupFormError.value = "";
+  try {
+    const input = {
+      name: groupForm.name.trim(),
+      minSelect: groupForm.required ? 1 : 0,
+      maxSelect: 1,
+      options: groupForm.options.map((o) => ({
+        id: o.id || null,
+        name: o.name.trim(),
+        priceDeltaCents: o.priceDeltaCents || 0,
+        available: o.available,
+      })),
+    };
+    if (groupForm.id) {
+      const { mutate } = useMutation(UPDATE_MODIFIER_GROUP);
+      await mutate({ id: groupForm.id, input });
+    } else {
+      const { mutate } = useMutation(CREATE_MODIFIER_GROUP);
+      await mutate({ input });
+    }
+    await refetch();
+    groupFormOpen.value = false;
+  } catch (err: any) {
+    groupFormError.value = err?.message ?? "No se pudo guardar la personalización";
+  } finally {
+    savingGroup.value = false;
+  }
+}
+
+const pendingGroupDeleteId = ref("");
+const groupDeleteError = ref("");
+
+async function confirmRemoveGroup(group: ModifierGroupAdmin) {
+  groupDeleteError.value = "";
+  try {
+    const { mutate } = useMutation(DELETE_MODIFIER_GROUP);
+    await mutate({ id: group.id });
+    await refetch();
+  } catch {
+    groupDeleteError.value = group.id;
+  } finally {
+    pendingGroupDeleteId.value = "";
+  }
+}
+
+function productsUsing(groupId: string) {
+  const names = categories.value.flatMap((c) => c.items).filter((i) => i.modifiers.some((m) => m.group.id === groupId)).map((i) => i.name);
+  return names.length ? `En: ${names.join(", ")}` : "Sin productos asignados";
+}
+
 const formOpen = ref(false);
 const saving = ref(false);
 const formError = ref("");
@@ -275,7 +512,19 @@ function emptyForm() {
     priceCents: 0,
     imageUrl: "",
     available: true,
+    modifiers: [] as { groupId: string; defaultOptionId: string }[],
   };
+}
+
+function modifierOf(groupId: string) {
+  return form.modifiers.find((m) => m.groupId === groupId);
+}
+
+function toggleModifier(group: ModifierGroupAdmin, checked: boolean) {
+  // Obligatoria: se propone la primera; opcional: sin ninguna por defecto.
+  const defaultOptionId = group.minSelect > 0 ? group.options[0]?.id ?? "" : "";
+  if (checked) form.modifiers.push({ groupId: group.id, defaultOptionId });
+  else form.modifiers = form.modifiers.filter((m) => m.groupId !== group.id);
 }
 
 const form = reactive(emptyForm());
@@ -296,6 +545,7 @@ function startEdit(item: MenuItemAdmin, categoryId: string) {
     priceCents: item.priceCents,
     imageUrl: item.imageUrl ?? "",
     available: item.available,
+    modifiers: item.modifiers.map((m) => ({ groupId: m.group.id, defaultOptionId: m.defaultOptionId ?? "" })),
   });
   formError.value = "";
   formOpen.value = true;
@@ -354,6 +604,7 @@ async function submitForm() {
       priceCents: form.priceCents,
       imageUrl: form.imageUrl.trim() || null,
       available: form.available,
+      modifiers: form.modifiers.map((m) => ({ groupId: m.groupId, defaultOptionId: m.defaultOptionId || null })),
     };
     if (form.id) {
       const { mutate } = useMutation(UPDATE_MENU_ITEM);
@@ -405,6 +656,14 @@ function formatPrice(priceCents: number) {
 .category-name { font-weight: 600; }
 .category-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .category-form { margin: 12px 0; display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
+
+.groups-admin { margin-top: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.group-form { margin: 12px 0; display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
+.option-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px auto auto; gap: 8px; align-items: center; }
+.option-row input[type="text"], .option-row input[type="number"] { min-width: 0; }
+.option-out { text-decoration: line-through; }
+.modifier-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.modifier-row select { flex: 1; min-width: 180px; width: auto; }
 
 .category { margin-top: 24px; }
 .item-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }

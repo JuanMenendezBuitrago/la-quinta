@@ -30,6 +30,10 @@ export async function buildClosedPayload<S extends OrderClosedPayload["status"]>
       menuItemId: i.menuItemId.toString(),
       name: i.name, quantity: i.quantity,
       priceCents: i.priceCents,
+      options: (i.options ?? []).filter((o) => !o.isDefault).map((o) => o.name),
+      optionSwaps: (i.options ?? [])
+        .filter((o) => !o.isDefault)
+        .map((o) => ({ fromOptionId: o.defaultOptionId?.toString() ?? null, toOptionId: o.optionId.toString() })),
     })),
     pickupSlot: order.pickupSlot.toISOString(),
     source: order.source ?? "WEB",

@@ -1,11 +1,12 @@
 import { Types } from "mongoose";
 import { EVENTS } from "../../config/pubsub";
 import { GraphQLContext, requireStaff } from "../../graphql/context";
-import { MenuItem } from "../menu/model";
+import { MenuItem, ModifierGroup } from "../menu/model";
 import { Order } from "../orders/model";
 import { StaffUser } from "../users/model";
 import {
   isDuplicateKeyError,
+  OptionSupply,
   Recipe,
   StockMovement,
   Supply,
@@ -121,6 +122,10 @@ export const inventoryResolvers = {
       requireStaff(ctx, ["gestion"]);
       return Recipe.find().lean();
     },
+    optionSupplies: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["gestion"]);
+      return OptionSupply.find().lean();
+    },
   },
 
   Mutation: {
@@ -185,6 +190,9 @@ export const inventoryResolvers = {
       if (await Recipe.exists({ "lines.supplyId": args.id })) {
         throw new Error("Esta en alguna receta: quitalo de ella antes");
       }
+      if (await OptionSupply.exists({ supplyId: args.id })) {
+        throw new Error("Es el insumo de una opcion de la carta: quitalo de ella antes");
+      }
       await Supply.deleteOne({ _id: args.id });
       return true;
     },
@@ -206,6 +214,27 @@ export const inventoryResolvers = {
         staffId: staff.id,
         note: cleanNote(args.note, true),
       });
+    },
+
+    setOptionSupply: async (
+      _: unknown,
+      args: { optionId: string; supplyId?: string | null; qty?: number | null },
+      ctx: GraphQLContext
+    ) => {
+      requireStaff(ctx, ["gestion"]);
+      checkId(args.optionId, "Opcion");
+      if (!(await ModifierGroup.exists({ "options._id": args.optionId }))) throw new Error("Opcion no encontrada");
+      if (!args.supplyId) {
+        await OptionSupply.deleteOne({ optionId: args.optionId });
+        return null;
+      }
+      const supply = await findActiveSupply(args.supplyId);
+      const qty = args.qty ? positiveQty(args.qty, `La cantidad de «${supply.name}»`) : null;
+      return OptionSupply.findOneAndUpdate(
+        { optionId: args.optionId },
+        { $set: { supplyId: supply._id, qty } },
+        { upsert: true, new: true }
+      ).lean();
     },
 
     setRecipe: async (
@@ -332,6 +361,10 @@ export const inventoryResolvers = {
     low: (doc: SupplyDoc) => doc.stock <= doc.minStock,
   },
 
+  OptionSupply: {
+    optionId: (doc: { optionId: Types.ObjectId }) => doc.optionId.toString(),
+    supply: (doc: { supplyId: Types.ObjectId }) => Supply.findById(doc.supplyId).lean(),
+  },
   Recipe: {
     menuItemId: (doc: { menuItemId: Types.ObjectId }) => doc.menuItemId.toString(),
     lines: async (doc: { lines: { supplyId: Types.ObjectId; qty: number; onlyTakeaway: boolean }[] }) => {

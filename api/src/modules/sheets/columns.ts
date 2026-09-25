@@ -62,7 +62,11 @@ export function sheetColumns(kind: SheetsExportKind): Column[] {
     { title: "Recogida", value: (p) => dateFormatter.format(new Date(p.pickupSlot)) },
     { title: "Origen", value: originLabel },
     { title: "Cliente", value: (p) => text(p.customerName) },
-    { title: "Productos", value: (p) => text(p.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")) },
+    {
+      title: "Productos",
+      // "2× Latte (Avena)": solo las opciones que cambian el producto, como en la cola.
+      value: (p) => text(p.items.map((i) => `${i.quantity}× ${i.name}${i.options?.length ? ` (${i.options.join(", ")})` : ""}`).join(", ")),
+    },
     { title: "Unidades", value: (p) => p.items.reduce((sum, i) => sum + i.quantity, 0) },
     // pesos colombianos sin decimales: en la carta, priceCents son pesos
     { title: "Total (COP)", value: (p) => p.totalCents },

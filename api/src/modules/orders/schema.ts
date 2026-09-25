@@ -7,11 +7,22 @@ export const ordersTypeDefs = /* GraphQL */ `
     CANCELADO
   }
 
+  type OrderLineOption {
+    groupName: String!
+    name: String!
+    priceDeltaCents: Int!
+    """La que lleva el producto por defecto: en la cola solo se destacan las que no lo son."""
+    isDefault: Boolean!
+  }
+
   type OrderLine {
     menuItemId: ID!
     name: String!
+    """Precio por unidad, con los suplementos de las opciones incluidos."""
     priceCents: Int!
     quantity: Int!
+    """Personalizaciones elegidas (p. ej. Leche: Avena), incluidas las de por defecto."""
+    options: [OrderLineOption!]!
     """Imagen actual del producto (puede ser null si nunca tuvo o si el producto se borro)."""
     imageUrl: String
   }
@@ -41,7 +52,7 @@ export const ordersTypeDefs = /* GraphQL */ `
     customer: Customer
     """WEB: lo hizo el cliente; STAFF: lo tomo el personal."""
     source: OrderSource!
-    """Solo pedidos del personal: en mesa o para llevar."""
+    """En mesa (el personal, o el cliente desde el local) o para llevar. Null: pedido web para recoger."""
     serviceType: ServiceType
     table: String
     note: String
@@ -62,6 +73,8 @@ export const ordersTypeDefs = /* GraphQL */ `
   input OrderLineInput {
     menuItemId: ID!
     quantity: Int!
+    """Opciones elegidas. En los grupos sin eleccion se aplica la opcion por defecto del producto."""
+    optionIds: [ID!]
   }
 
   input StaffOrderInput {
@@ -84,7 +97,11 @@ export const ordersTypeDefs = /* GraphQL */ `
   }
 
   extend type Mutation {
-    createOrder(items: [OrderLineInput!]!, pickupSlot: String!): Order!
+    """
+    Cliente: para recoger a la hora pickupSlot o, si indica mesa (table), desde el propio local:
+    se sirve en esa mesa o en la barra ("Barra"), se prepara ya y se cobra aparte.
+    """
+    createOrder(items: [OrderLineInput!]!, pickupSlot: String, table: String): Order!
     setOrderStatus(id: ID!, status: OrderStatus!): Order!
     """Personal: cobra un pedido de mesa o barra (antes o despues de entregarlo)."""
     markOrderPaid(id: ID!, method: PaymentMethod!): Order!

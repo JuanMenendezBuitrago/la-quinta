@@ -36,22 +36,49 @@
               <div v-if="product" class="lightbox-info">
                 <div class="lightbox-heading">
                   <h3 class="lightbox-name">{{ product.name }}</h3>
-                  <span class="lightbox-price price">{{ formatPrice(product.priceCents) }}</span>
+                  <span class="lightbox-price price">{{ formatPrice(unitPriceCents) }}</span>
                 </div>
                 <p v-if="product.description" class="lightbox-desc">{{ product.description }}</p>
                 <p v-if="product.allergens?.length" class="lightbox-allergens">
                   Alérgenos: {{ product.allergens.join(", ") }}
                 </p>
-                <div class="lightbox-qty-row">
+                <!-- Personalizaciones (p. ej. Leche): viene marcada la de la receta -->
+                <div v-for="m in canOrder ? singleChoice : []" :key="m.group.id" class="lightbox-modifier">
+                  <span class="lightbox-qty-label">{{ m.group.name }}</span>
+                  <div class="modifier-chips" role="radiogroup" :aria-label="m.group.name">
+                    <button
+                      v-if="m.group.minSelect === 0"
+                      type="button"
+                      role="radio"
+                      :aria-checked="!selected[m.group.id]"
+                      :class="{ active: !selected[m.group.id] }"
+                      @click="selected[m.group.id] = ''"
+                    >
+                      Ninguna
+                    </button>
+                    <button
+                      v-for="o in m.group.options"
+                      :key="o.id"
+                      type="button"
+                      role="radio"
+                      :aria-checked="selected[m.group.id] === o.id"
+                      :class="{ active: selected[m.group.id] === o.id }"
+                      @click="selected[m.group.id] = o.id"
+                    >
+                      {{ o.name }}<span v-if="o.priceDeltaCents" class="chip-delta"> +{{ formatPrice(o.priceDeltaCents) }}</span>
+                    </button>
+                  </div>
+                </div>
+                <div v-if="canOrder" class="lightbox-qty-row">
                   <span class="lightbox-qty-label">Cantidad en el pedido</span>
                   <div class="qty">
                     <button class="qty-btn" type="button" aria-label="Quitar una unidad" :disabled="quantity === 0" @click="decrease">−</button>
                     <span class="qty-value">{{ quantity }}</span>
-                    <button class="qty-btn" type="button" aria-label="Añadir una unidad" @click="increase">+</button>
+                    <button class="qty-btn" type="button" aria-label="Añadir una unidad" :disabled="missing.length > 0" @click="increase">+</button>
                   </div>
                 </div>
-                <button class="button lightbox-add" type="button" @click="onAddClick">
-                  {{ justAdded ? "Añadido ✓" : "Añadir al pedido" }}
+                <button v-if="canOrder" class="button lightbox-add" type="button" :disabled="missing.length > 0" @click="onAddClick">
+                  {{ justAdded ? "Añadido ✓" : missing.length ? `Elige ${missing[0].group.name.toLowerCase()}` : "Añadir al pedido" }}
                 </button>
               </div>
             </div>
@@ -63,7 +90,9 @@
 </template>
 
 <script setup lang="ts">
-import { useCart } from "~/composables/useCart";
+import { cartLineKey, useCart } from "~/composables/useCart";
+import { cartOption, defaultCartOptions, missingModifiers } from "~/composables/useMenu";
+import { useCustomerOrdering } from "~/composables/useSiteSettings";
 import type { LightboxProduct } from "~/composables/useLightbox";
 
 const props = withDefaults(
@@ -101,25 +130,51 @@ function onTouchEnd(event: TouchEvent) {
 }
 
 const { lines, add, setQuantity } = useCart();
+const canOrder = useCustomerOrdering();
 
-// Cantidad de este producto ya presente en el pedido (0 si aun no se ha añadido).
+// Opcion elegida en cada grupo de una sola opcion; al pasar a otro producto vuelve a la de su receta.
+const singleChoice = computed(() => (props.product?.modifiers ?? []).filter((m) => m.group.maxSelect === 1));
+const selected = ref<Record<string, string>>({});
+watch(
+  () => props.product?.id,
+  () => {
+    selected.value = Object.fromEntries(defaultCartOptions(props.product ?? {}).map((o) => [o.groupId, o.id]));
+  },
+  { immediate: true }
+);
+const chosenOptions = computed(() =>
+  singleChoice.value.flatMap((m) => {
+    const option = selected.value[m.group.id] ? cartOption(m, selected.value[m.group.id]) : null;
+    return option ? [option] : [];
+  })
+);
+const missing = computed(() => missingModifiers(props.product?.modifiers, chosenOptions.value));
+const unitPriceCents = computed(
+  () => (props.product?.priceCents ?? 0) + chosenOptions.value.reduce((sum, o) => sum + o.priceDeltaCents, 0)
+);
+
+// Cantidad en el pedido de este producto CON las opciones elegidas (0 si aun no se ha añadido).
 // Al ser el mismo estado global que usa el carrito, tocar aqui el "+"/"-" se refleja
 // tambien en /carrito sin recargar nada.
-const quantity = computed(() => lines.value.find((l) => l.menuItemId === props.product?.id)?.quantity ?? 0);
+const lineKey = computed(() => (props.product ? cartLineKey(props.product.id, chosenOptions.value) : ""));
+const quantity = computed(() => lines.value.find((l) => l.key === lineKey.value)?.quantity ?? 0);
 
 function increase() {
-  if (!props.product) return;
-  add({
-    id: props.product.id,
-    name: props.product.name,
-    priceCents: props.product.priceCents,
-    imageUrl: props.url,
-  });
+  if (!props.product || missing.value.length) return;
+  add(
+    {
+      id: props.product.id,
+      name: props.product.name,
+      priceCents: props.product.priceCents,
+      imageUrl: props.url,
+    },
+    chosenOptions.value
+  );
 }
 
 function decrease() {
   if (!props.product) return;
-  setQuantity(props.product.id, quantity.value - 1);
+  setQuantity(lineKey.value, quantity.value - 1);
 }
 
 // Boton explicito debajo de la cantidad: para quien no relacione el "+" del stepper con
@@ -219,6 +274,21 @@ function formatPrice(priceCents: number) {
 .qty-value { min-width: 16px; text-align: center; font-variant-numeric: tabular-nums; }
 
 .lightbox-add { width: 100%; margin-top: 12px; }
+
+.lightbox-modifier { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.modifier-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.modifier-chips button {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.modifier-chips button.active { border-color: var(--accent); background: var(--accent); color: var(--bg); font-weight: 600; }
+.chip-delta { font-size: 12px; opacity: 0.85; }
 
 .lightbox-close {
   position: fixed;

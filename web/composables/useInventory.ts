@@ -196,3 +196,32 @@ export function useInventoryAlerts(enabled: Ref<boolean>) {
 
   return { lowCount, lastAlert };
 }
+
+/** Opciones de la carta (Leche: Avena...) y el insumo que es cada una. */
+export const OPTION_SUPPLIES_QUERY = gql`
+  query OptionSupplies {
+    modifierGroups {
+      id
+      name
+      options(includeUnavailable: true) {
+        id
+        name
+      }
+    }
+    optionSupplies {
+      optionId
+      qty
+      supply {
+        id
+      }
+    }
+  }
+`;
+
+export const SET_OPTION_SUPPLY = gql`
+  mutation SetOptionSupply($optionId: ID!, $supplyId: ID, $qty: Float) {
+    setOptionSupply(optionId: $optionId, supplyId: $supplyId, qty: $qty) {
+      optionId
+    }
+  }
+`;

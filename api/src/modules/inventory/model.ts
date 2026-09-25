@@ -110,6 +110,30 @@ const recipeSchema = new Schema<RecipeDoc>({
 
 export const Recipe = model<RecipeDoc>("Recipe", recipeSchema);
 
+/**
+ * Que insumo es cada opcion de la carta (Leche "Avena" = insumo "Leche de avena"). Vive aqui,
+ * como las recetas, para que la carta no dependa del inventario. Al entregar un pedido con una
+ * opcion distinta de la de por defecto:
+ * - Sustituye: si la receta lleva el insumo de la opcion por defecto, se cambia por este en la
+ *   misma cantidad (un Latte con avena gasta 200 ml de avena en vez de 200 ml de deslactosada).
+ * - Anade: si no (adiciones sin opcion por defecto, o jugo "en leche" en vez de agua), se suma
+ *   `qty` de este insumo por unidad. Sin qty, no se anade nada.
+ */
+export interface OptionSupplyDoc {
+  _id: Types.ObjectId;
+  optionId: Types.ObjectId;
+  supplyId: Types.ObjectId;
+  qty?: number | null; // en la unidad base del insumo, por unidad de producto
+}
+
+const optionSupplySchema = new Schema<OptionSupplyDoc>({
+  optionId: { type: Schema.Types.ObjectId, required: true, unique: true },
+  supplyId: { type: Schema.Types.ObjectId, ref: "Supply", required: true },
+  qty: { type: Number, min: 0 },
+});
+
+export const OptionSupply = model<OptionSupplyDoc>("OptionSupply", optionSupplySchema);
+
 export function isDuplicateKeyError(err: unknown) {
   return (err as { code?: number })?.code === 11000;
 }

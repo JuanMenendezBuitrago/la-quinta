@@ -43,9 +43,18 @@ export interface OrderClosedPayload {
   code: string;
   customerName: string;
   customerCode: string;
-  items: { menuItemId: string; name: string; quantity: number; priceCents: number }[];
+  // options: personalizaciones que no son las de por defecto ("Avena"), para mostrarlas.
+  // optionSwaps: esas mismas, con la opcion por defecto a la que sustituyen (para el inventario).
+  items: {
+    menuItemId: string;
+    name: string;
+    quantity: number;
+    priceCents: number;
+    options?: string[];
+    optionSwaps?: { fromOptionId: string | null; toOptionId: string }[];
+  }[];
   pickupSlot: string;
-  // Origen del pedido: WEB (el cliente) o STAFF (el personal, en mesa o para llevar).
+  // Origen del pedido: WEB (el cliente, para recoger o desde su mesa) o STAFF (el personal).
   source?: "WEB" | "STAFF";
   serviceType?: "MESA" | "LLEVAR" | null;
   table?: string | null;

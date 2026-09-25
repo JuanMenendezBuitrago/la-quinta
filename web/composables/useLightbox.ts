@@ -1,3 +1,5 @@
+import type { MenuItemModifier } from "./useMenu";
+
 export interface LightboxProduct {
   id: string;
   name: string;
@@ -5,6 +7,7 @@ export interface LightboxProduct {
   priceCents: number;
   allergens?: string[];
   imageUrl?: string | null;
+  modifiers?: MenuItemModifier[];
 }
 
 interface LightboxEntry {

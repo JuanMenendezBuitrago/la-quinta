@@ -14,6 +14,11 @@ export async function getOpeningHours(): Promise<OpeningHoursDoc[]> {
   return (await loadSettings()).openingHours;
 }
 
+/** Si esta activo, solo el personal puede crear pedidos. Lo usa "orders" en createOrder. */
+export async function staffOnlyOrders(): Promise<boolean> {
+  return !!(await loadSettings()).staffOnlyOrders;
+}
+
 export const settingsResolvers = {
   Query: {
     siteSettings: () => loadSettings(),
@@ -21,6 +26,8 @@ export const settingsResolvers = {
   SiteSettings: {
     openingHours: (doc: any) => [...doc.openingHours].sort((a: OpeningHoursDoc, b: OpeningHoursDoc) => a.weekday - b.weekday),
     schedule: (doc: any) => scheduleLines(doc.openingHours),
+    // Documentos guardados antes de existir el campo: sin valor equivale a desactivado.
+    staffOnlyOrders: (doc: any) => !!doc.staffOnlyOrders,
   },
   Mutation: {
     updateSiteSettings: async (_: unknown, args: { input: Record<string, unknown> }, ctx: GraphQLContext) => {
@@ -31,6 +38,8 @@ export const settingsResolvers = {
       }
       const update: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(args.input)) {
+        // null en un booleano no significa "borrar": se ignora como si no viniera.
+        if (key === "staffOnlyOrders" && value === null) continue;
         if (value !== undefined) update[key] = value;
       }
       return SiteSettings.findOneAndUpdate({}, update, {

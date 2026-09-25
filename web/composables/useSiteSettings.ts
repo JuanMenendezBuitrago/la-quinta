@@ -25,6 +25,7 @@ export const SITE_SETTINGS_QUERY = gql`
       legalName
       taxId
       privacyEmail
+      staffOnlyOrders
     }
   }
 `;
@@ -52,6 +53,7 @@ export const UPDATE_SITE_SETTINGS = gql`
       legalName
       taxId
       privacyEmail
+      staffOnlyOrders
     }
   }
 `;
@@ -84,4 +86,16 @@ export interface SiteSettings {
   legalName: string | null;
   taxId: string | null;
   privacyEmail: string | null;
+  /** Solo el personal crea pedidos: el cliente ve la carta y sus pedidos, pero no puede pedir. */
+  staffOnlyOrders: boolean;
+}
+
+/**
+ * Si el cliente puede anadir productos y hacer pedidos desde la web. Mismo query que el pie de
+ * pagina: sale de la cache de Apollo (y en SSR ya viene resuelto, sin parpadeo de botones).
+ * Mientras no se sabe, se ocultan los controles: mejor no ofrecer algo que la API rechazaria.
+ */
+export function useCustomerOrdering() {
+  const { result } = useQuery<{ siteSettings: SiteSettings }>(SITE_SETTINGS_QUERY);
+  return computed(() => result.value?.siteSettings.staffOnlyOrders === false);
 }

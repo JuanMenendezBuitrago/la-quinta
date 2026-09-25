@@ -62,8 +62,17 @@
             />
           </div>
           <div class="order-info">
-            <span class="order-name">{{ order.items.map((i: any) => `${i.quantity}× ${i.name}`).join(", ") }}</span>
-            <span class="order-date">{{ order.code }} · {{ formatDate(order.pickupSlot) }}</span>
+            <span class="order-name">{{
+              order.items
+                .map((i: any) => {
+                  const changed = (i.options ?? []).filter((o: any) => !o.isDefault).map((o: any) => o.name);
+                  return `${i.quantity}× ${i.name}${changed.length ? ` (${changed.join(", ")})` : ""}`;
+                })
+                .join(", ")
+            }}</span>
+            <span class="order-date">
+              {{ order.code }} · {{ formatDate(order.pickupSlot) }}{{ order.table ? ` · ${tableLabel(order.table)}` : "" }}
+            </span>
           </div>
           <span class="status" :data-status="order.status">{{ statusLabel(order.status) }}</span>
         </div>
@@ -82,6 +91,7 @@ import { useAuth } from "~/composables/useAuth";
 import { useLightbox } from "~/composables/useLightbox";
 import ImageLightbox from "~/components/ImageLightbox.vue";
 import { useImageUrl } from "~/composables/useImageUrl";
+import { tableLabel } from "~/composables/useTables";
 
 const LOYALTY_QUERY = gql`
   query MyLoyaltyStatus {
@@ -100,10 +110,15 @@ const ORDERS_QUERY = gql`
       code
       status
       pickupSlot
+      table
       items {
         name
         quantity
         imageUrl
+        options {
+          name
+          isDefault
+        }
       }
     }
   }

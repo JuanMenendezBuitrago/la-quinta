@@ -41,7 +41,12 @@ export const privacyResolvers = {
           pedidos: orders.map((o) => ({
             codigo: o.code,
             estado: o.status,
-            productos: o.items.map((i) => ({ nombre: i.name, cantidad: i.quantity, precio: i.priceCents })),
+            productos: o.items.map((i) => ({
+              nombre: i.name,
+              cantidad: i.quantity,
+              precio: i.priceCents,
+              opciones: (i.options ?? []).map((x) => `${x.groupName}: ${x.name}`),
+            })),
             totalCOP: o.totalCents,
             recogida: o.pickupSlot,
             creadoEl: o.createdAt,

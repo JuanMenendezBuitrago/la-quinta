@@ -70,7 +70,7 @@
                 <strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}
               </template>
               <strong v-else class="muted">Sin cliente</strong>
-              <p class="muted">{{ order.items.map((i: any) => `${i.quantity}× ${i.name}`).join(", ") }}</p>
+              <OrderItems :items="order.items" />
               <p class="service">{{ serviceLabel(order) }}</p>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
               <p v-if="order.paidAt" class="paid-badge">Cobrado · {{ paymentLabel(order.paymentMethod) }}</p>
@@ -160,7 +160,7 @@
               <strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}
             </template>
             <strong v-else class="muted">Sin cliente</strong>
-            <p class="muted">{{ order.items.map((i: any) => `${i.quantity}× ${i.name}`).join(", ") }}</p>
+            <OrderItems :items="order.items" />
             <p class="muted">
               {{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}{{
                 order.paidAt ? ` · Cobrado con ${paymentLabel(order.paymentMethod)}` : ""
@@ -196,7 +196,7 @@
         <StaffAdmin />
       </section>
 
-      <!-- Pie de pagina (solo gestion) -->
+      <!-- Configuracion: pedidos de clientes y pie de pagina (solo gestion) -->
       <section v-else-if="activeTab === 'pie'">
         <SiteSettingsAdmin />
       </section>
@@ -215,6 +215,7 @@ import CustomersAdmin from "~/components/CustomersAdmin.vue";
 import StaffOrderTaker from "~/components/StaffOrderTaker.vue";
 import HeroAdmin from "~/components/HeroAdmin.vue";
 import CustomerLookup from "~/components/CustomerLookup.vue";
+import OrderItems from "~/components/OrderItems.vue";
 import InventoryAdmin from "~/components/InventoryAdmin.vue";
 import { formatQty, useInventoryAlerts } from "~/composables/useInventory";
 import { goToSection, STAFF_SECTIONS, useStaffBadges, useStaffSection } from "~/composables/useStaffSections";

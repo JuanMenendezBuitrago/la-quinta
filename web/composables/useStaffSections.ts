@@ -18,7 +18,8 @@ export const STAFF_SECTIONS = [
   { id: "personal", label: "Personal", group: "local", roles: ["gestion"] },
   { id: "carta", label: "Carta", group: "web", roles: ["gestion"] },
   { id: "portada", label: "Portada", group: "web", roles: ["gestion"] },
-  { id: "pie", label: "Pie de página", group: "web", roles: ["gestion"] },
+  // id "pie": nombre historico (enlaces /staff?s=pie); ahora incluye tambien los pedidos de clientes.
+  { id: "pie", label: "Configuración", group: "web", roles: ["gestion"] },
 ] as const satisfies readonly { id: string; label: string; group: string; roles: readonly StaffRole[] }[];
 
 export type StaffSectionId = (typeof STAFF_SECTIONS)[number]["id"];

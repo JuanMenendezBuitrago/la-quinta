@@ -3,7 +3,8 @@
     <p class="muted intro">
       La receta dice qué insumos gasta <strong>una unidad</strong> de cada producto. Al entregar un
       pedido se descuentan solos. Marca «solo para llevar» en vasos, tapas y similares: se
-      descuentan en los pedidos web y en los «para llevar», no en los de mesa.
+      descuentan en los pedidos web y en los «para llevar», no en los de mesa. Qué insumo es cada
+      opción de leche se indica al final de la página.
     </p>
 
     <div class="toolbar">
@@ -72,6 +73,8 @@
         </li>
       </ul>
     </section>
+
+    <InventoryOptionSupplies :supplies="supplies" />
   </div>
 </template>
 
@@ -86,6 +89,7 @@ import {
   type Supply,
 } from "~/composables/useInventory";
 import QtyInput from "~/components/QtyInput.vue";
+import InventoryOptionSupplies from "~/components/InventoryOptionSupplies.vue";
 
 interface RecipeMenuCategory {
   id: string;

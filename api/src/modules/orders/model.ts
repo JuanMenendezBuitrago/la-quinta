@@ -24,11 +24,26 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   CANCELADO: "cancelado",
 };
 
+/** Personalizacion elegida (snapshot, como el nombre y el precio del producto). */
+export interface OrderLineOptionDoc {
+  groupId: Types.ObjectId;
+  groupName: string;
+  optionId: Types.ObjectId;
+  name: string;
+  priceDeltaCents: number;
+  // La que lleva el producto por defecto: en la cola solo se destacan las que no lo son.
+  isDefault: boolean;
+  // La opcion por defecto del grupo en ese producto (la de su receta): el inventario la cambia
+  // por la elegida. Vacio en pedidos anteriores a este campo o si el grupo no tiene defecto.
+  defaultOptionId?: Types.ObjectId | null;
+}
+
 export interface OrderLineDoc {
   menuItemId: Types.ObjectId;
   name: string; // snapshot: si el precio de la carta cambia despues, el pedido no se altera
-  priceCents: number;
+  priceCents: number; // precio por unidad, suplementos de las opciones incluidos
   quantity: number;
+  options: OrderLineOptionDoc[];
 }
 
 export type OrderSource = "WEB" | "STAFF";
@@ -41,6 +56,11 @@ export const PAYMENT_METHODS: PaymentMethod[] = ["EFECTIVO", "TARJETA", "TRANSFE
  * y el pedido solo se cierra (completedAt) cuando esta entregado Y cobrado. En los pedidos web y
  * para llevar se entrega y se cobra a la vez, asi que se cierran al entregar.
  */
+/** Valor de `table` para la barra: se sirve como en mesa, pero sin numero. */
+export const BAR_TABLE = "Barra";
+/** Donde puede sentarse un cliente que pide desde el local: las 6 mesas y la barra. */
+export const CUSTOMER_TABLES = ["1", "2", "3", "4", "5", "6", BAR_TABLE];
+
 export function requiresPayment(order: Pick<OrderDoc, "serviceType">) {
   return order.serviceType === "MESA";
 }
@@ -51,7 +71,7 @@ export interface OrderDoc {
   // Sin cliente: pedido tomado por el personal a alguien sin cuenta (se puede asignar despues).
   customerId?: Types.ObjectId | null;
   source: OrderSource;
-  // Solo pedidos tomados por el personal: en mesa (con su numero) o para llevar.
+  // En mesa (con su numero, o "Barra") o para llevar. Sin valor: pedido web para recoger.
   serviceType?: ServiceType;
   table?: string;
   note?: string;
@@ -70,12 +90,26 @@ export interface OrderDoc {
   updatedAt: Date;
 }
 
+const orderLineOptionSchema = new Schema<OrderLineOptionDoc>(
+  {
+    groupId: { type: Schema.Types.ObjectId, required: true },
+    groupName: { type: String, required: true },
+    optionId: { type: Schema.Types.ObjectId, required: true },
+    name: { type: String, required: true },
+    priceDeltaCents: { type: Number, required: true, min: 0 },
+    isDefault: { type: Boolean, required: true },
+    defaultOptionId: { type: Schema.Types.ObjectId },
+  },
+  { _id: false }
+);
+
 const orderLineSchema = new Schema<OrderLineDoc>(
   {
     menuItemId: { type: Schema.Types.ObjectId, ref: "MenuItem", required: true },
     name: { type: String, required: true },
     priceCents: { type: Number, required: true },
     quantity: { type: Number, required: true, min: 1 },
+    options: { type: [orderLineOptionSchema], default: [] },
   },
   { _id: false }
 );

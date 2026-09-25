@@ -33,7 +33,7 @@
         </button>
         <template v-if="quantityOf(item.id)">
           <span class="tile-qty" aria-live="polite">{{ quantityOf(item.id) }}</span>
-          <button type="button" class="tile-minus" :aria-label="`Quitar un ${item.name}`" @click="setQuantity(item.id, quantityOf(item.id) - 1)">−</button>
+          <button type="button" class="tile-minus" :aria-label="`Quitar un ${item.name}`" @click="removeOne(item.id)">−</button>
         </template>
       </li>
     </ul>
@@ -43,9 +43,21 @@
       <h3>Ticket</h3>
       <p v-if="!lines.length" class="muted">Añade productos de la carta.</p>
       <ul v-else class="ticket-lines">
-        <li v-for="line in lines" :key="line.menuItemId">
-          <span>{{ line.quantity }}× {{ line.name }}</span>
-          <span class="muted">{{ formatPrice(line.priceCents * line.quantity) }}</span>
+        <li v-for="line in lines" :key="line.key" class="ticket-line">
+          <div class="ticket-line-main">
+            <div class="qty">
+              <button type="button" class="qty-btn" :aria-label="`Quitar un ${line.name}`" @click="setQuantity(line.key, line.quantity - 1)">−</button>
+              <span class="qty-value">{{ line.quantity }}</span>
+              <button type="button" class="qty-btn" :aria-label="`Añadir un ${line.name}`" @click="setQuantity(line.key, line.quantity + 1)">+</button>
+            </div>
+            <span class="ticket-line-name">{{ line.name }}</span>
+            <span class="muted">{{ formatPrice(line.priceCents * line.quantity) }}</span>
+          </div>
+          <LineOptionsPicker
+            :modifiers="itemsById.get(line.menuItemId)?.modifiers ?? []"
+            :options="line.options"
+            @change="setOptions(line.key, $event)"
+          />
         </li>
         <li class="ticket-total"><span>Total</span><span>{{ formatPrice(totalCents) }}</span></li>
       </ul>
@@ -78,9 +90,10 @@
 
       <label class="field">
         <span class="muted">Nota (opcional)</span>
-        <input v-model="note" type="text" maxlength="200" placeholder="Ej. sin azúcar, leche de avena" />
+        <input v-model="note" type="text" maxlength="200" placeholder="Ej. sin azúcar, bien caliente" />
       </label>
 
+      <p v-if="missingChoice" class="muted" style="color: var(--danger)">Elige la opción marcada en rojo: la de siempre está agotada.</p>
       <p v-if="submitError" class="muted" style="color: var(--danger)">{{ submitError }}</p>
       <div class="ticket-actions">
         <button class="button" type="button" :disabled="!canSubmit" @click="submit">
@@ -100,9 +113,11 @@
 
 <script setup lang="ts">
 import { gql } from "graphql-tag";
-import { useCart } from "~/composables/useCart";
-import { MENU_QUERY, type MenuCategory, type MenuItem } from "~/composables/useMenu";
-import { BAR_TABLE, type CustomerMatch } from "~/composables/useStaffOrders";
+import { orderLinesInput, useCart } from "~/composables/useCart";
+import { MENU_QUERY, defaultCartOptions, missingModifiers, type MenuCategory, type MenuItem } from "~/composables/useMenu";
+import LineOptionsPicker from "~/components/LineOptionsPicker.vue";
+import { type CustomerMatch } from "~/composables/useStaffOrders";
+import { BAR_TABLE, TABLES } from "~/composables/useTables";
 
 const CREATE_STAFF_ORDER = gql`
   mutation CreateStaffOrder($input: StaffOrderInput!) {
@@ -117,7 +132,7 @@ const { result, loading, error } = useQuery<{ menu: MenuCategory[] }>(MENU_QUERY
 const menu = computed(() => result.value?.menu ?? []);
 
 // Ticket propio: no se mezcla con el carrito publico aunque sea el mismo navegador.
-const { lines, add, setQuantity, clear, cartCount, totalCents } = useCart("staff-ticket-lines");
+const { lines, add, setQuantity, setOptions, clear, cartCount, totalCents } = useCart("staff-ticket-lines");
 
 const search = ref("");
 // Calculada (no asignada al cargar): asi el servidor ya pinta la primera categoria marcada y la
@@ -138,21 +153,29 @@ const visibleItems = computed<MenuItem[]>(() => {
   return menu.value.find((c) => c.id === activeCategoryId.value)?.items ?? [];
 });
 
+const itemsById = computed(() => new Map(menu.value.flatMap((c) => c.items).map((i) => [i.id, i])));
+
 function quantityOf(menuItemId: string) {
-  return lines.value.find((l) => l.menuItemId === menuItemId)?.quantity ?? 0;
+  return lines.value.filter((l) => l.menuItemId === menuItemId).reduce((sum, l) => sum + l.quantity, 0);
 }
 function addItem(item: MenuItem) {
-  add({ id: item.id, name: item.name, priceCents: item.priceCents });
+  add({ id: item.id, name: item.name, priceCents: item.priceCents }, defaultCartOptions(item));
+}
+// El "−" de la tarjeta quita primero de la linea sin personalizar; si no la hay, de la ultima.
+function removeOne(menuItemId: string) {
+  const itemLines = lines.value.filter((l) => l.menuItemId === menuItemId);
+  const line = itemLines.find((l) => l.options.every((o) => o.isDefault)) ?? itemLines[itemLines.length - 1];
+  if (line) setQuantity(line.key, line.quantity - 1);
 }
 
-// El local: 6 mesas y la barra. La barra se guarda como servicio en mesa con table = "Barra".
-const TABLE_COUNT = 6;
+// Lineas con una personalizacion obligatoria sin elegir (su opcion por defecto esta agotada).
+const missingChoice = computed(() =>
+  lines.value.some((l) => missingModifiers(itemsById.value.get(l.menuItemId)?.modifiers, l.options).length)
+);
+
+// Las mesas y la barra (que se guarda como servicio en mesa con table = "Barra"), o para llevar.
 const BAR = BAR_TABLE;
-const PLACES = [
-  ...Array.from({ length: TABLE_COUNT }, (_, i) => ({ id: String(i + 1), label: `Mesa ${i + 1}` })),
-  { id: BAR, label: "Barra" },
-  { id: "LLEVAR", label: "Para llevar" },
-];
+const PLACES = [...TABLES, { id: "LLEVAR", label: "Para llevar" }];
 // Sin valor por defecto: obliga a elegir, para que ningun pedido acabe en la mesa equivocada.
 const place = ref("");
 const customer = ref<CustomerMatch | null>(null);
@@ -164,7 +187,7 @@ const submitError = ref("");
 const lastCode = ref("");
 
 const canSubmit = computed(
-  () => !submitting.value && lines.value.length > 0 && !!place.value
+  () => !submitting.value && lines.value.length > 0 && !!place.value && !missingChoice.value
 );
 
 function reset() {
@@ -183,7 +206,7 @@ async function submit() {
     const { mutate } = useMutation(CREATE_STAFF_ORDER);
     const res = await mutate({
       input: {
-        items: lines.value.map((l) => ({ menuItemId: l.menuItemId, quantity: l.quantity })),
+        items: orderLinesInput(lines.value),
         serviceType: place.value === "LLEVAR" ? "LLEVAR" : "MESA",
         table: place.value === "LLEVAR" ? null : place.value,
         customerId: customer.value?.id ?? null,
@@ -312,6 +335,23 @@ input {
 .ticket h3 { margin: 0; }
 .ticket-lines { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .ticket-lines li { display: flex; justify-content: space-between; gap: 12px; }
+.ticket-lines li.ticket-line { flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.ticket-line-main { display: flex; align-items: center; gap: 10px; }
+.ticket-line-name { flex: 1; min-width: 0; font-weight: 600; }
+.qty { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.qty-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.qty-value { min-width: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+
 .ticket-total { border-top: 1px solid var(--border); padding-top: 6px; font-weight: 700; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 /* Botones grandes: 3 mesas por fila en movil; barra y para llevar ocupan media fila cada uno */

@@ -1,11 +1,20 @@
 <template>
   <section class="settings-admin">
-    <p class="muted">Estos datos se muestran en el pie de página de toda la web.</p>
+    <p class="muted">Configuración de la web: pedidos de clientes y datos del pie de página.</p>
 
     <p v-if="loading" class="muted">Cargando…</p>
     <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
 
     <form v-if="settings" class="card settings-form" @submit.prevent="submit">
+      <div class="field">
+        <span class="muted">Pedidos</span>
+        <label class="day-toggle">
+          <input v-model="form.staffOnlyOrders" type="checkbox" />
+          <span>Solo el personal puede crear pedidos</span>
+        </label>
+        <span class="muted">Los clientes seguirán viendo la carta y sus pedidos, pero no podrán añadir productos ni pedir desde la web.</span>
+      </div>
+
       <label class="field">
         <span class="muted">Dirección</span>
         <textarea v-model="form.address" rows="2" placeholder="Calle 00 # 00-00&#10;Barrio, Ciudad"></textarea>
@@ -123,6 +132,7 @@ function emptyForm() {
     legalName: "",
     taxId: "",
     privacyEmail: "",
+    staffOnlyOrders: false,
   };
 }
 
@@ -146,6 +156,7 @@ watch(
       legalName: val.legalName ?? "",
       taxId: val.taxId ?? "",
       privacyEmail: val.privacyEmail ?? "",
+      staffOnlyOrders: val.staffOnlyOrders,
     });
   },
   { immediate: true }
@@ -178,6 +189,7 @@ async function submit() {
         legalName: form.legalName.trim() || null,
         taxId: form.taxId.trim() || null,
         privacyEmail: form.privacyEmail.trim() || null,
+        staffOnlyOrders: form.staffOnlyOrders,
       },
     });
     await refetch();

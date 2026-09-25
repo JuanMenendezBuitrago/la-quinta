@@ -14,7 +14,8 @@
     "import-menu": "ts-node-dev --transpile-only --exit-child src/scripts/import-menu.ts",
     "export-sheets": "ts-node-dev --transpile-only --exit-child src/scripts/export-orders-to-sheets.ts",
     "recalc-stock": "ts-node-dev --transpile-only --exit-child src/scripts/recalc-stock.ts",
-    "import-recipes": "ts-node-dev --transpile-only --exit-child src/scripts/import-recipes.ts"
+    "import-recipes": "ts-node-dev --transpile-only --exit-child src/scripts/import-recipes.ts",
+    "seed-options": "ts-node-dev --transpile-only --exit-child src/scripts/seed-options.ts"
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",

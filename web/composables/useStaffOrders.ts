@@ -2,9 +2,7 @@ import { gql } from "graphql-tag";
 import type { ComputedRef, Ref } from "vue";
 import { playNewOrderChime } from "./useOrderChime";
 import { useOrderNotifications } from "./useOrderNotifications";
-
-/** Valor de `table` para los pedidos servidos en la barra (servicio MESA, sin numero de mesa). */
-export const BAR_TABLE = "Barra";
+import { tableLabel } from "./useTables";
 
 export type PaymentMethod = "EFECTIVO" | "TARJETA" | "TRANSFERENCIA";
 export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
@@ -42,6 +40,10 @@ const ORDER_FIELDS = `
   items {
     name
     quantity
+    options {
+      name
+      isDefault
+    }
   }
 `;
 
@@ -280,9 +282,11 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     }
   }
 
-  /** Donde va el pedido: mesa o para llevar si lo tomo el personal; hora de recogida si es web. */
+  /** Donde va el pedido: mesa (la pida el personal o el cliente desde el local), para llevar o recogida. */
   function serviceLabel(order: any) {
-    if (order.serviceType === "MESA") return order.table === BAR_TABLE ? "Barra" : `Mesa ${order.table}`;
+    if (order.serviceType === "MESA") {
+      return order.source === "WEB" ? `${tableLabel(order.table)} · pedido por el cliente` : tableLabel(order.table);
+    }
     if (order.serviceType === "LLEVAR") return "Para llevar";
     return `Recogida: ${formatTime(order.pickupSlot)}`;
   }

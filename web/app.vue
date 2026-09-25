@@ -11,7 +11,7 @@
       </nav>
       <nav v-else>
         <NuxtLink to="/">Carta</NuxtLink>
-        <NuxtLink to="/carrito">Carrito<span v-if="cartCount" class="badge">{{ cartCount }}</span></NuxtLink>
+        <NuxtLink v-if="canOrder" to="/carrito">Carrito<span v-if="cartCount" class="badge">{{ cartCount }}</span></NuxtLink>
         <NuxtLink to="/cuenta">Mi cuenta</NuxtLink>
       </nav>
     </header>
@@ -23,12 +23,31 @@
 <script setup lang="ts">
 import { useCart } from "~/composables/useCart";
 import { restoreSession, useStaffAuth } from "~/composables/useAuth";
+import { TABLES, useCustomerTable } from "~/composables/useTables";
+import { useCustomerOrdering } from "~/composables/useSiteSettings";
 import StaffNav from "~/components/StaffNav.vue";
 
-const { cartCount } = useCart();
+const { cartCount, clear: clearCart } = useCart();
+// Si se activa "solo el personal crea pedidos", el carrito deja de existir para el cliente.
+const canOrder = useCustomerOrdering();
+watch(canOrder, (enabled) => {
+  if (!enabled) clearCart();
+});
 const { staff } = useStaffAuth();
 const route = useRoute();
 const inStaff = computed(() => route.path === "/staff" || route.path.startsWith("/staff/"));
+
+// ?mesa=3 (o ?mesa=barra), p. ej. desde un QR en la mesa: el cliente pide desde el local.
+const customerTable = useCustomerTable();
+watch(
+  () => route.query.mesa,
+  (mesa) => {
+    const value = typeof mesa === "string" ? mesa.trim().toLowerCase() : "";
+    const table = TABLES.find((t) => t.id.toLowerCase() === value);
+    if (table) customerTable.value = table.id;
+  },
+  { immediate: true }
+);
 
 // Recupera la sesion (cliente o personal) a partir de la cookie del token.
 await useAsyncData("session", async () => {

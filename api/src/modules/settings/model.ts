@@ -26,6 +26,8 @@ export interface SiteSettingsDoc {
   legalName?: string;
   taxId?: string;
   privacyEmail?: string;
+  // Solo el personal crea pedidos: los clientes ven la carta y sus pedidos, pero no pueden pedir.
+  staffOnlyOrders: boolean;
 }
 
 // Documento unico (singleton): siempre se lee/escribe con un findOneAndUpdate sin filtro,
@@ -47,6 +49,7 @@ const siteSettingsSchema = new Schema<SiteSettingsDoc>({
   legalName: { type: String, trim: true },
   taxId: { type: String, trim: true },
   privacyEmail: { type: String, trim: true, lowercase: true },
+  staffOnlyOrders: { type: Boolean, default: false },
 });
 
 export const SiteSettings = model<SiteSettingsDoc>("SiteSettings", siteSettingsSchema);
