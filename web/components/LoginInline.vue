@@ -87,6 +87,6 @@ async function verify() {
 <style scoped>
 .login-inline { display: flex; flex-direction: column; gap: 8px; max-width: 320px; }
 .consent { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; font-size: 13px; line-height: 1.45; }
-.consent input { margin-top: 3px; flex-shrink: 0; }
+.consent input { margin-top: 3px; flex-shrink: 0; width: auto; display: inline-flex;}
 .consent a { color: inherit; text-decoration: underline; }
 </style>
