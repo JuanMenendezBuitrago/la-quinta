@@ -96,7 +96,8 @@ function onTouchEnd(event: TouchEvent) {
   const deltaX = touch.clientX - touchStartX;
   const deltaY = touch.clientY - touchStartY;
   if (Math.abs(deltaX) < SWIPE_THRESHOLD || Math.abs(deltaX) < Math.abs(deltaY)) return;
-  emit(deltaX < 0 ? "next" : "prev");
+  if (deltaX < 0) emit("next");
+  else emit("prev");
 }
 
 const { lines, add, setQuantity } = useCart();

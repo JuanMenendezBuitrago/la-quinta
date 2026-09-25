@@ -79,7 +79,7 @@
         <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" :disabled="uploading" @change="handleImageUpload" />
         <span v-if="uploading" class="muted">Subiendo imagen…</span>
         <span v-if="uploadError" class="muted" style="color: var(--danger)">{{ uploadError }}</span>
-        <img v-if="form.imageUrl" :src="resolveImageUrl(form.imageUrl)" alt="" class="image-preview" />
+        <img v-if="form.imageUrl" :src="resolveImageUrl(form.imageUrl) ?? undefined" alt="" class="image-preview" />
       </label>
 
       <label class="field-inline">
@@ -102,7 +102,7 @@
     <section v-for="category in categories" :key="category.id" class="category">
       <h3>{{ category.name }}</h3>
       <div class="card item-row" v-for="item in category.items" :key="item.id" :class="{ unavailable: !item.available }">
-        <img v-if="item.imageUrl" :src="resolveImageUrl(item.imageUrl)" alt="" class="thumb" />
+        <img v-if="item.imageUrl" :src="resolveImageUrl(item.imageUrl) ?? undefined" alt="" class="thumb" />
         <div class="item-info">
           <strong>{{ item.name }}</strong>
           <span v-if="!item.available" class="muted"> · oculto</span>

@@ -30,7 +30,8 @@ export function useOrderNotifications() {
         body: [order.customer?.name, items].filter(Boolean).join("\n"),
         tag: "la-quinta-nuevo-pedido", // agrupa varias notificaciones seguidas en una sola
         renotify: true,
-      });
+        // renotify lo soportan los navegadores, pero aun no esta en los tipos de TypeScript.
+      } as NotificationOptions);
       notification.onclick = () => {
         window.focus();
         notification.close();

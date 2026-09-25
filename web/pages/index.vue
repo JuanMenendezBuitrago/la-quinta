@@ -27,7 +27,7 @@
         <article v-for="item in category.items" :key="item.id" class="item" :title="item.description || undefined">
           <img
             v-if="item.imageUrl"
-            :src="resolveImageUrl(item.imageUrl)"
+            :src="resolveImageUrl(item.imageUrl) ?? undefined"
             :alt="item.name"
             class="item-image"
             role="button"
@@ -74,12 +74,12 @@
 
 <script setup lang="ts">
 import { useCart } from "~/composables/useCart";
-import { MENU_QUERY } from "~/composables/useMenu";
+import { MENU_QUERY, type MenuCategory } from "~/composables/useMenu";
 import { useLightbox } from "~/composables/useLightbox";
 import { useImageUrl } from "~/composables/useImageUrl";
 import ImageLightbox from "~/components/ImageLightbox.vue";
 
-const { result, loading, error } = useQuery(MENU_QUERY);
+const { result, loading, error } = useQuery<{ menu: MenuCategory[] }>(MENU_QUERY);
 const menu = computed(() => result.value?.menu ?? []);
 const { add, cartCount, totalCents } = useCart();
 
