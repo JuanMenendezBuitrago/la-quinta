@@ -107,7 +107,7 @@ async function save(optionId: string, supplyId: string, qty: number | null) {
   min-width: 0;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-border);
   font: inherit;
   font-size: 14px;
 }

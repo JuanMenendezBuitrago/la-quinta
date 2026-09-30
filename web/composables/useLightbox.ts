@@ -1,4 +1,4 @@
-import type { MenuItemModifier } from "./useMenu";
+import type { CoffeeDetails, MenuItemModifier, MenuSize } from "./useMenu";
 
 export interface LightboxProduct {
   id: string;
@@ -8,6 +8,9 @@ export interface LightboxProduct {
   allergens?: string[];
   imageUrl?: string | null;
   modifiers?: MenuItemModifier[];
+  coffee?: CoffeeDetails | null;
+  /** Cafe en grano con varios tamanos: se elige uno y se anade ese producto. */
+  sizes?: MenuSize[];
 }
 
 interface LightboxEntry {

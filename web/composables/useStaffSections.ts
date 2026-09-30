@@ -17,6 +17,7 @@ export const STAFF_SECTIONS = [
   { id: "clientes", label: "Clientes", group: "local", roles: ["gestion"] },
   { id: "personal", label: "Personal", group: "local", roles: ["gestion"] },
   { id: "carta", label: "Carta", group: "web", roles: ["gestion"] },
+  { id: "cafe", label: "Café en grano", group: "web", roles: ["gestion"] },
   { id: "portada", label: "Portada", group: "web", roles: ["gestion"] },
   // id "pie": nombre historico (enlaces /staff?s=pie); ahora incluye tambien los pedidos de clientes.
   { id: "pie", label: "Configuración", group: "web", roles: ["gestion"] },

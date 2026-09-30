@@ -56,7 +56,7 @@ function formatPrice(priceCents: number) {
   width: auto;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-border);
   background: var(--surface);
   color: var(--text);
   font: inherit;

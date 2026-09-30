@@ -181,6 +181,11 @@
         <MenuAdmin />
       </section>
 
+      <!-- Cafe en grano en bolsas (solo gestion) -->
+      <section v-else-if="activeTab === 'cafe'">
+        <CoffeeAdmin />
+      </section>
+
       <!-- Clientes (solo gestion) -->
       <section v-else-if="activeTab === 'clientes'">
         <CustomersAdmin />
@@ -209,6 +214,7 @@ import { useStaffAuth } from "~/composables/useAuth";
 import { PAYMENT_LABELS, useStaffOrders, type CustomerMatch, type PaymentMethod } from "~/composables/useStaffOrders";
 import { primeAudio } from "~/composables/useOrderChime";
 import MenuAdmin from "~/components/MenuAdmin.vue";
+import CoffeeAdmin from "~/components/CoffeeAdmin.vue";
 import StaffAdmin from "~/components/StaffAdmin.vue";
 import SiteSettingsAdmin from "~/components/SiteSettingsAdmin.vue";
 import CustomersAdmin from "~/components/CustomersAdmin.vue";

@@ -158,7 +158,7 @@ async function save() {
   min-width: 0;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-border);
   font-size: 15px;
   font-family: inherit;
 }

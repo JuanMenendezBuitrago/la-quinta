@@ -370,7 +370,7 @@ async function submitOrder() {
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--field-border);
   border-radius: 999px;
   padding: 10px 16px;
   background: var(--surface);

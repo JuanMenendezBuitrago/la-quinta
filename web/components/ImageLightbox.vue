@@ -39,9 +39,33 @@
                   <span class="lightbox-price price">{{ formatPrice(unitPriceCents) }}</span>
                 </div>
                 <p v-if="product.description" class="lightbox-desc">{{ product.description }}</p>
+                <!-- Bolsas de cafe en grano: la ficha del cafe -->
+                <dl v-if="coffeeFacts.length" class="coffee-facts">
+                  <template v-for="fact in coffeeFacts" :key="fact.label">
+                    <dt>{{ fact.label }}</dt>
+                    <dd>{{ fact.value }}</dd>
+                  </template>
+                </dl>
                 <p v-if="product.allergens?.length" class="lightbox-allergens">
                   Alérgenos: {{ product.allergens.join(", ") }}
                 </p>
+                <!-- Cafe en grano con varios tamanos: se anade el producto del tamano elegido -->
+                <div v-if="canOrder && product.sizes" class="lightbox-modifier">
+                  <span class="lightbox-qty-label">Tamaño</span>
+                  <div class="modifier-chips" role="radiogroup" aria-label="Tamaño">
+                    <button
+                      v-for="s in product.sizes"
+                      :key="s.menuItemId"
+                      type="button"
+                      role="radio"
+                      :aria-checked="target?.id === s.menuItemId"
+                      :class="{ active: target?.id === s.menuItemId }"
+                      @click="sizeId = s.menuItemId"
+                    >
+                      {{ s.label }}<span class="chip-delta"> {{ formatPrice(s.priceCents) }}</span>
+                    </button>
+                  </div>
+                </div>
                 <!-- Personalizaciones (p. ej. Leche): viene marcada la de la receta -->
                 <div v-for="m in canOrder ? singleChoice : []" :key="m.group.id" class="lightbox-modifier">
                   <span class="lightbox-qty-label">{{ m.group.name }}</span>
@@ -91,7 +115,7 @@
 
 <script setup lang="ts">
 import { cartLineKey, useCart } from "~/composables/useCart";
-import { cartOption, defaultCartOptions, missingModifiers } from "~/composables/useMenu";
+import { ROAST_LABELS, cartOption, defaultCartOptions, missingModifiers } from "~/composables/useMenu";
 import { useCustomerOrdering } from "~/composables/useSiteSettings";
 import type { LightboxProduct } from "~/composables/useLightbox";
 
@@ -130,7 +154,34 @@ function onTouchEnd(event: TouchEvent) {
 }
 
 const { lines, add, setQuantity } = useCart();
+
+const coffeeFacts = computed(() => {
+  const c = props.product?.coffee;
+  if (!c) return [];
+  return [
+    { label: "Origen", value: c.origin },
+    { label: "Variedad", value: c.variety },
+    { label: "Proceso", value: c.process?.name },
+    { label: "Altitud", value: c.altitudeMasl ? `${c.altitudeMasl.toLocaleString("es-CO")} m s. n. m.` : null },
+    { label: "Tueste", value: c.roastLevel ? ROAST_LABELS[c.roastLevel] : null },
+    { label: "Notas", value: c.tastingNotes.length ? c.tastingNotes.join(", ") : null },
+  ].filter((f) => f.value);
+});
 const canOrder = useCustomerOrdering();
+
+// Cafe en grano con varios tamanos: el producto que se pide es el del tamano elegido (al abrir,
+// el mas economico). En el resto de productos, el propio producto.
+const sizeId = ref("");
+watch(
+  () => props.product?.id,
+  () => (sizeId.value = props.product?.sizes?.[0]?.menuItemId ?? ""),
+  { immediate: true }
+);
+const target = computed(() => {
+  const product = props.product;
+  const size = product?.sizes?.find((s) => s.menuItemId === sizeId.value);
+  return size && product ? { ...product, id: size.menuItemId, name: size.name, priceCents: size.priceCents } : product;
+});
 
 // Opcion elegida en cada grupo de una sola opcion; al pasar a otro producto vuelve a la de su receta.
 const singleChoice = computed(() => (props.product?.modifiers ?? []).filter((m) => m.group.maxSelect === 1));
@@ -150,22 +201,22 @@ const chosenOptions = computed(() =>
 );
 const missing = computed(() => missingModifiers(props.product?.modifiers, chosenOptions.value));
 const unitPriceCents = computed(
-  () => (props.product?.priceCents ?? 0) + chosenOptions.value.reduce((sum, o) => sum + o.priceDeltaCents, 0)
+  () => (target.value?.priceCents ?? 0) + chosenOptions.value.reduce((sum, o) => sum + o.priceDeltaCents, 0)
 );
 
 // Cantidad en el pedido de este producto CON las opciones elegidas (0 si aun no se ha añadido).
 // Al ser el mismo estado global que usa el carrito, tocar aqui el "+"/"-" se refleja
 // tambien en /carrito sin recargar nada.
-const lineKey = computed(() => (props.product ? cartLineKey(props.product.id, chosenOptions.value) : ""));
+const lineKey = computed(() => (target.value ? cartLineKey(target.value.id, chosenOptions.value) : ""));
 const quantity = computed(() => lines.value.find((l) => l.key === lineKey.value)?.quantity ?? 0);
 
 function increase() {
-  if (!props.product || missing.value.length) return;
+  if (!target.value || missing.value.length) return;
   add(
     {
-      id: props.product.id,
-      name: props.product.name,
-      priceCents: props.product.priceCents,
+      id: target.value.id,
+      name: target.value.name,
+      priceCents: target.value.priceCents,
       imageUrl: props.url,
     },
     chosenOptions.value
@@ -173,7 +224,7 @@ function increase() {
 }
 
 function decrease() {
-  if (!props.product) return;
+  if (!target.value) return;
   setQuantity(lineKey.value, quantity.value - 1);
 }
 
@@ -274,6 +325,16 @@ function formatPrice(priceCents: number) {
 .qty-value { min-width: 16px; text-align: center; font-variant-numeric: tabular-nums; }
 
 .lightbox-add { width: 100%; margin-top: 12px; }
+
+.coffee-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+.coffee-facts dt { color: var(--text-muted); }
+.coffee-facts dd { margin: 0; color: var(--text); }
 
 .lightbox-modifier { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .modifier-chips { display: flex; flex-wrap: wrap; gap: 6px; }

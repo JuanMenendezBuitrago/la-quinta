@@ -24,7 +24,7 @@
     <section v-for="category in menu" :id="`cat-${category.id}`" :key="category.id" class="category">
       <h2 class="category-title">{{ category.name }}</h2>
       <div class="items">
-        <article v-for="item in category.items" :key="item.id" class="item" :title="item.description || undefined">
+        <article v-for="item in menuEntries(category.items)" :key="item.id" class="item" :title="item.description || undefined">
           <img
             v-if="item.imageUrl"
             :src="resolveImageUrl(item.imageUrl) ?? undefined"
@@ -37,14 +37,14 @@
           />
           <div class="item-info">
             <h3 class="item-name">{{ item.name }}</h3>
-            <span class="item-price price">{{ formatPrice(item.priceCents) }}</span>
+            <span class="item-price price">{{ item.sizes ? "desde " : "" }}{{ formatPrice(item.priceCents) }}</span>
           </div>
           <button
             v-if="canOrder"
             class="add-btn"
             type="button"
             aria-label="Añadir al carrito"
-            @click="add({ id: item.id, name: item.name, priceCents: item.priceCents, imageUrl: resolveImageUrl(item.imageUrl) }, defaultCartOptions(item))"
+            @click="onAdd(item)"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
               <line x1="12" y1="5" x2="12" y2="19" />
@@ -76,7 +76,7 @@
 <script setup lang="ts">
 import { useCart } from "~/composables/useCart";
 import { useCustomerOrdering } from "~/composables/useSiteSettings";
-import { MENU_QUERY, defaultCartOptions, type MenuCategory } from "~/composables/useMenu";
+import { MENU_QUERY, defaultCartOptions, menuEntries, type MenuCategory, type MenuEntry } from "~/composables/useMenu";
 import { useLightbox } from "~/composables/useLightbox";
 import { useImageUrl } from "~/composables/useImageUrl";
 import ImageLightbox from "~/components/ImageLightbox.vue";
@@ -196,12 +196,24 @@ const { resolveImageUrl } = useImageUrl();
 // carta (categoria a categoria). Es lo que permite el swipe / las flechas de la vista
 // ampliada: navegar de un producto al siguiente sin volver al grid, cruzando categorias.
 const navigableItems = computed(() =>
-  menu.value.flatMap((category: any) =>
-    category.items
-      .filter((item: any) => item.imageUrl)
-      .map((item: any) => ({ url: resolveImageUrl(item.imageUrl), product: item }))
+  menu.value.flatMap((category) =>
+    menuEntries(category.items).flatMap((item) => {
+      const url = resolveImageUrl(item.imageUrl);
+      return url ? [{ url, product: item }] : [];
+    })
   )
 );
+
+// Un cafe con varios tamanos abre su ficha para elegir cual; sin foto no hay ficha, asi que se
+// anade el tamano mas economico (en el carrito se ve cual es).
+function onAdd(item: MenuEntry) {
+  if (item.sizes && item.imageUrl) return openProduct(item);
+  const target = item.sizes ? { ...item, id: item.sizes[0].menuItemId, name: item.sizes[0].name } : item;
+  add(
+    { id: target.id, name: target.name, priceCents: target.priceCents, imageUrl: resolveImageUrl(item.imageUrl) },
+    defaultCartOptions(target)
+  );
+}
 
 function openProduct(item: any) {
   const resolvedUrl = resolveImageUrl(item.imageUrl);

@@ -142,7 +142,8 @@
 
       <label class="field">
         <span class="muted">Imagen</span>
-        <input v-model="form.imageUrl" type="url" placeholder="https://… (o sube un archivo)" />
+        <!-- text, no url: al subir un archivo queda una ruta relativa (/uploads/…), que type="url" rechaza -->
+        <input v-model="form.imageUrl" type="text" inputmode="url" placeholder="https://… (o sube un archivo)" />
         <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" :disabled="uploading" @change="handleImageUpload" />
         <span v-if="uploading" class="muted">Subiendo imagen…</span>
         <span v-if="uploadError" class="muted" style="color: var(--danger)">{{ uploadError }}</span>
@@ -207,7 +208,11 @@
           </p>
           <p v-if="deleteError === item.id" class="muted" style="color: var(--danger)">No se pudo borrar el producto</p>
         </div>
-        <div v-if="pendingDeleteId === item.id" class="item-actions">
+        <!-- Bolsas de cafe: nombre, precio y disponibilidad los fija su cafe al guardarlo -->
+        <div v-if="item.coffee" class="item-actions">
+          <NuxtLink class="button secondary" style="text-decoration: none" :to="{ query: { s: 'cafe' } }">Editar en Café en grano</NuxtLink>
+        </div>
+        <div v-else-if="pendingDeleteId === item.id" class="item-actions">
           <span class="muted">¿Borrar?</span>
           <button class="button secondary" type="button" :disabled="deleting" @click="confirmRemove(item)">Sí</button>
           <button class="button secondary" type="button" :disabled="deleting" @click="pendingDeleteId = ''">No</button>
@@ -248,6 +253,8 @@ interface MenuItemAdmin {
   imageUrl: string | null;
   available: boolean;
   modifiers: { defaultOptionId: string | null; group: { id: string; name: string } }[];
+  /** Bolsa de cafe en grano: se edita desde su cafe, no aqui. */
+  coffee: { id: string } | null;
 }
 
 interface MenuCategoryAdmin {
@@ -270,6 +277,9 @@ const ADMIN_MENU_QUERY = gql`
         priceCents
         imageUrl
         available
+        coffee {
+          id
+        }
         modifiers {
           defaultOptionId
           group {
@@ -556,41 +566,11 @@ function cancelForm() {
   formError.value = "";
 }
 
-const uploading = ref(false);
-const uploadError = ref("");
+const { uploading, uploadError, uploadFromInput } = useImageUpload();
 
 async function handleImageUpload(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-
-  uploading.value = true;
-  uploadError.value = "";
-  try {
-    const config = useRuntimeConfig();
-    const uploadsBase = String(config.public.graphqlHttp).replace(/\/graphql\/?$/, "");
-    const token = useCookie("lq_auth_token").value;
-
-    const body = new FormData();
-    body.append("file", file);
-
-    const res = await fetch(`${uploadsBase}/uploads`, {
-      method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body,
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(data?.error ?? "No se pudo subir la imagen");
-
-    // Se guarda solo la ruta relativa: el host correcto para verla lo resuelve
-    // cada dispositivo por su cuenta (ver useImageUrl.ts).
-    form.imageUrl = data.url;
-  } catch (err: any) {
-    uploadError.value = err?.message ?? "No se pudo subir la imagen";
-  } finally {
-    uploading.value = false;
-    input.value = "";
-  }
+  const url = await uploadFromInput(event);
+  if (url) form.imageUrl = url;
 }
 
 async function submitForm() {
@@ -682,7 +662,7 @@ select, textarea {
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-border);
   font-size: 15px;
   font-family: inherit;
 }

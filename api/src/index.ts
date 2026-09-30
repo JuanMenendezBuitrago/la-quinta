@@ -17,6 +17,7 @@ import { registerInventoryListeners } from "./modules/inventory/listeners";
 import { registerSheetsListeners } from "./modules/sheets/listeners";
 import { backfillCompletedOrders, backfillOrderCodes } from "./modules/orders/model";
 import { seedHeroSlidesOnce } from "./modules/hero/model";
+import { ensureCoffeeProcesses } from "./modules/coffee/model";
 import { uploadsRouter, UPLOAD_DIR } from "./modules/uploads/router";
 
 async function main() {
@@ -24,6 +25,7 @@ async function main() {
   await backfillOrderCodes();
   await backfillCompletedOrders();
   await seedHeroSlidesOnce();
+  await ensureCoffeeProcesses();
   registerLoyaltyListeners();
   registerInventoryListeners();
   await registerSheetsListeners();

@@ -35,6 +35,8 @@
   --danger: #e2725b;
   --border: rgba(243, 236, 225, 0.08);
   --border-strong: rgba(243, 236, 225, 0.16);
+  /* Borde de los campos de formulario: el marron del texto, que se vea sobre el crema del fondo. */
+  --field-border: rgba(159, 113, 77, 0.4);
   --font-serif: "Bodoni Moda", serif;
   --font-futura: "Futura Now Condensed", "Arial Narrow", sans-serif;
   --font-sans: "Work Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -123,7 +125,7 @@ input, select, textarea {
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--field-border);
   background: var(--surface);
   color: var(--text);
   font-family: var(--font-sans);
