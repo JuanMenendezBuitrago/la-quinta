@@ -57,7 +57,13 @@
       <section v-if="activeTab === 'cola'" class="queue-board">
         <div v-for="group in groupedQueue" :key="group.status" class="queue-column">
           <h2>{{ statusLabel(group.status) }} ({{ group.orders.length }})</h2>
-          <p v-if="!group.orders.length" class="muted">Nada aquí ahora mismo.</p>
+          <div v-if="!group.orders.length" class="order-card order-card--empty" :class="`status-${group.status}`">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+              <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+            </svg>
+            <span>Nada aquí ahora mismo.</span>
+          </div>
           <div
             v-for="order in group.orders"
             :key="order.id"
@@ -434,6 +440,15 @@ watchEffect(() => {
 @keyframes order-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(154, 210, 208, 0); }
   30% { box-shadow: 0 0 0 6px rgba(154, 210, 208, 0.45); }
+}
+/* Columna vacia: una tarjeta apagada en lugar de un texto suelto. */
+.order-card--empty {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  opacity: 0.5;
+  color: var(--text-muted);
+  font-size: 14px;
 }
 .order-card--new { animation: order-pulse 0.9s ease-out 2; }
 
