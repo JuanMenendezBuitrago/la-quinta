@@ -65,6 +65,13 @@ export function requiresPayment(order: Pick<OrderDoc, "serviceType">) {
   return order.serviceType === "MESA";
 }
 
+/** Un cambio de estado: cuando y, si lo hizo el personal, quien (el NUEVO de un pedido web no lo tiene). */
+export interface OrderStatusChangeDoc {
+  status: OrderStatus;
+  at: Date;
+  staffId?: Types.ObjectId;
+}
+
 export interface OrderDoc {
   _id: Types.ObjectId;
   code: string; // codigo corto y unico para identificar el pedido en el mostrador
@@ -80,6 +87,8 @@ export interface OrderDoc {
   totalCents: number;
   pickupSlot: Date;
   status: OrderStatus;
+  // Todos los cambios de estado en orden, empezando por el NUEVO de la creacion.
+  statusHistory: OrderStatusChangeDoc[];
   deliveredAt?: Date;
   paidAt?: Date;
   paymentMethod?: PaymentMethod;
@@ -99,6 +108,15 @@ const orderLineOptionSchema = new Schema<OrderLineOptionDoc>(
     priceDeltaCents: { type: Number, required: true, min: 0 },
     isDefault: { type: Boolean, required: true },
     defaultOptionId: { type: Schema.Types.ObjectId },
+  },
+  { _id: false }
+);
+
+const orderStatusChangeSchema = new Schema<OrderStatusChangeDoc>(
+  {
+    status: { type: String, enum: ["NUEVO", "EN_PREPARACION", "LISTO", "ENTREGADO", "CANCELADO"], required: true },
+    at: { type: Date, required: true },
+    staffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
   },
   { _id: false }
 );
@@ -131,6 +149,7 @@ const orderSchema = new Schema<OrderDoc>({
     enum: ["NUEVO", "EN_PREPARACION", "LISTO", "ENTREGADO", "CANCELADO"],
     default: "NUEVO",
   },
+  statusHistory: { type: [orderStatusChangeSchema], default: [] },
   deliveredAt: { type: Date },
   paidAt: { type: Date },
   paymentMethod: { type: String, enum: PAYMENT_METHODS },
@@ -189,4 +208,33 @@ export async function backfillCompletedOrders() {
     { $set: { completedAt: "$updatedAt", deliveredAt: { $ifNull: ["$deliveredAt", "$updatedAt"] } } },
   ]);
   if (result.modifiedCount) console.log(`[orders] ${result.modifiedCount} pedidos entregados marcados como cerrados`);
+}
+
+/**
+ * Historial para los pedidos anteriores a statusHistory, con lo unico que se sabe de ellos: la
+ * creacion, la entrega (deliveredAt) y la cancelacion (su ultimo cambio, updatedAt). Los pasos
+ * intermedios (en preparacion, listo) no se guardaban y quedan fuera. Idempotente.
+ */
+export async function backfillStatusHistory() {
+  const result = await Order.updateMany({ statusHistory: { $exists: false } }, [
+    {
+      $set: {
+        statusHistory: {
+          $concatArrays: [
+            [{ status: "NUEVO", at: "$createdAt", staffId: "$createdByStaffId" }],
+            {
+              $switch: {
+                branches: [
+                  { case: { $eq: ["$status", "ENTREGADO"] }, then: [{ status: "ENTREGADO", at: { $ifNull: ["$deliveredAt", "$updatedAt"] } }] },
+                  { case: { $eq: ["$status", "CANCELADO"] }, then: [{ status: "CANCELADO", at: "$updatedAt" }] },
+                ],
+                default: [],
+              },
+            },
+          ],
+        },
+      },
+    },
+  ]);
+  if (result.modifiedCount) console.log(`[orders] historial de estados reconstruido en ${result.modifiedCount} pedidos`);
 }

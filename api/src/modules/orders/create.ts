@@ -89,7 +89,10 @@ export async function buildOrderLines(items: OrderLineRequest[]) {
 export async function createWithUniqueCode(data: Omit<Partial<OrderDoc>, "_id" | "code">) {
   for (let attempt = 1; ; attempt++) {
     try {
-      return await Order.create({ ...data, code: generateOrderCode() });
+      // El historial empieza con la creacion (y quien lo tomo, si fue el personal).
+      const createdAt = new Date();
+      const statusHistory = [{ status: data.status ?? "NUEVO", at: createdAt, staffId: data.createdByStaffId }];
+      return await Order.create({ ...data, createdAt, statusHistory, code: generateOrderCode() });
     } catch (err) {
       if (!isDuplicateCodeError(err) || attempt >= MAX_CODE_ATTEMPTS) throw err;
     }

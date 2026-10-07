@@ -44,6 +44,14 @@ export const ordersTypeDefs = /* GraphQL */ `
     TRANSFERENCIA
   }
 
+  """Un cambio de estado del pedido."""
+  type OrderStatusChange {
+    status: OrderStatus!
+    at: String!
+    """Quien lo hizo; null en el NUEVO de un pedido web (lo crea el cliente) y en los reconstruidos."""
+    staffName: String
+  }
+
   type Order {
     id: ID!
     """Codigo corto y unico del pedido (p. ej. P-7K3F9Q)."""
@@ -60,6 +68,8 @@ export const ordersTypeDefs = /* GraphQL */ `
     totalCents: Int!
     pickupSlot: String!
     status: OrderStatus!
+    """Todos los cambios de estado en orden. Los pedidos anteriores solo tienen creacion, entrega y cancelacion."""
+    statusHistory: [OrderStatusChange!]!
     deliveredAt: String
     """Solo pedidos de mesa y barra, que se cobran aparte (antes o despues de entregar)."""
     paidAt: String

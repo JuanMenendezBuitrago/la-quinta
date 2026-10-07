@@ -4,7 +4,7 @@ import { ALLOWED_FROM, CUSTOMER_TABLES, Order, OrderStatus, PAYMENT_METHODS, Pay
 import { tryComplete } from "./complete";
 import { buildOrderLines, createWithUniqueCode, type OrderLineRequest } from "./create";
 import { MenuItem } from "../menu/model";
-import { User } from "../users/model";
+import { StaffUser, User } from "../users/model";
 import { EVENTS } from "../../config/pubsub";
 import { internalEvents, INTERNAL_EVENTS } from "../../config/events";
 import { buildClosedPayload } from "./closed";
@@ -59,6 +59,18 @@ export const ordersResolvers = {
     createdAt: (doc: any) => new Date(doc.createdAt).toISOString(),
     updatedAt: (doc: any) => new Date(doc.updatedAt).toISOString(),
     deliveredAt: (doc: any) => iso(doc.deliveredAt),
+    // Una sola consulta por pedido para los nombres del personal que hizo cada cambio.
+    statusHistory: async (doc: any) => {
+      const history: any[] = doc.statusHistory ?? [];
+      const staffIds = [...new Set(history.map((h) => h.staffId?.toString()).filter(Boolean))];
+      const staff = staffIds.length ? await StaffUser.find({ _id: { $in: staffIds } }).select("name").lean() : [];
+      const nameById = new Map(staff.map((s) => [s._id.toString(), s.name]));
+      return history.map((h) => ({
+        status: h.status,
+        at: new Date(h.at).toISOString(),
+        staffName: h.staffId ? nameById.get(h.staffId.toString()) ?? null : null,
+      }));
+    },
     paidAt: (doc: any) => iso(doc.paidAt),
     paymentMethod: (doc: any) => doc.paymentMethod ?? null,
     awaitingPayment: (doc: any) =>
@@ -218,7 +230,7 @@ export const ordersResolvers = {
       args: { id: string; status: OrderStatus },
       ctx: GraphQLContext
     ) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      const staff = requireStaff(ctx, ["barra", "gestion"]);
 
       // La comprobacion del estado de origen va dentro del propio update: si dos personas
       // actuan a la vez sobre el mismo pedido, solo una lo consigue (y solo se emite un evento,
@@ -233,7 +245,10 @@ export const ordersResolvers = {
       const order = await Order.findOneAndUpdate(
         filter,
         // findOneAndUpdate no pasa por el hook pre("save"): updatedAt se fija aqui a mano.
-        { status: args.status, updatedAt: now, ...(args.status === "ENTREGADO" ? { deliveredAt: now } : {}) },
+        {
+          $set: { status: args.status, updatedAt: now, ...(args.status === "ENTREGADO" ? { deliveredAt: now } : {}) },
+          $push: { statusHistory: { status: args.status, at: now, staffId: staff.id } },
+        },
         { new: true }
       );
       if (!order) {
