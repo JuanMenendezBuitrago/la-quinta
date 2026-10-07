@@ -8,9 +8,11 @@ export type OrderStatus = "NUEVO" | "EN_PREPARACION" | "LISTO" | "ENTREGADO" | "
  * (NUEVO -> EN_PREPARACION -> LISTO -> ENTREGADO), se puede cancelar mientras el pedido
  * este activo, y ENTREGADO y CANCELADO son finales: no se sale de ellos.
  */
+// Se puede volver un paso atras mientras el pedido no se ha entregado (p. ej. se marco listo por
+// error). Desde ENTREGADO no: la entrega ya desconto el inventario y puede haber cerrado el pedido.
 export const ALLOWED_FROM: Record<OrderStatus, OrderStatus[]> = {
-  NUEVO: [],
-  EN_PREPARACION: ["NUEVO"],
+  NUEVO: ["EN_PREPARACION"],
+  EN_PREPARACION: ["NUEVO", "LISTO"],
   LISTO: ["EN_PREPARACION"],
   ENTREGADO: ["LISTO"],
   CANCELADO: ["NUEVO", "EN_PREPARACION", "LISTO"],

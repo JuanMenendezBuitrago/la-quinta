@@ -58,7 +58,7 @@
         <button class="button secondary" type="button" @click="actionError = ''">Cerrar</button>
       </p>
       <section v-if="activeTab === 'cola'" class="queue-board">
-        <div v-for="group in groupedQueue" :key="group.status" class="queue-column">
+        <div v-for="group in groupedQueue" :id="`cola-${group.status}`" :key="group.status" class="queue-column">
           <h2>{{ statusLabel(group.status) }} ({{ group.orders.length }})</h2>
           <div v-if="!group.orders.length" class="order-card order-card--empty" :class="`status-${group.status}`">
             <Inbox :size="22" :stroke-width="1.6" />
@@ -87,10 +87,22 @@
               <button class="button secondary" type="button" @click="assigningId = ''">No asignar</button>
             </div>
 
-            <div v-if="pendingCancelId === order.id" class="order-actions">
-              <span class="muted">¿Cancelar?</span>
-              <button class="button secondary" type="button" :disabled="busyOrderId === order.id" @click="doCancel(order)">Sí</button>
-              <button class="button secondary" type="button" @click="pendingCancelId = ''">No</button>
+            <!-- Confirmacion de cancelacion: "No" queda donde estaba la accion principal, para que un
+                 doble toque no cancele; el "Si" va despues y en rojo. -->
+            <div v-if="pendingCancelId === order.id" class="cancel-confirm" role="alert">
+              <p>
+                <strong>¿Cancelar el pedido <span class="nowrap">{{ order.code }}</span>?</strong>
+                {{ order.awaitingPayment ? "Ya está servido y sin cobrar: quedará como no pagado." : "" }}
+                No se puede deshacer.
+              </p>
+              <div class="order-actions">
+                <button class="button secondary" type="button" :disabled="busyOrderId === order.id" @click="pendingCancelId = ''">
+                  No, mantener
+                </button>
+                <button class="button danger-solid" type="button" :disabled="busyOrderId === order.id" @click="doCancel(order)">
+                  {{ busyOrderId === order.id ? "Cancelando…" : "Sí, cancelar" }}
+                </button>
+              </div>
             </div>
             <!-- Cobro (mesa y barra): un toque en el metodo de pago -->
             <div v-else-if="payingId === order.id" class="pay-box">
@@ -127,6 +139,16 @@
                 @click="advance(order)"
               >
                 {{ nextStatusLabel(order) }}
+              </button>
+              <button
+                v-if="prevStatusLabel(order)"
+                class="button secondary back-button"
+                type="button"
+                :disabled="busyOrderId === order.id"
+                @click="goBack(order)"
+              >
+                <Undo2 :size="14" :stroke-width="1.8" />
+                {{ prevStatusLabel(order) }}
               </button>
               <button
                 class="button secondary"
@@ -216,7 +238,7 @@
 </template>
 
 <script setup lang="ts">
-import { Bell, BellOff, BellRing, Inbox } from "lucide-vue-next";
+import { Bell, BellOff, BellRing, Inbox, Undo2 } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import { PAYMENT_LABELS, useStaffOrders, type CustomerMatch, type PaymentMethod } from "~/composables/useStaffOrders";
 import { primeAudio } from "~/composables/useOrderChime";
@@ -279,6 +301,8 @@ const {
   historyLoading,
   loadHistory,
   advance,
+  goBack,
+  prevStatusLabel,
   cancelOrder,
   assignCustomer,
   markPaid,
@@ -341,12 +365,15 @@ watchEffect(() => {
   badges.value = {
     cola: groupedQueue.value.reduce((sum: number, g: { orders: unknown[] }) => sum + g.orders.length, 0),
     inventario: lowCount.value,
+    porCobrar: groupedQueue.value.find((g: { status: string }) => g.status === "POR_COBRAR")?.orders.length ?? 0,
   };
 });
 </script>
 
 <style scoped>
 .page-staff { padding-bottom: 60px; }
+/* Al saltar a una columna desde la barra de acceso rapido, que no quede bajo la barra superior */
+.queue-column { scroll-margin-top: 80px; }
 
 .account-hero { margin-bottom: 22px; }
 .staff-hero { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 0; }
@@ -479,6 +506,16 @@ watchEffect(() => {
 
 .order-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .order-actions .button { min-height: 44px; padding-left: 16px; padding-right: 16px; }
+.cancel-confirm {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.cancel-confirm p { margin: 0 0 10px; font-size: 14px; }
+.nowrap { white-space: nowrap; }
+.back-button { display: inline-flex; align-items: center; gap: 6px; }
+.danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
 
 .history-list { display: flex; flex-direction: column; gap: 10px; }
 .history-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }

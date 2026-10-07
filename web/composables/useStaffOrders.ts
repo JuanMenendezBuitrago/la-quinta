@@ -100,6 +100,15 @@ const NEXT_STATUS: Record<string, string> = {
   EN_PREPARACION: "LISTO",
   LISTO: "ENTREGADO",
 };
+// Un paso atras, solo antes de entregar (la API rechaza volver desde ENTREGADO).
+const PREV_STATUS: Record<string, string> = {
+  EN_PREPARACION: "NUEVO",
+  LISTO: "EN_PREPARACION",
+};
+const PREV_LABEL: Record<string, string> = {
+  EN_PREPARACION: "Volver a nuevos",
+  LISTO: "Volver a preparación",
+};
 const NEXT_LABEL: Record<string, string> = {
   NUEVO: "Empezar a preparar",
   EN_PREPARACION: "Marcar listo",
@@ -243,6 +252,14 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     if (!status) return false;
     return changeStatus(order, status);
   }
+  async function goBack(order: any) {
+    const status = PREV_STATUS[order.status];
+    if (!status) return false;
+    return changeStatus(order, status);
+  }
+  function prevStatusLabel(order: any) {
+    return PREV_LABEL[order.status];
+  }
   async function cancelOrder(order: any) {
     return changeStatus(order, "CANCELADO");
   }
@@ -305,6 +322,8 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     historyLoading,
     loadHistory,
     advance,
+    goBack,
+    prevStatusLabel,
     cancelOrder,
     assignCustomer,
     markPaid,
