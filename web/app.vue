@@ -17,6 +17,7 @@
     </header>
     <NuxtPage />
     <SiteFooter />
+    <StaffQuickBar v-if="inStaff && staff" />
   </div>
 </template>
 
@@ -26,6 +27,7 @@ import { restoreSession, useStaffAuth } from "~/composables/useAuth";
 import { TABLES, useCustomerTable } from "~/composables/useTables";
 import { useCustomerOrdering } from "~/composables/useSiteSettings";
 import StaffNav from "~/components/StaffNav.vue";
+import StaffQuickBar from "~/components/StaffQuickBar.vue";
 
 const { cartCount, clear: clearCart } = useCart();
 // Si se activa "solo el personal crea pedidos", el carrito deja de existir para el cliente.

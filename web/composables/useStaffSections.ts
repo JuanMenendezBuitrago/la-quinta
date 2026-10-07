@@ -45,7 +45,10 @@ export function goToSection(id: StaffSectionId) {
   return navigateTo({ path: "/staff", query: id === "cola" ? {} : { s: id } });
 }
 
-/** Contadores que la pagina del panel publica para el menu (pedidos en cola, insumos bajo minimo). */
+/**
+ * Contadores que la pagina del panel publica para los menus (pedidos en cola, insumos bajo minimo
+ * y, para la barra de acceso rapido, los pedidos por cobrar).
+ */
 export function useStaffBadges() {
-  return useState<Partial<Record<StaffSectionId, number>>>("lq-staff-badges", () => ({}));
+  return useState<Partial<Record<StaffSectionId | "porCobrar", number>>>("lq-staff-badges", () => ({}));
 }
