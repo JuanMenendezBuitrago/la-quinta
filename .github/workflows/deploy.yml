@@ -1,0 +1,64 @@
+# Despliegue automatico al VPS en cada push a main (o a mano desde la pestana Actions).
+# Primero comprueba tipos de api y web; si pasan, ejecuta deploy.sh tal cual, con el host
+# "laquinta-vps" definido a partir de los secretos del repositorio:
+#   SSH_HOST, SSH_USER, SSH_PRIVATE_KEY (clave de despliegue) y SSH_KNOWN_HOSTS.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Nunca dos despliegues a la vez; si llega otro push, el nuevo espera a que acabe el anterior.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [api, web]
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+
+  deploy:
+    needs: typecheck
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<CONFIG
+          Host laquinta-vps
+            HostName $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+          CONFIG
+
+      - name: Desplegar
+        run: ./deploy.sh

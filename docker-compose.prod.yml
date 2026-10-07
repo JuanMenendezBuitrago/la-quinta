@@ -1,0 +1,65 @@
+# Produccion (VPS). El nginx del servidor hace de proxy: aqui solo se publican la web y la API en
+# 127.0.0.1, y Mongo y Redis quedan dentro de la red de Docker.
+# Las imagenes se construyen fuera del VPS (ver deploy.sh) y llegan ya hechas.
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    # El VPS es pequeno y lo comparte con otros servicios: se limita la cache de WiredTiger.
+    command: ["--wiredTigerCacheSizeGB", "0.25"]
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-laquinta}
+    volumes:
+      - mongo-data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis-data:/data
+
+  api:
+    image: laquinta-api:latest
+    restart: unless-stopped
+    depends_on:
+      - mongo
+      - redis
+    environment:
+      NODE_ENV: production
+      API_PORT: 4000
+      STORE_TIME_ZONE: ${STORE_TIME_ZONE:-America/Bogota}
+      MONGO_URI: mongodb://mongo:27017/${MONGO_INITDB_DATABASE:-laquinta}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30d}
+      OTP_TTL_SECONDS: ${OTP_TTL_SECONDS:-300}
+      OTP_CHANNEL: ${OTP_CHANNEL:-email}
+      SMTP_URL: ${SMTP_URL:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      GOOGLE_SHEETS_SPREADSHEET_ID: ${GOOGLE_SHEETS_SPREADSHEET_ID:-}
+      GOOGLE_SHEETS_TAB: ${GOOGLE_SHEETS_TAB:-Pedidos}
+      GOOGLE_SHEETS_CANCELLED_TAB: ${GOOGLE_SHEETS_CANCELLED_TAB:-Cancelados}
+      GOOGLE_SERVICE_ACCOUNT_EMAIL: ${GOOGLE_SERVICE_ACCOUNT_EMAIL:-}
+      GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY:-}
+    volumes:
+      - api-uploads:/app/uploads
+    ports:
+      - "127.0.0.1:4000:4000"
+
+  web:
+    image: laquinta-web:latest
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NUXT_PUBLIC_GRAPHQL_HTTP: /graphql
+      NUXT_PUBLIC_GRAPHQL_WS: /graphql
+      NUXT_PUBLIC_STORE_TIME_ZONE: ${STORE_TIME_ZONE:-America/Bogota}
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  mongo-data:
+  redis-data:
+  api-uploads:
