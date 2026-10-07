@@ -210,8 +210,10 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
   function nextStatus(status: string) {
     return NEXT_STATUS[status];
   }
-  function nextStatusLabel(status: string) {
-    return NEXT_LABEL[status];
+  function nextStatusLabel(order: any) {
+    // Los que no son de mesa ni barra se cobran al entregarlos: al marcarlos se cierran del todo.
+    if (order.status === "LISTO" && order.serviceType !== "MESA") return "Marcar entregado y pagado";
+    return NEXT_LABEL[order.status];
   }
   // Pedido con un cambio de estado en curso: sus botones se desactivan para evitar el doble clic.
   const busyOrderId = ref("");

@@ -120,7 +120,7 @@
                 :disabled="busyOrderId === order.id"
                 @click="advance(order)"
               >
-                {{ nextStatusLabel(order.status) }}
+                {{ nextStatusLabel(order) }}
               </button>
               <button
                 class="button secondary"
