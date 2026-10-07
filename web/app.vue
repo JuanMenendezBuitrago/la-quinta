@@ -2,7 +2,7 @@
   <div>
     <header class="topbar">
       <NuxtLink :to="inStaff && staff ? '/staff' : '/'" class="brand" aria-label="La Quinta">
-        <img src="/logo.png" alt="La Quinta" class="brand-logo" />
+        <img src="/logo-laquintaesencia.png" alt="La Quinta" class="brand-logo" width="694" height="76" />
       </NuxtLink>
       <!-- En el panel de personal, su propio menu: carrito y "mi cuenta" son cosas del cliente -->
       <StaffNav v-if="inStaff && staff" />
@@ -82,10 +82,13 @@ await useAsyncData("session", async () => {
   display: flex;
   align-items: center;
 }
+/* Logotipo horizontal (694x76): por altura, para que no empuje el menu en movil */
 .brand-logo {
   display: block;
-  height: 36px;
+  height: 24px;
   width: auto;
+  max-width: 55vw;
+  object-fit: contain;
 }
 nav {
   display: flex;
