@@ -2,17 +2,28 @@
   <div>
     <header class="topbar">
       <NuxtLink :to="inStaff && staff ? '/staff' : '/'" class="brand" aria-label="La Quinta">
-        <img src="/logo-laquintaesencia.png" alt="La Quinta" class="brand-logo" width="694" height="76" />
+        <!-- En movil, el logotipo compacto "La 5ta"; en el resto, el horizontal "laquintaesencia" -->
+        <img src="/logo-laquintaesencia.png" alt="La Quinta" class="brand-logo brand-logo--wide" width="694" height="76" />
+        <img src="/logo.png" alt="La Quinta" class="brand-logo brand-logo--compact" width="268" height="115" />
       </NuxtLink>
       <!-- En el panel de personal, su propio menu: carrito y "mi cuenta" son cosas del cliente -->
       <StaffNav v-if="inStaff && staff" />
       <nav v-else-if="inStaff">
         <NuxtLink to="/">Ver carta</NuxtLink>
       </nav>
-      <nav v-else>
-        <NuxtLink to="/">Carta</NuxtLink>
-        <NuxtLink v-if="canOrder" to="/carrito">Carrito<span v-if="cartCount" class="badge">{{ cartCount }}</span></NuxtLink>
-        <NuxtLink to="/cuenta">Mi cuenta</NuxtLink>
+      <!-- Cliente: solo iconos; el nombre va en aria-label (lectores de pantalla) y title (al pasar el raton) -->
+      <nav v-else class="icon-nav">
+        <NuxtLink to="/" aria-label="Carta" title="Carta"><BookOpen :size="22" :stroke-width="1.7" /></NuxtLink>
+        <NuxtLink
+          v-if="canOrder"
+          to="/carrito"
+          :aria-label="cartCount ? `Carrito (${cartCount})` : 'Carrito'"
+          title="Carrito"
+        >
+          <ShoppingBag :size="22" :stroke-width="1.7" />
+          <span v-if="cartCount" class="badge" aria-hidden="true">{{ cartCount }}</span>
+        </NuxtLink>
+        <NuxtLink to="/cuenta" aria-label="Mi cuenta" title="Mi cuenta"><User :size="22" :stroke-width="1.7" /></NuxtLink>
       </nav>
     </header>
     <NuxtPage />
@@ -22,6 +33,7 @@
 </template>
 
 <script setup lang="ts">
+import { BookOpen, ShoppingBag, User } from "lucide-vue-next";
 import { useCart } from "~/composables/useCart";
 import { restoreSession, useStaffAuth } from "~/composables/useAuth";
 import { TABLES, useCustomerTable } from "~/composables/useTables";
@@ -82,13 +94,18 @@ await useAsyncData("session", async () => {
   display: flex;
   align-items: center;
 }
-/* Logotipo horizontal (694x76): por altura, para que no empuje el menu en movil */
+/* Logotipo por altura: el horizontal (694x76) en escritorio y tablet, el compacto (268x115) en movil */
 .brand-logo {
   display: block;
-  height: 24px;
+  height: 30px;
   width: auto;
-  max-width: 55vw;
+  max-width: 60vw;
   object-fit: contain;
+}
+.brand-logo--compact { display: none; height: 36px; }
+@media (max-width: 760px) {
+  .brand-logo--wide { display: none; }
+  .brand-logo--compact { display: block; }
 }
 nav {
   display: flex;
@@ -113,6 +130,15 @@ nav a:hover { color: var(--text); }
 nav a.router-link-exact-active {
   color: var(--accent);
   border-bottom-color: var(--accent);
+}
+/* Iconos del cliente: mas juntos que los textos, con el contador del carrito sobre el icono */
+.icon-nav { gap: 18px; }
+.icon-nav a { padding: 4px 2px; }
+.icon-nav .badge {
+  position: absolute;
+  top: -4px;
+  right: -10px;
+  margin-left: 0;
 }
 .badge {
   display: inline-flex;
