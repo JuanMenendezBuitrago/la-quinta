@@ -99,7 +99,7 @@ const socials = computed(() => {
 }
 h4 {
   margin: 0 0 8px;
-  font-family: var(--font-futura);
+  font-family: var(--font-futura-text);
   font-weight: 950;
   font-size: 15px;
   text-transform: uppercase;

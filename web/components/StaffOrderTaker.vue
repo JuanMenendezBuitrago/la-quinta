@@ -41,7 +41,7 @@
     <!-- Ticket -->
     <section ref="ticketEl" class="card ticket">
       <h3>Ticket</h3>
-      <p v-if="!lines.length" class="muted">Añade productos de la carta.</p>
+      <p v-if="!lines.length" class="muted add-items">Añade productos de la carta.</p>
       <ul v-else class="ticket-lines">
         <li v-for="line in lines" :key="line.key" class="ticket-line">
           <div class="ticket-line-main">
@@ -332,7 +332,8 @@ input {
 }
 
 .ticket { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 80px; }
-.ticket h3 { margin: 0; }
+.ticket h3 { text-transform: uppercase; margin: 0; }
+.ticket .muted.add-items { font-size: 18px; text-align: center;}
 .ticket-lines { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .ticket-lines li { display: flex; justify-content: space-between; gap: 12px; }
 .ticket-lines li.ticket-line { flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
