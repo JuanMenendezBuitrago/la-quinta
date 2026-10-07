@@ -31,6 +31,7 @@
             :class="{ current: group.entries[0].id === section }"
             @click="select(group.entries[0])"
           >
+            <component :is="ENTRY_ICONS[group.entries[0].id]" class="entry-icon" :size="16" :stroke-width="1.8" />
             {{ group.entries[0].label }}
             <span v-if="group.entries[0].badge" class="badge" :class="{ danger: group.entries[0].danger }">{{ group.entries[0].badge }}</span>
           </component>
@@ -41,7 +42,7 @@
           <button type="button" class="group-btn" :aria-expanded="open === group.id" @click="toggle(group.id)">
             {{ group.label }}
             <span v-if="group.badge" class="badge" :class="{ danger: group.danger }">{{ group.badge }}</span>
-            <span class="caret" aria-hidden="true">▾</span>
+            <ChevronDown class="caret" :size="14" :stroke-width="2" />
           </button>
           <ul class="dropdown" :class="{ open: open === group.id }">
             <li v-for="entry in group.entries" :key="entry.id">
@@ -53,7 +54,8 @@
                 :aria-current="entry.id === section ? 'page' : undefined"
                 @click="select(entry)"
               >
-                {{ entry.label }}
+                <component :is="ENTRY_ICONS[entry.id]" class="entry-icon" :size="16" :stroke-width="1.8" />
+                <span class="entry-label">{{ entry.label }}</span>
                 <span v-if="entry.badge" class="badge" :class="{ danger: entry.danger }">{{ entry.badge }}</span>
               </component>
             </li>
@@ -66,11 +68,16 @@
         <span class="group-title">Sesión · {{ staff?.name }}</span>
         <button type="button" class="group-btn" :aria-expanded="open === 'account'" @click="toggle('account')">
           {{ staff?.name }}
-          <span class="caret" aria-hidden="true">▾</span>
+          <ChevronDown class="caret" :size="14" :stroke-width="2" />
         </button>
         <ul class="dropdown align-right" :class="{ open: open === 'account' }">
           <li class="who muted">{{ staff?.name }} · {{ roleLabel }}</li>
-          <li><button type="button" class="entry" @click="doLogout">Salir</button></li>
+          <li>
+            <button type="button" class="entry" @click="doLogout">
+              <LogOut class="entry-icon" :size="16" :stroke-width="1.8" />
+              <span class="entry-label">Salir</span>
+            </button>
+          </li>
         </ul>
       </div>
     </div>
@@ -78,6 +85,22 @@
 </template>
 
 <script setup lang="ts">
+import {
+  BookOpen,
+  ChevronDown,
+  ClipboardList,
+  Coffee,
+  ExternalLink,
+  History,
+  IdCard,
+  ImageIcon,
+  LogOut,
+  Package,
+  Settings,
+  SquarePen,
+  Users,
+} from "lucide-vue-next";
+import type { Component } from "vue";
 import { useStaffAuth } from "~/composables/useAuth";
 import {
   goToSection,
@@ -97,6 +120,21 @@ interface Entry {
   external?: boolean;
 }
 
+// Icono de cada entrada de menu (la carta publica abre en otra pestaña: icono de enlace externo).
+const ENTRY_ICONS: Record<Entry["id"], Component> = {
+  cola: ClipboardList,
+  tomar: SquarePen,
+  historial: History,
+  inventario: Package,
+  clientes: Users,
+  personal: IdCard,
+  carta: BookOpen,
+  cafe: Coffee,
+  portada: ImageIcon,
+  pie: Settings,
+  "ver-carta": ExternalLink,
+};
+
 const { staff, logout } = useStaffAuth();
 const section = useStaffSection();
 const badges = useStaffBadges();
@@ -115,7 +153,7 @@ const groups = computed(() => {
       .filter((s) => s.group === g.id)
       .map((s) => ({ id: s.id, label: s.label, ...badgeFor(s.id) }));
     // La carta publica, para ver como la ve el cliente (en otra pestaña: el panel sigue abierto).
-    if (g.id === "web") entries.push({ id: "ver-carta", label: "Ver carta pública ↗", external: true });
+    if (g.id === "web") entries.push({ id: "ver-carta", label: "Ver carta pública", external: true });
     const badge = entries.reduce((sum, e) => sum + (e.badge ?? 0), 0);
     return { ...g, entries, badge, danger: entries.some((e) => e.danger && e.badge) };
   }).filter((g) => g.entries.length);
@@ -216,7 +254,7 @@ onBeforeUnmount(() => {
 }
 .group-btn:hover, .menu-toggle:hover { color: var(--text); }
 .group.active > .group-btn { color: var(--accent); border-bottom-color: var(--accent); }
-.caret { font-size: 10px; }
+.caret { flex-shrink: 0; }
 
 .badge {
   display: inline-flex;
@@ -268,6 +306,8 @@ onBeforeUnmount(() => {
 }
 .entry:hover { background: var(--surface); }
 .entry.current { color: var(--accent); font-weight: 600; }
+.entry-icon { flex-shrink: 0; opacity: 0.8; }
+.entry-label { flex: 1; }
 .group-btn.single.current { color: var(--accent); border-bottom-color: var(--accent); }
 .who { padding: 8px 12px 6px; font-size: 13px; }
 

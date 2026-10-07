@@ -3,10 +3,7 @@
     <Transition name="lightbox-fade">
       <div v-if="url" class="lightbox" @click="$emit('close')">
         <button class="lightbox-close" type="button" aria-label="Cerrar" @click.stop="$emit('close')">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-            <line x1="6" y1="6" x2="18" y2="18" />
-            <line x1="18" y1="6" x2="6" y2="18" />
-          </svg>
+          <X :size="18" :stroke-width="1.6" />
         </button>
 
         <button
@@ -16,7 +13,7 @@
           aria-label="Producto anterior"
           @click.stop="$emit('prev')"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18" /></svg>
+          <ChevronLeft :size="20" :stroke-width="1.8" />
         </button>
         <button
           v-if="hasNext"
@@ -25,7 +22,7 @@
           aria-label="Producto siguiente"
           @click.stop="$emit('next')"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18" /></svg>
+          <ChevronRight :size="20" :stroke-width="1.8" />
         </button>
 
         <div class="lightbox-card" @click.stop @touchstart.passive="onTouchStart" @touchend.passive="onTouchEnd">
@@ -114,6 +111,7 @@
 </template>
 
 <script setup lang="ts">
+import { ChevronLeft, ChevronRight, X } from "lucide-vue-next";
 import { cartLineKey, useCart } from "~/composables/useCart";
 import { ROAST_LABELS, cartOption, defaultCartOptions, missingModifiers } from "~/composables/useMenu";
 import { useCustomerOrdering } from "~/composables/useSiteSettings";

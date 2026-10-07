@@ -2,9 +2,7 @@
   <main class="container page-cart">
     <header class="cart-header">
       <NuxtLink to="/" class="back-link" aria-label="Volver a la carta">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
+        <ChevronLeft :size="18" :stroke-width="1.4" />
       </NuxtLink>
       <h1>Tu pedido</h1>
     </header>
@@ -84,10 +82,7 @@
         <template v-else>
           <p class="eyebrow">Recogida en tienda</p>
           <div class="pickup-field">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 7v5l3.5 2" />
-            </svg>
+            <Clock :size="16" :stroke-width="1.4" />
             <input
               id="pickup"
               v-model="pickupSlot"
@@ -138,6 +133,7 @@
 </template>
 
 <script setup lang="ts">
+import { ChevronLeft, Clock } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { orderLinesInput, useCart } from "~/composables/useCart";
 import { MENU_QUERY, missingModifiers, type MenuCategory } from "~/composables/useMenu";

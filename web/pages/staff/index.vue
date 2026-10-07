@@ -23,16 +23,19 @@
         <div v-if="activeTab === 'cola'" class="staff-who">
           <button
             v-if="notificationPermission === 'default'"
-            class="button secondary"
+            class="button secondary notif-button"
             type="button"
             @click="requestNotificationPermission"
           >
+            <Bell :size="16" :stroke-width="1.8" />
             Activar notificaciones
           </button>
-          <span v-else-if="notificationPermission === 'granted'" class="muted notif-status">
-            🔔 Notificaciones activadas
+          <span v-else-if="notificationPermission === 'granted'" class="notif-status">
+            <BellRing :size="14" :stroke-width="1.8" />
+            Notificaciones activadas
           </span>
-          <span v-else-if="notificationPermission === 'denied'" class="muted notif-status">
+          <span v-else-if="notificationPermission === 'denied'" class="notif-status notif-status--off">
+            <BellOff :size="14" :stroke-width="1.8" />
             Notificaciones bloqueadas por el navegador
           </span>
         </div>
@@ -58,10 +61,7 @@
         <div v-for="group in groupedQueue" :key="group.status" class="queue-column">
           <h2>{{ statusLabel(group.status) }} ({{ group.orders.length }})</h2>
           <div v-if="!group.orders.length" class="order-card order-card--empty" :class="`status-${group.status}`">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
-              <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
-            </svg>
+            <Inbox :size="22" :stroke-width="1.6" />
             <span>Nada aquí ahora mismo.</span>
           </div>
           <div
@@ -216,6 +216,7 @@
 </template>
 
 <script setup lang="ts">
+import { Bell, BellOff, BellRing, Inbox } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import { PAYMENT_LABELS, useStaffOrders, type CustomerMatch, type PaymentMethod } from "~/composables/useStaffOrders";
 import { primeAudio } from "~/composables/useOrderChime";
@@ -350,7 +351,26 @@ watchEffect(() => {
 .account-hero { margin-bottom: 22px; }
 .staff-hero { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 0; }
 .staff-who { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.notif-status { font-size: 12.5px; white-space: nowrap; }
+/* Estado de las notificaciones: pastilla con icono, turquesa si estan activas y roja si no. */
+.notif-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent-strong);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.notif-status--off {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+.notif-button { display: inline-flex; align-items: center; gap: 8px; }
 
 .login-card { max-width: 320px; }
 
@@ -405,7 +425,12 @@ watchEffect(() => {
   .queue-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
 }
 @media (min-width: 900px) {
-  .queue-board { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* En columnas: linea suave entre ellas, a toda la altura del tablero (stretch). */
+  .queue-board { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; align-items: stretch; }
+  .queue-column { padding: 0 12px; }
+  .queue-column:first-child { padding-left: 0; }
+  .queue-column:last-child { padding-right: 0; }
+  .queue-column + .queue-column { border-left: 1px solid color-mix(in srgb, var(--text) 15%, transparent); }
 }
 
 .order-card {

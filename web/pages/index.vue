@@ -46,10 +46,7 @@
             aria-label="Añadir al carrito"
             @click="onAdd(item)"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
+            <Plus :size="14" :stroke-width="1.8" />
           </button>
         </article>
       </div>
@@ -74,6 +71,7 @@
 </template>
 
 <script setup lang="ts">
+import { Plus } from "lucide-vue-next";
 import { useCart } from "~/composables/useCart";
 import { useCustomerOrdering } from "~/composables/useSiteSettings";
 import { MENU_QUERY, defaultCartOptions, menuEntries, type MenuCategory, type MenuEntry } from "~/composables/useMenu";
