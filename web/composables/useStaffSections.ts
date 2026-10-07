@@ -19,6 +19,8 @@ export const STAFF_SECTIONS = [
   { id: "carta", label: "Carta", group: "web", roles: ["gestion"] },
   { id: "cafe", label: "Café en grano", group: "web", roles: ["gestion"] },
   { id: "portada", label: "Portada", group: "web", roles: ["gestion"] },
+  // Correos de novedades a los clientes que lo han autorizado (datos personales: solo gestion).
+  { id: "novedades", label: "Novedades", group: "web", roles: ["gestion"] },
   // id "pie": nombre historico (enlaces /staff?s=pie); ahora incluye tambien los pedidos de clientes.
   { id: "pie", label: "Configuración", group: "web", roles: ["gestion"] },
 ] as const satisfies readonly { id: string; label: string; group: string; roles: readonly StaffRole[] }[];

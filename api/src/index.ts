@@ -16,6 +16,7 @@ import { registerLoyaltyListeners } from "./modules/loyalty/listeners";
 import { registerInventoryListeners } from "./modules/inventory/listeners";
 import { registerSheetsListeners } from "./modules/sheets/listeners";
 import { backfillCompletedOrders, backfillOrderCodes, backfillStatusHistory } from "./modules/orders/model";
+import { markInterruptedCampaigns } from "./modules/newsletter/model";
 import { seedHeroSlidesOnce } from "./modules/hero/model";
 import { ensureCoffeeProcesses } from "./modules/coffee/model";
 import { uploadsRouter, UPLOAD_DIR } from "./modules/uploads/router";
@@ -25,6 +26,7 @@ async function main() {
   await backfillOrderCodes();
   await backfillCompletedOrders();
   await backfillStatusHistory();
+  await markInterruptedCampaigns();
   await seedHeroSlidesOnce();
   await ensureCoffeeProcesses();
   registerLoyaltyListeners();

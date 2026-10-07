@@ -26,6 +26,15 @@
           <a href="/privacidad" target="_blank" rel="noopener">política de tratamiento de datos</a>.
         </span>
       </label>
+      <!-- Alta con email: novedades opcionales, desmarcadas (la autorizacion tiene que ser expresa).
+           Se puede cambiar despues en Mi cuenta. -->
+      <label v-if="requirements.askName && isEmail" class="consent">
+        <input v-model="subscribeNewsletter" type="checkbox" />
+        <span>
+          Quiero recibir por email novedades de La Quinta: ofertas, eventos y nuevos cafés
+          (opcional; puedo darme de baja cuando quiera).
+        </span>
+      </label>
       <button
         class="button"
         style="margin-top: 8px"
@@ -55,6 +64,8 @@ const verifying = ref(false);
 const error = ref("");
 const requirements = ref<LoginRequirements>({ askName: false, askPrivacyConsent: false });
 const acceptPrivacy = ref(false);
+const subscribeNewsletter = ref(false);
+const isEmail = computed(() => identifier.value.includes("@"));
 
 async function sendCode() {
   sending.value = true;
@@ -62,6 +73,7 @@ async function sendCode() {
   try {
     requirements.value = await requestCode(identifier.value);
     acceptPrivacy.value = false;
+    subscribeNewsletter.value = false;
     step.value = "code";
   } catch (err: any) {
     error.value = err?.message ?? "No se pudo enviar el código";
@@ -74,7 +86,13 @@ async function verify() {
   verifying.value = true;
   error.value = "";
   try {
-    await verifyCode(identifier.value, code.value, name.value || undefined, acceptPrivacy.value || undefined);
+    await verifyCode(
+      identifier.value,
+      code.value,
+      name.value || undefined,
+      acceptPrivacy.value || undefined,
+      (requirements.value.askName && isEmail.value && subscribeNewsletter.value) || undefined
+    );
     emit("logged-in");
   } catch (err: any) {
     error.value = err?.message ?? "Código incorrecto";

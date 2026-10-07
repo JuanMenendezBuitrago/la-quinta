@@ -224,6 +224,11 @@
         <HeroAdmin />
       </section>
 
+      <!-- Novedades por email (solo gestion) -->
+      <section v-else-if="activeTab === 'novedades'">
+        <NewsletterAdmin />
+      </section>
+
       <!-- Personal (solo gestion) -->
       <section v-else-if="activeTab === 'personal'">
         <StaffAdmin />
@@ -245,6 +250,7 @@ import { primeAudio } from "~/composables/useOrderChime";
 import MenuAdmin from "~/components/MenuAdmin.vue";
 import CoffeeAdmin from "~/components/CoffeeAdmin.vue";
 import StaffAdmin from "~/components/StaffAdmin.vue";
+import NewsletterAdmin from "~/components/NewsletterAdmin.vue";
 import SiteSettingsAdmin from "~/components/SiteSettingsAdmin.vue";
 import CustomersAdmin from "~/components/CustomersAdmin.vue";
 import StaffOrderTaker from "~/components/StaffOrderTaker.vue";

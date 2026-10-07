@@ -62,8 +62,15 @@ export const usersTypeDefs = /* GraphQL */ `
     """Paso 1 del login: envia un codigo de un solo uso a email o telefono."""
     requestOtp(identifier: String!): Boolean!
     """Paso 2 del login: valida el codigo y devuelve un token de sesion. acceptPrivacyPolicy es
-    obligatorio (true) si loginRequirements pidio la autorizacion."""
-    verifyOtp(identifier: String!, code: String!, name: String, acceptPrivacyPolicy: Boolean): AuthPayload!
+    obligatorio (true) si loginRequirements pidio la autorizacion. subscribeNewsletter (opcional)
+    solo cuenta al crear una cuenta nueva con email: autoriza recibir novedades."""
+    verifyOtp(
+      identifier: String!
+      code: String!
+      name: String
+      acceptPrivacyPolicy: Boolean
+      subscribeNewsletter: Boolean
+    ): AuthPayload!
     """Derecho de actualizacion: el cliente corrige su nombre."""
     updateMyProfile(name: String!): Customer!
     """Login del equipo del local (usuario/contraseña)."""

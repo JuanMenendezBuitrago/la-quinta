@@ -41,10 +41,16 @@
         <li>Gestionar tu tarjeta de sellos y tus recompensas.</li>
         <li>Llevar la contabilidad del local y cumplir nuestras obligaciones legales.</li>
         <li>Atender tus consultas y reclamos sobre tus datos.</li>
+        <li>
+          Solo si lo autorizas aparte (es opcional), enviarte por email novedades del local: ofertas,
+          eventos y nuevos productos. Puedes retirar esta autorización cuando quieras en «Mi cuenta»
+          o con el enlace que va en cada correo, sin que afecte a tu cuenta.
+        </li>
       </ul>
       <p>
-        No usamos tus datos para enviarte publicidad ni los vendemos o cedemos a terceros. Si
-        algún día quisiéramos usarlos para algo distinto, te pediremos antes una nueva autorización.
+        Sin esa autorización aparte no te enviamos publicidad. Nunca vendemos ni cedemos tus datos a
+        terceros. Si algún día quisiéramos usarlos para algo distinto, te pediremos antes una nueva
+        autorización.
       </p>
     </section>
 
@@ -53,7 +59,7 @@
       <p>Para prestar el servicio nos apoyamos en proveedores que tratan los datos solo siguiendo nuestras instrucciones (encargados del tratamiento):</p>
       <ul>
         <li>El proveedor de alojamiento donde funciona esta web y su base de datos.</li>
-        <li>El proveedor de correo electrónico con el que te enviamos el código de acceso.</li>
+        <li>El proveedor de correo electrónico con el que te enviamos el código de acceso y, si las pediste, las novedades.</li>
         <li>
           Google (Google Sheets), donde registramos los pedidos entregados y cancelados para la
           contabilidad. Google puede almacenar esta información fuera de Colombia.

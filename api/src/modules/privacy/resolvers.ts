@@ -37,6 +37,9 @@ export const privacyResolvers = {
             autorizacionTratamientoDatos: user.privacyConsent
               ? { aceptadaEl: user.privacyConsent.acceptedAt, versionPolitica: user.privacyConsent.policyVersion }
               : null,
+            autorizacionNovedadesEmail: user.newsletterConsent
+              ? { aceptadaEl: user.newsletterConsent.acceptedAt }
+              : null,
           },
           pedidos: orders.map((o) => ({
             codigo: o.code,
@@ -76,7 +79,7 @@ export const privacyResolvers = {
         { _id: customerId, deletedAt: { $exists: false } },
         {
           $set: { name: DELETED_CUSTOMER_NAME, deletedAt: new Date() },
-          $unset: { email: 1, phone: 1, privacyConsent: 1 },
+          $unset: { email: 1, phone: 1, privacyConsent: 1, newsletterConsent: 1 },
         },
         { new: true }
       );

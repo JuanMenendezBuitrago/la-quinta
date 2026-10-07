@@ -14,6 +14,18 @@
       <p v-if="contact" class="muted contact">Acceso con: {{ contact }}</p>
       <p v-if="nameSaved" class="muted ok">Nombre actualizado ✓</p>
 
+      <!-- Autorizacion aparte y opcional para las novedades: se marca y se desmarca cuando se quiera -->
+      <label v-if="contactResult?.me?.email" class="newsletter">
+        <input type="checkbox" :checked="newsletterSubscribed" :disabled="savingNewsletter" @change="toggleNewsletter" />
+        <span>
+          Quiero recibir por email novedades de La Quinta: ofertas, eventos y nuevos cafés. Puedo
+          darme de baja cuando quiera desde aquí o desde cualquier correo.
+        </span>
+      </label>
+      <p v-else-if="contactResult?.me" class="muted contact">
+        Las novedades por email solo están disponibles para cuentas con email.
+      </p>
+
       <div class="actions">
         <button class="button secondary" type="button" :disabled="exporting" @click="downloadData">
           {{ exporting ? "Preparando…" : "Descargar mis datos" }}
@@ -61,6 +73,7 @@ const CONTACT_QUERY = gql`
       id
       email
       phone
+      newsletterSubscribed
     }
   }
 `;
@@ -69,6 +82,14 @@ const UPDATE_PROFILE = gql`
     updateMyProfile(name: $name) {
       id
       name
+    }
+  }
+`;
+const SET_NEWSLETTER = gql`
+  mutation SetMyNewsletterSubscription($subscribed: Boolean!) {
+    setMyNewsletterSubscription(subscribed: $subscribed) {
+      id
+      newsletterSubscribed
     }
   }
 `;
@@ -109,6 +130,25 @@ async function saveName() {
     error.value = err?.message ?? "No se pudo guardar el nombre";
   } finally {
     savingName.value = false;
+  }
+}
+
+// --- Novedades por email (Apollo actualiza me.newsletterSubscribed en cache con la respuesta) ---
+const newsletterSubscribed = computed(() => !!contactResult.value?.me?.newsletterSubscribed);
+const savingNewsletter = ref(false);
+const { mutate: setNewsletter } = useMutation(SET_NEWSLETTER);
+
+async function toggleNewsletter(event: Event) {
+  const input = event.target as HTMLInputElement;
+  savingNewsletter.value = true;
+  error.value = "";
+  try {
+    await setNewsletter({ subscribed: input.checked });
+  } catch (err: any) {
+    input.checked = newsletterSubscribed.value;
+    error.value = err?.message ?? "No se pudo guardar tu preferencia";
+  } finally {
+    savingNewsletter.value = false;
   }
 }
 
@@ -169,6 +209,8 @@ async function deleteAccount() {
   font-family: inherit;
 }
 .contact, .ok, .legal-note { margin: 0; font-size: 13px; }
+.newsletter { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; line-height: 1.45; cursor: pointer; }
+.newsletter input { margin-top: 3px; flex-shrink: 0; width: auto; }
 .ok { color: var(--accent-strong); }
 .legal-note a { color: inherit; text-decoration: underline; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }

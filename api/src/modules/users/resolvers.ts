@@ -43,13 +43,14 @@ export const usersResolvers = {
     },
     verifyOtp: async (
       _: unknown,
-      args: { identifier: string; code: string; name?: string; acceptPrivacyPolicy?: boolean }
+      args: { identifier: string; code: string; name?: string; acceptPrivacyPolicy?: boolean; subscribeNewsletter?: boolean }
     ) => {
       const { token, user } = await verifyOtpAndIssueToken(
         args.identifier,
         args.code,
         args.name,
-        args.acceptPrivacyPolicy === true
+        args.acceptPrivacyPolicy === true,
+        args.subscribeNewsletter === true
       );
       return { token, customer: user };
     },

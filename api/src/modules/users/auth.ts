@@ -1,20 +1,10 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import nodemailer from "nodemailer";
 import { randomInt } from "crypto";
 import { env } from "../../config/env";
+import { getTransporter } from "../../config/mailer";
 import { redisClient } from "../../config/redis";
 import { User, StaffUser, StaffRole, PRIVACY_POLICY_VERSION, hasCurrentConsent } from "./model";
-
-// Transporter perezoso y reutilizado entre peticiones: crearlo abre la conexion SMTP,
-// no hace falta una por cada codigo enviado.
-let transporter: nodemailer.Transporter | null = null;
-
-function getTransporter(): nodemailer.Transporter | null {
-  if (!env.smtpUrl) return null;
-  if (!transporter) transporter = nodemailer.createTransport(env.smtpUrl);
-  return transporter;
-}
 
 async function sendOtpEmail(to: string, code: string): Promise<void> {
   const mailer = getTransporter();
@@ -98,7 +88,8 @@ export async function verifyOtpAndIssueToken(
   identifier: string,
   code: string,
   name?: string,
-  acceptPrivacyPolicy = false
+  acceptPrivacyPolicy = false,
+  subscribeNewsletter = false
 ): Promise<{ token: string; user: InstanceType<typeof User> }> {
   const stored = await redisClient.get(otpKey(identifier));
   if (!stored || stored !== code) {
@@ -122,6 +113,8 @@ export async function verifyOtpAndIssueToken(
       name: name?.trim() || "Cliente La Quinta",
       customerCode: generateCustomerCode(),
       privacyConsent: consent,
+      // Novedades: casilla aparte y desmarcada en el alta; solo si la marca y la cuenta tiene email.
+      ...(subscribeNewsletter && "email" in query ? { newsletterConsent: { acceptedAt: consent.acceptedAt } } : {}),
     });
   } else if (!hasCurrentConsent(user)) {
     user.privacyConsent = consent;

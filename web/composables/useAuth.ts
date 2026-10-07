@@ -7,8 +7,20 @@ const REQUEST_OTP = gql`
 `;
 
 const VERIFY_OTP = gql`
-  mutation VerifyOtp($identifier: String!, $code: String!, $name: String, $acceptPrivacyPolicy: Boolean) {
-    verifyOtp(identifier: $identifier, code: $code, name: $name, acceptPrivacyPolicy: $acceptPrivacyPolicy) {
+  mutation VerifyOtp(
+    $identifier: String!
+    $code: String!
+    $name: String
+    $acceptPrivacyPolicy: Boolean
+    $subscribeNewsletter: Boolean
+  ) {
+    verifyOtp(
+      identifier: $identifier
+      code: $code
+      name: $name
+      acceptPrivacyPolicy: $acceptPrivacyPolicy
+      subscribeNewsletter: $subscribeNewsletter
+    ) {
       token
       customer {
         id
@@ -110,8 +122,14 @@ export function useAuth() {
     return requirementsResult?.data?.loginRequirements ?? { askName: true, askPrivacyConsent: true };
   }
 
-  async function verifyCode(identifier: string, code: string, name?: string, acceptPrivacyPolicy?: boolean) {
-    const result = await verifyOtp({ identifier, code, name, acceptPrivacyPolicy });
+  async function verifyCode(
+    identifier: string,
+    code: string,
+    name?: string,
+    acceptPrivacyPolicy?: boolean,
+    subscribeNewsletter?: boolean
+  ) {
+    const result = await verifyOtp({ identifier, code, name, acceptPrivacyPolicy, subscribeNewsletter });
     const payload = result?.data?.verifyOtp;
     if (!payload) throw new Error("No se pudo verificar el codigo");
     await onLogin(payload.token);

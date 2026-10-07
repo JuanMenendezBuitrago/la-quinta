@@ -23,6 +23,8 @@ export const env = {
   // Zona horaria de la tienda: horario de apertura, horas de recogida y fechas exportadas.
   storeTimeZone: process.env.STORE_TIME_ZONE || "America/Bogota",
   smtpFrom: process.env.SMTP_FROM ?? '"La Quinta" <no-reply@laquinta.local>',
+  // Direccion publica de la web, para los enlaces de los correos (p. ej. darse de baja).
+  publicSiteUrl: (process.env.PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, ""),
   // Exportacion de pedidos entregados a Google Sheets. Si falta alguno de los tres primeros
   // valores, la exportacion queda desactivada (el resto de la API funciona igual).
   googleSheets: {

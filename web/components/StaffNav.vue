@@ -95,6 +95,7 @@ import {
   IdCard,
   ImageIcon,
   LogOut,
+  Megaphone,
   Package,
   Settings,
   SquarePen,
@@ -131,6 +132,7 @@ const ENTRY_ICONS: Record<Entry["id"], Component> = {
   carta: BookOpen,
   cafe: Coffee,
   portada: ImageIcon,
+  novedades: Megaphone,
   pie: Settings,
   "ver-carta": ExternalLink,
 };

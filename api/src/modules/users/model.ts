@@ -13,6 +13,14 @@ export interface PrivacyConsentDoc {
   policyVersion: string;
 }
 
+/**
+ * Autorizacion aparte, opcional y revocable, para recibir novedades por email (ofertas, eventos).
+ * No forma parte de la autorizacion general: sin ella la cuenta funciona igual.
+ */
+export interface NewsletterConsentDoc {
+  acceptedAt: Date;
+}
+
 export interface UserDoc {
   _id: Types.ObjectId;
   name: string;
@@ -20,6 +28,7 @@ export interface UserDoc {
   phone?: string;
   customerCode: string; // codigo corto que el cliente enseña en el mostrador
   privacyConsent?: PrivacyConsentDoc;
+  newsletterConsent?: NewsletterConsentDoc;
   // Cuenta suprimida a peticion del titular: se anonimiza (sin nombre, email ni telefono) pero
   // el documento se conserva para que sus pedidos, que hay que guardar por obligaciones
   // contables, sigan apuntando a un cliente. Ver modules/privacy.
@@ -37,6 +46,9 @@ const userSchema = new Schema<UserDoc>({
       { acceptedAt: { type: Date, required: true }, policyVersion: { type: String, required: true } },
       { _id: false }
     ),
+  },
+  newsletterConsent: {
+    type: new Schema<NewsletterConsentDoc>({ acceptedAt: { type: Date, required: true } }, { _id: false }),
   },
   deletedAt: { type: Date },
   createdAt: { type: Date, default: () => new Date() },
