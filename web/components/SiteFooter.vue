@@ -83,7 +83,7 @@ const socials = computed(() => {
   /* Las reglas de abajo usan var(--text), var(--text-muted), etc.: se redefinen aqui para
      contraste sobre el fondo marrón. Las custom properties atraviesan el scoping de Vue. */
   --text: var(--surface);
-  --text-muted: rgba(255, 255, 255, 0.72);
+  --text-muted: rgba(255, 255, 255, 0.9);
   --border-strong: rgba(255, 255, 255, 0.3);
   border-top: 1px solid var(--border-strong);
   /* deja sitio a la barra fija del carrito */
@@ -126,7 +126,7 @@ address, .plain { font-style: normal; font-size: 13.5px; line-height: 1.7; color
 }
 .social:hover { background: var(--accent); border-color: var(--accent); }
 
-.legal { margin: 26px 0 0; font-size: 11.5px; color: var(--text-muted); opacity: 0.85; }
+.legal { margin: 26px 0 0; font-size: 11.5px; color: var(--text-muted); }
 .staff-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .staff-link:hover { color: var(--text); }
 </style>

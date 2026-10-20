@@ -42,18 +42,22 @@
 }
 
 :root {
+  /* Colores de texto y de relleno con texto encima: todos llegan a 4.5:1 (WCAG AA) sobre
+     --bg, --surface y --surface-alt, y el crema de --bg tambien sobre ellos. */
   --bg: #faf6ce;
   --surface: #fffdf5;
   --surface-alt: #f0e8c8;
-  --text: #9f714d;
-  --text-muted: #9b8533;
-  --accent: #9ad2d0;
-  --accent-strong: #6cc3c0;
-  --danger: #e2725b;
+  --text: #876041;
+  --text-muted: #786728;
+  --accent: #2e726f;
+  --accent-strong: #245b59;
+  /* Turquesa claro de la marca: solo decorativo, nunca con texto encima ni como color de texto. */
+  --accent-soft: #9ad2d0;
+  --danger: #b23920;
   --border: rgba(243, 236, 225, 0.08);
   --border-strong: rgba(243, 236, 225, 0.16);
-  /* Borde de los campos de formulario: el marron del texto, que se vea sobre el crema del fondo. */
-  --field-border: rgba(159, 113, 77, 0.4);
+  /* Borde de los campos de formulario: el marron del texto, con 3:1 sobre el crema (WCAG 1.4.11). */
+  --field-border: rgba(135, 96, 65, 0.75);
   --font-serif: "Bodoni Moda", serif;
   --font-futura: "Futura Now Condensed", "Arial Narrow", sans-serif;
   --font-futura-text: "Futura Now Text", Futura, "Century Gothic", sans-serif;
@@ -61,8 +65,8 @@
   --color1: #9ad2d0;
   --color2: #6cc3c0;
   --color3: #faf6ce;
-  --color4: #9f714d;
-  --color5: #9b8533;
+  --color4: #876041;
+  --color5: #786728;
 }
 
 * { box-sizing: border-box; }
@@ -137,7 +141,8 @@ h3 { font-size: 17px; }
   color: var(--accent);
   border: 1px solid var(--border-strong);
 }
-.button.secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); }
+/* Relleno completo al pasar el raton: con el turquesa oscuro, solo oscurecer el texto apenas se nota. */
+.button.secondary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 
 input, select, textarea {
   width: 100%;
@@ -149,7 +154,7 @@ input, select, textarea {
   font-family: var(--font-sans);
   font-size: 15px;
 }
-input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 0.8; }
+input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1; }
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--accent);
