@@ -9,61 +9,64 @@
 
     <form v-if="formOpen" class="card staff-form" @submit.prevent="submitForm">
       <h3>{{ form.id ? "Editar cuenta" : "Nueva cuenta" }}</h3>
+      <!-- Datos a la izquierda; estado de la cuenta y botones a la derecha (en movil, debajo) -->
+      <div class="form-grid">
+        <div class="form-main">
+          <label class="field">
+            <span class="muted">Nombre</span>
+            <input v-model="form.name" type="text" required maxlength="120" />
+          </label>
 
-      <label class="field">
-        <span class="muted">Nombre</span>
-        <input v-model="form.name" type="text" required maxlength="120" />
-      </label>
+          <label class="field">
+            <span class="muted">Email</span>
+            <input v-model="form.email" type="email" required :disabled="!!form.id" />
+            <span v-if="form.id" class="muted">El email no se puede cambiar aquí.</span>
+          </label>
 
-      <label class="field">
-        <span class="muted">Email</span>
-        <input v-model="form.email" type="email" required :disabled="!!form.id" />
-        <span v-if="form.id" class="muted">El email no se puede cambiar aquí.</span>
-      </label>
+          <label class="field">
+            <span class="muted">{{ form.id ? "Nueva contraseña" : "Contraseña" }}</span>
+            <input v-model="form.password" type="password" :required="!form.id" minlength="8" />
+            <span v-if="form.id" class="muted">Deja en blanco para no cambiarla.</span>
+          </label>
 
-      <label class="field">
-        <span class="muted">{{ form.id ? "Nueva contraseña" : "Contraseña" }}</span>
-        <input v-model="form.password" type="password" :required="!form.id" minlength="8" />
-        <span v-if="form.id" class="muted">Deja en blanco para no cambiarla.</span>
-      </label>
+          <label class="field">
+            <span class="muted">Rol</span>
+            <select v-model="form.role" :disabled="isSelf">
+              <option value="barra">Barra</option>
+              <option value="gestion">Gestión</option>
+            </select>
+            <span v-if="isSelf" class="muted">No puedes cambiar tu propio rol.</span>
+          </label>
 
-      <label class="field">
-        <span class="muted">Rol</span>
-        <select v-model="form.role" :disabled="isSelf">
-          <option value="barra">Barra</option>
-          <option value="gestion">Gestión</option>
-        </select>
-        <span v-if="isSelf" class="muted">No puedes cambiar tu propio rol.</span>
-      </label>
-
-      <div v-if="form.id" class="field">
-        <label class="switch">
-          <input v-model="form.active" type="checkbox" role="switch" :disabled="isSelf" />
-          <span class="switch-track" aria-hidden="true"><span class="switch-thumb" /></span>
-          <span>Cuenta activa</span>
-        </label>
-        <span class="muted">
-          {{ isSelf ? "No puedes desactivar tu propia cuenta." : "Desactivada no aparece al entrar al panel, no puede iniciar sesión y se cierra la que tenga abierta." }}
-        </span>
-      </div>
-
-      <!-- Solo el propio avatar: cada uno elige el suyo (puede ser una foto suya). Se guarda al
-           elegirlo, sin esperar a "Guardar". -->
-      <div v-if="isSelf" class="field">
-        <span class="muted">Tu avatar</span>
-        <AvatarPicker who="staff" :avatar="staff?.avatar" :name="staff?.name" />
-      </div>
-
-      <p v-if="formError" class="muted" style="color: var(--danger)">{{ formError }}</p>
-
-      <div class="form-actions">
-        <button class="button" type="submit" :disabled="saving">
-          {{ saving ? "Guardando…" : "Guardar" }}
-        </button>
-        <button class="button secondary cancel" type="button" :disabled="saving" @click="cancelForm">
-          <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
-          Cancelar
-        </button>
+          <!-- Solo el propio avatar: cada uno elige el suyo (puede ser una foto suya). Se guarda al
+               elegirlo, sin esperar a "Guardar". -->
+          <div v-if="isSelf" class="field">
+            <span class="muted">Tu avatar</span>
+            <AvatarPicker who="staff" :avatar="staff?.avatar" :name="staff?.name" />
+          </div>
+        </div>
+        <div class="form-side">
+          <div v-if="form.id" class="field">
+            <label class="switch">
+              <input v-model="form.active" type="checkbox" role="switch" :disabled="isSelf" />
+              <span class="switch-track" aria-hidden="true"><span class="switch-thumb" /></span>
+              <span>Cuenta activa</span>
+            </label>
+            <span class="muted">
+              {{ isSelf ? "No puedes desactivar tu propia cuenta." : "Desactivada no aparece al entrar al panel, no puede iniciar sesión y se cierra la que tenga abierta." }}
+            </span>
+          </div>
+          <p v-if="formError" class="muted" style="color: var(--danger)">{{ formError }}</p>
+          <div class="form-actions">
+            <button class="button" type="submit" :disabled="saving">
+              {{ saving ? "Guardando…" : "Guardar" }}
+            </button>
+            <button class="button secondary cancel" type="button" :disabled="saving" @click="cancelForm">
+              <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
+              Cancelar
+            </button>
+          </div>
+        </div>
       </div>
     </form>
 
@@ -239,7 +242,10 @@ async function submitForm() {
 .switch:has(input:disabled) { cursor: not-allowed; opacity: 0.6; }
 @media (prefers-reduced-motion: reduce) { .switch-track, .switch-thumb { transition: none; } }
 
-.staff-form { margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; max-width: 420px; }
+.staff-form { margin-bottom: 16px; display: flex; flex-direction: column; gap: 12px; }
+.form-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start; }
+.form-main, .form-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+@media (max-width: 700px) { .form-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .form-actions { display: flex; gap: 8px; margin-top: 4px; }
 

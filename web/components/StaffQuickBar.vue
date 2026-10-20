@@ -84,7 +84,7 @@ const actions = computed<QuickAction[]>(() => {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 80; /* por debajo del panel lateral del menu (90/100) */
+    z-index: 80; /* por debajo de la cabecera (85), que contiene el panel lateral del menu */
     display: grid;
     /* En tablet las 5 acciones no se estiran a todo el ancho: quedan centradas */
     grid-template-columns: repeat(5, minmax(0, 120px));

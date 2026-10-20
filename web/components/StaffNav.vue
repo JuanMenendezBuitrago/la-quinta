@@ -411,7 +411,7 @@ onBeforeUnmount(() => {
     flex-direction: column;
     align-items: stretch;
     gap: 4px;
-    padding: 8px 8px 24px;
+    padding: 8px 8px calc(24px + env(safe-area-inset-bottom));
     background: var(--bg);
     border-left: 1px solid var(--border-strong);
     box-shadow: -8px 0 24px rgba(0, 0, 0, 0.14);

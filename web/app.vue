@@ -93,7 +93,10 @@ await useAsyncData("session", async () => {
 .topbar {
   position: sticky;
   top: 0;
-  z-index: 50;
+  /* Por encima de la barra inferior del personal (80): el panel lateral del menu movil vive
+     dentro de esta cabecera y su z-index (90/100) solo cuenta dentro de ella. Con 50 la barra
+     inferior tapaba las ultimas filas del panel. */
+  z-index: 85;
   display: flex;
   align-items: center;
   justify-content: space-between;
