@@ -23,7 +23,10 @@
           <ShoppingBag :size="22" :stroke-width="1.7" />
           <span v-if="cartCount" class="badge" aria-hidden="true">{{ cartCount }}</span>
         </NuxtLink>
-        <NuxtLink to="/cuenta" aria-label="Mi cuenta" title="Mi cuenta"><User :size="22" :stroke-width="1.7" /></NuxtLink>
+        <NuxtLink to="/cuenta" aria-label="Mi cuenta" title="Mi cuenta">
+          <UserAvatar v-if="customer" :avatar="customer.avatar" :name="customer.name" :size="26" />
+          <User v-else :size="22" :stroke-width="1.7" />
+        </NuxtLink>
       </nav>
     </header>
     <NuxtPage />
@@ -35,11 +38,12 @@
 <script setup lang="ts">
 import { BookOpen, ShoppingBag, User } from "lucide-vue-next";
 import { useCart } from "~/composables/useCart";
-import { restoreSession, useStaffAuth } from "~/composables/useAuth";
+import { restoreSession, useAuth, useStaffAuth } from "~/composables/useAuth";
 import { TABLES, useCustomerTable } from "~/composables/useTables";
 import { useCustomerOrdering } from "~/composables/useSiteSettings";
 import StaffNav from "~/components/StaffNav.vue";
 import StaffQuickBar from "~/components/StaffQuickBar.vue";
+import UserAvatar from "~/components/UserAvatar.vue";
 
 const { cartCount, clear: clearCart } = useCart();
 // Si se activa "solo el personal crea pedidos", el carrito deja de existir para el cliente.
@@ -48,6 +52,7 @@ watch(canOrder, (enabled) => {
   if (!enabled) clearCart();
 });
 const { staff } = useStaffAuth();
+const { customer } = useAuth();
 const route = useRoute();
 const inStaff = computed(() => route.path === "/staff" || route.path.startsWith("/staff/"));
 

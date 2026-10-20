@@ -55,6 +55,7 @@ function summary(user: UserDoc, stats: Awaited<ReturnType<typeof statsFor>>) {
     email: user.email ?? null,
     phone: user.phone ?? null,
     customerCode: user.customerCode,
+    avatar: user.avatar ?? null,
     createdAt: user.createdAt.toISOString(),
     ordersCount: o?.ordersCount ?? 0,
     deliveredCount: o?.deliveredCount ?? 0,

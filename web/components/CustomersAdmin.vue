@@ -9,7 +9,10 @@
 
       <template v-if="detail">
         <header class="detail-header">
-          <h2>{{ detail.customer.name }}</h2>
+          <h2 class="detail-name">
+            <UserAvatar :avatar="detail.customer.avatar" :name="detail.customer.name" :size="44" />
+            {{ detail.customer.name }}
+          </h2>
           <p class="muted">
             <span class="code">{{ detail.customer.customerCode }}</span>
             · {{ detail.customer.email || detail.customer.phone }}
@@ -107,6 +110,7 @@
       </p>
 
       <button v-for="c in customers" :key="c.id" type="button" class="card row customer-row" @click="openDetail(c.id)">
+        <UserAvatar :avatar="c.avatar" :name="c.name" :size="36" />
         <div class="row-info">
           <strong>{{ c.name }}</strong> <span class="code">{{ c.customerCode }}</span>
           <p class="muted">{{ c.email || c.phone }}</p>
@@ -139,6 +143,7 @@
 
 <script setup lang="ts">
 import { gql } from "graphql-tag";
+import UserAvatar from "~/components/UserAvatar.vue";
 
 interface CustomerSummary {
   id: string;
@@ -146,6 +151,7 @@ interface CustomerSummary {
   email: string | null;
   phone: string | null;
   customerCode: string;
+  avatar?: string | null;
   createdAt: string;
   ordersCount: number;
   deliveredCount: number;
@@ -157,7 +163,7 @@ interface CustomerSummary {
 }
 
 const SUMMARY_FIELDS = `
-  id name email phone customerCode createdAt
+  id name email phone customerCode avatar createdAt
   ordersCount deliveredCount cancelledCount spentCents lastOrderAt
   stampsBalance rewardAvailable
 `;
@@ -361,6 +367,7 @@ input {
 .row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 10px; }
 .row-info { flex: 1; min-width: 0; }
 .row-info p { margin: 2px 0 0; }
+.detail-name { display: flex; align-items: center; gap: 12px; }
 .customer-row { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .customer-row:hover { border-color: var(--accent); }
 .row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }

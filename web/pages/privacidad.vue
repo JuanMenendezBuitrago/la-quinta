@@ -29,6 +29,7 @@
         <li>Tu código de cliente.</li>
         <li>Tus pedidos: productos, importes, fechas, hora de recogida y estado.</li>
         <li>Tus sellos de fidelización y los canjes.</li>
+        <li>Tu avatar, si eliges uno: una de nuestras ilustraciones o una foto que subas tú (opcional).</li>
       </ul>
       <p>No pedimos datos sensibles ni datos de pago: los pedidos se pagan en el local.</p>
     </section>
@@ -103,7 +104,8 @@
       <h2>7. Cuánto tiempo los conservamos</h2>
       <p>
         Tus datos de cuenta, mientras la mantengas activa. Si eliminas tu cuenta, borramos tu nombre,
-        email y teléfono, también en nuestra hoja de pedidos. Los pedidos se conservan sin datos que
+        email y teléfono, también en nuestra hoja de pedidos, y tu foto de perfil. Si cambias o quitas
+        tu foto, borramos la anterior. Los pedidos se conservan sin datos que
         te identifiquen durante el plazo que exigen las normas contables y tributarias.
       </p>
     </section>

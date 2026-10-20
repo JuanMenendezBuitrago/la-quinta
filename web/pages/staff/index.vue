@@ -86,9 +86,10 @@
           >
             <div class="order-info">
               <span class="order-code">{{ order.code }}</span>
-              <template v-if="order.customer">
-                <strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}
-              </template>
+              <span v-if="order.customer" class="order-customer">
+                <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="24" />
+                <span><strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}</span>
+              </span>
               <strong v-else class="muted">Sin cliente</strong>
               <OrderItems :items="order.items" />
               <p class="service">{{ serviceLabel(order) }}</p>
@@ -198,9 +199,10 @@
         <div v-for="order in historyOrders" :key="order.id" class="card history-row">
           <div class="order-info">
             <span class="order-code">{{ order.code }}</span>
-            <template v-if="order.customer">
-              <strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}
-            </template>
+            <span v-if="order.customer" class="order-customer">
+              <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="24" />
+              <span><strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}</span>
+            </span>
             <strong v-else class="muted">Sin cliente</strong>
             <OrderItems :items="order.items" />
             <p class="muted">
@@ -262,6 +264,7 @@ import { useStaffAuth } from "~/composables/useAuth";
 import { PAYMENT_LABELS, useStaffOrders, type CustomerMatch, type PaymentMethod } from "~/composables/useStaffOrders";
 import { primeAudio } from "~/composables/useOrderChime";
 import MenuAdmin from "~/components/MenuAdmin.vue";
+import UserAvatar from "~/components/UserAvatar.vue";
 import CoffeeAdmin from "~/components/CoffeeAdmin.vue";
 import StaffAdmin from "~/components/StaffAdmin.vue";
 import NewsletterAdmin from "~/components/NewsletterAdmin.vue";
@@ -420,6 +423,7 @@ watchEffect(() => {
   color: var(--danger);
 }
 .notif-button { display: inline-flex; align-items: center; gap: 8px; }
+.order-customer { display: flex; align-items: center; gap: 8px; }
 .notif-toggle { font-family: inherit; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
 .notif-toggle:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 .notif-status--muted {

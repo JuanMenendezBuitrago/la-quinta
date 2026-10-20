@@ -1,6 +1,8 @@
 import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
 import { User, StaffUser, hasCurrentConsent } from "./model";
 import { requestOtp, verifyOtpAndIssueToken, loginStaff, hashPassword, findExistingCustomer } from "./auth";
+import { presetAvatarValue, removeAvatarFile } from "./avatar";
+import { UPLOAD_DIR } from "../uploads/router";
 
 export const usersResolvers = {
   Query: {
@@ -60,6 +62,24 @@ export const usersResolvers = {
       if (!name) throw new Error("El nombre no puede estar vacio");
       if (name.length > 80) throw new Error("El nombre es demasiado largo");
       return User.findByIdAndUpdate(customerId, { name }, { new: true }).exec();
+    },
+    setMyAvatar: async (_: unknown, args: { preset?: string | null }, ctx: GraphQLContext) => {
+      const customerId = requireCustomer(ctx);
+      const avatar = presetAvatarValue(args.preset);
+      const update = avatar ? { $set: { avatar } } : { $unset: { avatar: 1 } };
+      const previous = await User.findByIdAndUpdate(customerId, update).lean();
+      if (!previous) throw new Error("Cuenta no encontrada");
+      await removeAvatarFile(previous.avatar, UPLOAD_DIR);
+      return User.findById(customerId).exec();
+    },
+    setMyStaffAvatar: async (_: unknown, args: { preset?: string | null }, ctx: GraphQLContext) => {
+      const staff = requireStaff(ctx, ["barra", "gestion"]);
+      const avatar = presetAvatarValue(args.preset);
+      const update = avatar ? { $set: { avatar } } : { $unset: { avatar: 1 } };
+      const previous = await StaffUser.findByIdAndUpdate(staff.id, update).lean();
+      if (!previous) throw new Error("Usuario no encontrado");
+      await removeAvatarFile(previous.avatar, UPLOAD_DIR);
+      return StaffUser.findById(staff.id).exec();
     },
     staffLogin: async (_: unknown, args: { email: string; password: string }) => {
       const { token, staff } = await loginStaff(args.email, args.password);

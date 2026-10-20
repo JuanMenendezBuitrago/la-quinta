@@ -27,6 +27,7 @@ export interface UserDoc {
   email?: string;
   phone?: string;
   customerCode: string; // codigo corto que el cliente enseña en el mostrador
+  avatar?: string; // ver avatar.ts
   privacyConsent?: PrivacyConsentDoc;
   newsletterConsent?: NewsletterConsentDoc;
   // Cuenta suprimida a peticion del titular: se anonimiza (sin nombre, email ni telefono) pero
@@ -41,6 +42,7 @@ const userSchema = new Schema<UserDoc>({
   email: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
   phone: { type: String, unique: true, sparse: true, trim: true },
   customerCode: { type: String, required: true, unique: true },
+  avatar: { type: String },
   privacyConsent: {
     type: new Schema<PrivacyConsentDoc>(
       { acceptedAt: { type: Date, required: true }, policyVersion: { type: String, required: true } },
@@ -68,6 +70,7 @@ export interface StaffUserDoc {
   email: string;
   passwordHash: string;
   role: StaffRole;
+  avatar?: string; // ver avatar.ts
   createdAt: Date;
 }
 
@@ -76,6 +79,7 @@ const staffUserSchema = new Schema<StaffUserDoc>({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   passwordHash: { type: String, required: true },
   role: { type: String, enum: ["barra", "gestion"], required: true, default: "barra" },
+  avatar: { type: String },
   createdAt: { type: Date, default: () => new Date() },
 });
 

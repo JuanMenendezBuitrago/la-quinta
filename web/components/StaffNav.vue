@@ -67,11 +67,18 @@
       <div class="group account">
         <span class="group-title">Sesión · {{ staff?.name }}</span>
         <button type="button" class="group-btn" :aria-expanded="open === 'account'" @click="toggle('account')">
+          <UserAvatar :avatar="staff?.avatar" :name="staff?.name" :size="24" />
           {{ staff?.name }}
           <ChevronDown class="caret" :size="14" :stroke-width="2" />
         </button>
         <ul class="dropdown align-right" :class="{ open: open === 'account' }">
           <li class="who muted">{{ staff?.name }} · {{ roleLabel }}</li>
+          <li>
+            <button type="button" class="entry" @click="openAvatarDialog">
+              <CircleUserRound class="entry-icon" :size="16" :stroke-width="1.8" />
+              <span class="entry-label">Cambiar avatar</span>
+            </button>
+          </li>
           <li>
             <button type="button" class="entry" @click="doLogout">
               <LogOut class="entry-icon" :size="16" :stroke-width="1.8" />
@@ -81,6 +88,16 @@
         </ul>
       </div>
     </div>
+
+    <dialog ref="avatarDialog" class="avatar-dialog" aria-labelledby="avatar-dialog-title" @click.self="avatarDialog?.close()">
+      <div class="avatar-dialog-body">
+        <div class="avatar-dialog-head">
+          <h2 id="avatar-dialog-title">Tu avatar</h2>
+          <button type="button" class="close" aria-label="Cerrar" @click="avatarDialog?.close()">×</button>
+        </div>
+        <AvatarPicker who="staff" :avatar="staff?.avatar" :name="staff?.name" />
+      </div>
+    </dialog>
   </nav>
 </template>
 
@@ -88,6 +105,7 @@
 import {
   BookOpen,
   ChevronDown,
+  CircleUserRound,
   ClipboardList,
   Coffee,
   ExternalLink,
@@ -103,6 +121,8 @@ import {
 } from "lucide-vue-next";
 import type { Component } from "vue";
 import { useStaffAuth } from "~/composables/useAuth";
+import UserAvatar from "~/components/UserAvatar.vue";
+import AvatarPicker from "~/components/AvatarPicker.vue";
 import {
   goToSection,
   sectionsFor,
@@ -194,6 +214,12 @@ function toggle(id: string) {
   if (open.value === "mobile" && id !== "mobile" && id !== "account") return;
   open.value = open.value === id ? null : id;
 }
+const avatarDialog = ref<HTMLDialogElement | null>(null);
+function openAvatarDialog() {
+  open.value = null;
+  avatarDialog.value?.showModal();
+}
+
 function select(entry: Entry) {
   open.value = null;
   if (!entry.external) goToSection(entry.id as StaffSectionId);
@@ -312,6 +338,31 @@ onBeforeUnmount(() => {
 .entry-label { flex: 1; }
 .group-btn.single.current { color: var(--accent); border-bottom-color: var(--accent); }
 .who { padding: 8px 12px 6px; font-size: 13px; }
+.account .group-btn { gap: 8px; }
+
+.avatar-dialog {
+  width: min(440px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--field-border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+.avatar-dialog::backdrop { background: rgba(0, 0, 0, 0.35); }
+.avatar-dialog-body { padding: 18px 20px 20px; }
+.avatar-dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.avatar-dialog-head h2 { margin: 0; }
+.avatar-dialog .close {
+  display: block;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
 
 /* --- Movil: boton "seccion actual ☰" y panel con todos los grupos desplegados --- */
 .backdrop, .panel-head { display: none; }

@@ -15,7 +15,10 @@
     <template v-else>
       <header class="account-hero">
         <p class="eyebrow">Mi cuenta</p>
-        <h1>Hola, {{ customer.name }}</h1>
+        <h1 class="hello">
+          <UserAvatar :avatar="customer.avatar" :name="customer.name" :size="48" />
+          Hola, {{ customer.name }}
+        </h1>
       </header>
 
       <div class="card customer-card">
@@ -25,6 +28,13 @@
         </div>
         <button class="button secondary" @click="logout">Cerrar sesión</button>
       </div>
+
+      <section class="avatar-section">
+        <p class="eyebrow">Tu avatar</p>
+        <div class="card">
+          <AvatarPicker who="customer" :avatar="customer.avatar" :name="customer.name" />
+        </div>
+      </section>
 
       <section class="loyalty-section">
         <p class="eyebrow">Fidelización</p>
@@ -90,6 +100,8 @@ import { gql } from "graphql-tag";
 import { useAuth } from "~/composables/useAuth";
 import { useLightbox } from "~/composables/useLightbox";
 import ImageLightbox from "~/components/ImageLightbox.vue";
+import UserAvatar from "~/components/UserAvatar.vue";
+import AvatarPicker from "~/components/AvatarPicker.vue";
 import { useImageUrl } from "~/composables/useImageUrl";
 import { tableLabel } from "~/composables/useTables";
 
@@ -226,7 +238,8 @@ function statusLabel(status: string) {
 }
 .customer-code { font-family: var(--font-serif); font-size: 20px; color: var(--text); letter-spacing: 0.02em; }
 
-.loyalty-section, .orders-section { margin-top: 32px; }
+.hello { display: flex; align-items: center; gap: 14px; }
+.avatar-section, .loyalty-section, .orders-section { margin-top: 32px; }
 
 .loyalty-card {
   margin-top: 12px;

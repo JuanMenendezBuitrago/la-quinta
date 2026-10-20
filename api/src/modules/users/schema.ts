@@ -5,6 +5,8 @@ export const usersTypeDefs = /* GraphQL */ `
     email: String
     phone: String
     customerCode: String!
+    """"preset:<id>" o ruta de una foto subida (/uploads/avatars/...); null: sin avatar."""
+    avatar: String
   }
 
   type Staff {
@@ -12,6 +14,7 @@ export const usersTypeDefs = /* GraphQL */ `
     name: String!
     email: String!
     role: StaffRole!
+    avatar: String
   }
 
   enum StaffRole {
@@ -73,6 +76,11 @@ export const usersTypeDefs = /* GraphQL */ `
     ): AuthPayload!
     """Derecho de actualizacion: el cliente corrige su nombre."""
     updateMyProfile(name: String!): Customer!
+    """El cliente elige uno de los avatares ilustrados (su id, sin "preset:"), o null para quitarlo.
+    Las fotos se suben por POST /uploads/avatar, que ya las guarda en la cuenta."""
+    setMyAvatar(preset: String): Customer!
+    """Igual que setMyAvatar, para el miembro del personal con sesion."""
+    setMyStaffAvatar(preset: String): Staff!
     """Login del equipo del local (usuario/contraseña)."""
     staffLogin(email: String!, password: String!): StaffAuthPayload!
     """Alta de personal (requiere rol gestion)."""

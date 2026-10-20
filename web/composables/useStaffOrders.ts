@@ -36,6 +36,7 @@ const ORDER_FIELDS = `
   customer {
     name
     customerCode
+    avatar
   }
   items {
     name
@@ -80,6 +81,7 @@ const ASSIGN_CUSTOMER = gql`
       customer {
         name
         customerCode
+        avatar
       }
     }
   }

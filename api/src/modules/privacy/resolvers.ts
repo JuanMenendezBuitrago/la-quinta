@@ -6,6 +6,8 @@ import {
   DELETED_CUSTOMER_NAME,
 } from "../../config/events";
 import { User } from "../users/model";
+import { removeAvatarFile } from "../users/avatar";
+import { UPLOAD_DIR } from "../uploads/router";
 import { Order } from "../orders/model";
 import { LoyaltyTransaction } from "../loyalty/model";
 
@@ -33,6 +35,7 @@ export const privacyResolvers = {
             email: user.email ?? null,
             telefono: user.phone ?? null,
             codigoCliente: user.customerCode,
+            avatar: user.avatar ?? null,
             creadaEl: user.createdAt,
             autorizacionTratamientoDatos: user.privacyConsent
               ? { aceptadaEl: user.privacyConsent.acceptedAt, versionPolitica: user.privacyConsent.policyVersion }
@@ -79,11 +82,12 @@ export const privacyResolvers = {
         { _id: customerId, deletedAt: { $exists: false } },
         {
           $set: { name: DELETED_CUSTOMER_NAME, deletedAt: new Date() },
-          $unset: { email: 1, phone: 1, privacyConsent: 1, newsletterConsent: 1 },
-        },
-        { new: true }
+          $unset: { email: 1, phone: 1, avatar: 1, privacyConsent: 1, newsletterConsent: 1 },
+        }
       );
       if (!user) throw new Error("Cuenta no encontrada");
+      // user es el documento de antes de anonimizar: con el se borra tambien su foto de avatar.
+      await removeAvatarFile(user.avatar, UPLOAD_DIR);
 
       // La sesion deja de valer en la siguiente peticion (ver buildContextFromToken). Los pedidos
       // y los sellos no guardan datos personales propios: al anonimizar al usuario quedan anonimos.

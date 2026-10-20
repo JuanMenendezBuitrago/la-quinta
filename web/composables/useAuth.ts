@@ -28,6 +28,7 @@ const VERIFY_OTP = gql`
         email
         phone
         customerCode
+        avatar
       }
     }
   }
@@ -56,6 +57,7 @@ const STAFF_LOGIN = gql`
         name
         email
         role
+        avatar
       }
     }
   }
@@ -67,11 +69,13 @@ const SESSION_QUERY = gql`
       id
       name
       customerCode
+      avatar
     }
     myStaffProfile {
       id
       name
       role
+      avatar
     }
   }
 `;
@@ -104,7 +108,7 @@ export async function restoreSession() {
  */
 export function useAuth() {
   const { onLogin, onLogout } = useApollo();
-  const customer = useState<{ id: string; name: string; customerCode: string } | null>(
+  const customer = useState<{ id: string; name: string; customerCode: string; avatar?: string | null } | null>(
     "lq-customer",
     () => null
   );
@@ -150,7 +154,7 @@ export function useAuth() {
  * el contenido del JWT, no el frontend. */
 export function useStaffAuth() {
   const { onLogin, onLogout } = useApollo();
-  const staff = useState<{ id: string; name: string; role: string } | null>("lq-staff", () => null);
+  const staff = useState<{ id: string; name: string; role: string; avatar?: string | null } | null>("lq-staff", () => null);
   const { mutate: staffLogin } = useMutation(STAFF_LOGIN);
 
   async function login(email: string, password: string) {

@@ -6,6 +6,7 @@ export const customersTypeDefs = /* GraphQL */ `
     email: String
     phone: String
     customerCode: String!
+    avatar: String
     createdAt: String!
     """Pedidos de cualquier estado."""
     ordersCount: Int!
