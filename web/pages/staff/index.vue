@@ -158,7 +158,7 @@
             </div>
             <!-- Cobro (mesa y barra): un toque en el metodo de pago -->
             <div v-else-if="payingId === order.id" class="pay-box">
-              <span class="muted">Cobrar {{ formatPrice(order.totalCents) }} con:</span>
+              <span class="muted">{{ order.awaitingPayment ? "Cobrar" : "Entregar y cobrar" }} {{ formatPrice(order.totalCents) }} con:</span>
               <div class="pay-methods">
                 <button
                   v-for="(label, method) in PAYMENT_LABELS"
@@ -189,7 +189,7 @@
                 class="button"
                 type="button"
                 :disabled="busyOrderId === order.id"
-                @click="advance(order)"
+                @click="paysOnDelivery(order) ? (payingId = order.id) : advance(order)"
               >
                 <!-- Check en los pasos que terminan algo: listo, y entregado (y pagado) -->
                 <Check v-if="order.status === 'EN_PREPARACION' || order.status === 'LISTO'" :size="16" :stroke-width="2" aria-hidden="true" />
@@ -272,6 +272,11 @@
         <StaffAdmin />
       </section>
 
+      <!-- Cierre de caja (barra y gestion) -->
+      <section v-else-if="activeTab === 'caja'">
+        <CashClosingAdmin />
+      </section>
+
       <!-- Configuracion: pedidos de clientes y pie de pagina (solo gestion) -->
       <section v-else-if="activeTab === 'pie'">
         <SiteSettingsAdmin />
@@ -288,6 +293,7 @@ import { primeAudio } from "~/composables/useOrderChime";
 import MenuAdmin from "~/components/MenuAdmin.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
 import StaffLogin from "~/components/StaffLogin.vue";
+import CashClosingAdmin from "~/components/CashClosingAdmin.vue";
 import CoffeeAdmin from "~/components/CoffeeAdmin.vue";
 import StaffAdmin from "~/components/StaffAdmin.vue";
 import NewsletterAdmin from "~/components/NewsletterAdmin.vue";
@@ -329,6 +335,8 @@ const {
   loadHistory,
   advance,
   goBack,
+  paysOnDelivery,
+  deliverAndPay,
   prevStatusLabel,
   cancelOrder,
   assignCustomer,
@@ -376,7 +384,9 @@ watch(stockAlert, (alert) => {
 const pendingCancelId = ref("");
 const payingId = ref("");
 async function doPay(order: any, method: PaymentMethod) {
-  if (await markPaid(order, method)) payingId.value = "";
+  // Mesa: se cobra aparte. Para llevar o web: se entrega y se cobra a la vez (cuenta en el cierre de caja).
+  const done = order.awaitingPayment ? await markPaid(order, method) : await deliverAndPay(order, method);
+  if (done) payingId.value = "";
 }
 function paymentLabel(method: PaymentMethod | null) {
   return method ? PAYMENT_LABELS[method] : "";

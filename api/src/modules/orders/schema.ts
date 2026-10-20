@@ -113,7 +113,9 @@ export const ordersTypeDefs = /* GraphQL */ `
     se sirve en esa mesa o en la barra ("Barra"), se prepara ya y se cobra aparte.
     """
     createOrder(items: [OrderLineInput!]!, pickupSlot: String, table: String): Order!
-    setOrderStatus(id: ID!, status: OrderStatus!): Order!
+    """paymentMethod: solo al pasar a ENTREGADO un pedido que no es de mesa (se cobra al entregarlo):
+    queda cobrado con ese metodo, para el cierre de caja."""
+    setOrderStatus(id: ID!, status: OrderStatus!, paymentMethod: PaymentMethod): Order!
     """Personal: cobra un pedido de mesa o barra (antes o despues de entregarlo)."""
     markOrderPaid(id: ID!, method: PaymentMethod!): Order!
     """Personal: pedido tomado en el local (mesero o barra). La recogida es ahora."""

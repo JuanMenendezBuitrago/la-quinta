@@ -57,11 +57,13 @@ const QUEUE_SUBSCRIPTION = gql`subscription OrderQueueUpdated { orderQueueUpdate
 const HISTORY_QUERY = gql`query OrderHistory($limit: Int) { orderHistory(limit: $limit) { ${ORDER_FIELDS} } }`;
 
 const SET_STATUS = gql`
-  mutation SetOrderStatus($id: ID!, $status: OrderStatus!) {
-    setOrderStatus(id: $id, status: $status) {
+  mutation SetOrderStatus($id: ID!, $status: OrderStatus!, $paymentMethod: PaymentMethod) {
+    setOrderStatus(id: $id, status: $status, paymentMethod: $paymentMethod) {
       id
       status
       awaitingPayment
+      paidAt
+      paymentMethod
     }
   }
 `;
@@ -240,12 +242,12 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
    * La API rechaza las transiciones no validas (p. ej. si otra persona ya movio el pedido):
    * se muestra el motivo y se recarga la cola para ver el estado real. Devuelve si se aplico.
    */
-  async function changeStatus(order: any, status: string) {
+  async function changeStatus(order: any, status: string, paymentMethod?: PaymentMethod) {
     if (busyOrderId.value) return false;
     busyOrderId.value = order.id;
     actionError.value = "";
     try {
-      await setStatus({ id: order.id, status });
+      await setStatus({ id: order.id, status, paymentMethod: paymentMethod ?? null });
       return true;
     } catch (err: any) {
       actionError.value = err?.message ?? "No se pudo cambiar el estado del pedido";
@@ -259,6 +261,13 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     const status = nextStatus(order.status);
     if (!status) return false;
     return changeStatus(order, status);
+  }
+  /** Para llevar o web, ya listo: se cobra al entregarlo, asi que antes se elige el metodo de pago. */
+  function paysOnDelivery(order: any) {
+    return order.status === "LISTO" && order.serviceType !== "MESA";
+  }
+  async function deliverAndPay(order: any, method: PaymentMethod) {
+    return changeStatus(order, "ENTREGADO", method);
   }
   async function goBack(order: any) {
     const status = PREV_STATUS[order.status];
@@ -331,6 +340,8 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     loadHistory,
     advance,
     goBack,
+    paysOnDelivery,
+    deliverAndPay,
     prevStatusLabel,
     cancelOrder,
     assignCustomer,

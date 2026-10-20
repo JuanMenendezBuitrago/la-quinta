@@ -231,10 +231,15 @@ export const ordersResolvers = {
 
     setOrderStatus: async (
       _: unknown,
-      args: { id: string; status: OrderStatus },
+      args: { id: string; status: OrderStatus; paymentMethod?: PaymentMethod | null },
       ctx: GraphQLContext
     ) => {
       const staff = requireStaff(ctx, ["barra", "gestion"]);
+      // Cobro al entregar (pedidos para llevar o web): el metodo se guarda en el mismo update.
+      const paidOnDelivery = !!args.paymentMethod;
+      if (paidOnDelivery && (args.status !== "ENTREGADO" || !PAYMENT_METHODS.includes(args.paymentMethod!))) {
+        throw new Error("El metodo de pago solo se indica al entregar un pedido que no es de mesa");
+      }
 
       // La comprobacion del estado de origen va dentro del propio update: si dos personas
       // actuan a la vez sobre el mismo pedido, solo una lo consigue (y solo se emite un evento,
@@ -246,18 +251,28 @@ export const ordersResolvers = {
         delete filter.status;
         filter.$or = [{ status: { $in: ALLOWED_FROM.CANCELADO } }, AWAITING_PAYMENT];
       }
+      // Los de mesa se cobran aparte (markOrderPaid), antes o despues de entregar.
+      if (paidOnDelivery) filter.serviceType = { $ne: "MESA" };
       const order = await Order.findOneAndUpdate(
         filter,
         // findOneAndUpdate no pasa por el hook pre("save"): updatedAt se fija aqui a mano.
         {
-          $set: { status: args.status, updatedAt: now, ...(args.status === "ENTREGADO" ? { deliveredAt: now } : {}) },
+          $set: {
+            status: args.status,
+            updatedAt: now,
+            ...(args.status === "ENTREGADO" ? { deliveredAt: now } : {}),
+            ...(paidOnDelivery ? { paidAt: now, paymentMethod: args.paymentMethod, paidByStaffId: staff.id } : {}),
+          },
           $push: { statusHistory: { status: args.status, at: now, staffId: staff.id } },
         },
         { new: true }
       );
       if (!order) {
-        const current = await Order.findById(args.id).select("status code").lean();
+        const current = await Order.findById(args.id).select("status code serviceType").lean();
         if (!current) throw new Error("Pedido no encontrado");
+        if (paidOnDelivery && current.serviceType === "MESA") {
+          throw new Error(`El pedido ${current.code} es de mesa: se cobra aparte`);
+        }
         throw new Error(
           `El pedido ${current.code} esta "${STATUS_LABELS[current.status]}" y no puede pasar a "${STATUS_LABELS[args.status]}"`
         );

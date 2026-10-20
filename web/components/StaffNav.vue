@@ -104,6 +104,7 @@
 <script setup lang="ts">
 import {
   BookOpen,
+  Calculator,
   ChevronDown,
   CircleUserRound,
   ClipboardList,
@@ -147,6 +148,7 @@ const ENTRY_ICONS: Record<Entry["id"], Component> = {
   tomar: SquarePen,
   historial: History,
   inventario: Package,
+  caja: Calculator,
   clientes: Users,
   personal: IdCard,
   carta: BookOpen,

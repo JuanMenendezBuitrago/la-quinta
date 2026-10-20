@@ -13,6 +13,7 @@ export const STAFF_SECTIONS = [
   { id: "tomar", label: "Tomar pedido", group: "pedidos", roles: ["barra", "gestion"] },
   { id: "historial", label: "Historial", group: "pedidos", roles: ["barra", "gestion"] },
   { id: "inventario", label: "Inventario", group: "local", roles: ["barra", "gestion"] },
+  { id: "caja", label: "Cierre de caja", group: "local", roles: ["barra", "gestion"] },
   // Solo gestion: muestra datos personales (la politica de privacidad limita el acceso a quien lo necesita).
   { id: "clientes", label: "Clientes", group: "local", roles: ["gestion"] },
   { id: "personal", label: "Personal", group: "local", roles: ["gestion"] },
