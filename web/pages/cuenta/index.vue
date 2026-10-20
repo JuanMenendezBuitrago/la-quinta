@@ -54,6 +54,13 @@
         </div>
       </section>
 
+      <section class="favorites-section">
+        <p class="eyebrow">Tus favoritos</p>
+        <div class="card">
+          <FavoritesList />
+        </div>
+      </section>
+
       <section class="orders-section">
         <p class="eyebrow">Pedidos recientes</p>
         <p v-if="!orders?.length" class="muted">Todavía no has hecho ningún pedido.</p>
@@ -102,6 +109,7 @@ import { useLightbox } from "~/composables/useLightbox";
 import ImageLightbox from "~/components/ImageLightbox.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
 import AvatarPicker from "~/components/AvatarPicker.vue";
+import FavoritesList from "~/components/FavoritesList.vue";
 import { useImageUrl } from "~/composables/useImageUrl";
 import { tableLabel } from "~/composables/useTables";
 
@@ -239,7 +247,7 @@ function statusLabel(status: string) {
 .customer-code { font-family: var(--font-serif); font-size: 20px; color: var(--text); letter-spacing: 0.02em; }
 
 .hello { display: flex; align-items: center; gap: 14px; }
-.avatar-section, .loyalty-section, .orders-section { margin-top: 32px; }
+.avatar-section, .loyalty-section, .favorites-section, .orders-section { margin-top: 32px; }
 
 .loyalty-card {
   margin-top: 12px;
