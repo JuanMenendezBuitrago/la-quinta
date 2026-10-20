@@ -1,4 +1,5 @@
 import { IncomingMessage } from "http";
+import { GraphQLError } from "graphql";
 import { verifyToken } from "../modules/users/auth";
 import { StaffRole, User } from "../modules/users/model";
 import { pubsub } from "../config/pubsub";
@@ -52,15 +53,25 @@ async function buildContextFromToken(token: string | null): Promise<GraphQLConte
   };
 }
 
+/**
+ * Sin la sesion que hace falta: code UNAUTHENTICATED y `session` dice cual. La web lo usa para
+ * olvidar la sesion que creia tener (cliente y personal comparten cookie: si se entra con una,
+ * la otra deja de valer aunque la pestaña siga mostrandola). Ver web/plugins/apollo-auth-errors.client.ts.
+ */
+function unauthenticated(message: string, session: "customer" | "staff") {
+  return new GraphQLError(message, { extensions: { code: "UNAUTHENTICATED", session } });
+}
+
 export function requireCustomer(ctx: GraphQLContext): string {
-  if (!ctx.customerId) throw new Error("Necesitas iniciar sesion");
+  if (!ctx.customerId) throw unauthenticated("Necesitas iniciar sesion", "customer");
   return ctx.customerId;
 }
 
 export function requireStaff(ctx: GraphQLContext, roles?: StaffRole[]) {
-  if (!ctx.staff) throw new Error("Necesitas iniciar sesion como personal del local");
+  if (!ctx.staff) throw unauthenticated("Necesitas iniciar sesion como personal del local", "staff");
   if (roles && !roles.includes(ctx.staff.role)) {
-    throw new Error("No tienes permiso para esta accion");
+    // Con sesion valida pero sin el rol: no se cierra la sesion, solo se rechaza la accion.
+    throw new GraphQLError("No tienes permiso para esta accion", { extensions: { code: "FORBIDDEN" } });
   }
   return ctx.staff;
 }
