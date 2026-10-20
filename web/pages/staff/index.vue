@@ -108,7 +108,7 @@
               </div>
               <span v-if="order.customer" class="order-customer">
                 <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="24" />
-                <span><strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}</span>
+                <strong>{{ order.customer.name }}</strong>
               </span>
               <span v-else class="order-customer">
                 <strong class="muted">Sin cliente</strong>
@@ -124,7 +124,7 @@
                   <UserPlus :size="16" :stroke-width="1.8" aria-hidden="true" />
                 </button>
               </span>
-              <OrderItems :items="order.items" />
+              <OrderItems :items="order.items" list />
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
               <p v-if="order.paidAt" class="paid-badge">Cobrado · {{ paymentLabel(order.paymentMethod) }}</p>
             </div>
@@ -223,10 +223,10 @@
             <span class="order-code">{{ order.code }}</span>
             <span v-if="order.customer" class="order-customer">
               <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="24" />
-              <span><strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}</span>
+              <strong>{{ order.customer.name }}</strong>
             </span>
             <strong v-else class="muted">Sin cliente</strong>
-            <OrderItems :items="order.items" />
+            <OrderItems :items="order.items" list />
             <p class="muted">
               {{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}{{
                 order.paidAt ? ` · Cobrado con ${paymentLabel(order.paymentMethod)}` : ""
@@ -450,8 +450,11 @@ watchEffect(() => {
 .order-customer { display: flex; align-items: center; gap: 8px; }
 .login-hero { text-align: center; }
 .order-head { display: flex; align-items: center; gap: 8px; }
+/* Aire entre encabezado, cliente y productos de cada tarjeta de la cola */
+.order-card .order-head { margin-bottom: 12px; }
+.order-card .order-customer { margin-bottom: 4px; }
 /* Productos del pedido en la cola: mas grandes que el texto secundario (14px), se leen de lejos */
-.order-card .order-items { margin: 6px 0; font-size: 16px; line-height: 1.4; }
+.order-card .order-items { margin: 10px 0 12px; font-size: 16px; line-height: 1.4; }
 .order-head-right { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .handled-by { display: inline-flex; }
 .sr-only {
@@ -639,7 +642,8 @@ watchEffect(() => {
 .danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
 
 .history-list { display: flex; flex-direction: column; gap: 10px; }
-.history-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+/* Estado (entregado/cancelado) en la esquina superior derecha, alineado con el codigo */
+.history-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 
 .status-badge {
   flex-shrink: 0;

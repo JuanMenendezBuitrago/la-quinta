@@ -1,5 +1,6 @@
 <template>
-  <div>
+  <!-- Al menos todo el alto de la pantalla: con poco contenido, el pie queda pegado abajo -->
+  <div class="app-shell">
     <header class="topbar">
       <NuxtLink :to="inStaff && staff ? '/staff' : '/'" class="brand" aria-label="La Quinta">
         <!-- En movil, el logotipo compacto "La 5ta"; en el resto, el horizontal "laquintaesencia" -->
@@ -29,7 +30,9 @@
         </NuxtLink>
       </nav>
     </header>
-    <NuxtPage />
+    <div class="app-body">
+      <NuxtPage />
+    </div>
     <SiteFooter />
     <StaffQuickBar v-if="inStaff && staff" />
   </div>
@@ -76,6 +79,8 @@ await useAsyncData("session", async () => {
 </script>
 
 <style scoped>
+.app-shell { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+.app-body { flex: 1 0 auto; }
 .topbar {
   position: sticky;
   top: 0;
