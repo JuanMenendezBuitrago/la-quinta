@@ -215,7 +215,7 @@ async function deleteAccount() {
 .legal-note a { color: inherit; text-decoration: underline; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .danger { color: var(--danger); border-color: var(--danger); }
-.danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
+.danger-solid { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
 .delete-confirm {
   border: 1px solid var(--danger);
   border-radius: 8px;

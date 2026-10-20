@@ -7,6 +7,7 @@
         <img src="/logo-laquintaesencia.png" alt="La Quinta" class="brand-logo brand-logo--wide" width="694" height="76" />
         <img src="/logo.png" alt="La Quinta" class="brand-logo brand-logo--compact" width="268" height="115" />
       </NuxtLink>
+      <div class="topbar-end">
       <!-- En el panel de personal, su propio menu: carrito y "mi cuenta" son cosas del cliente -->
       <StaffNav v-if="inStaff && staff" />
       <nav v-else-if="inStaff">
@@ -29,6 +30,8 @@
           <User v-else :size="22" :stroke-width="1.7" />
         </NuxtLink>
       </nav>
+      <ThemeToggle />
+      </div>
     </header>
     <div class="app-body">
       <NuxtPage />
@@ -47,6 +50,8 @@ import { useCustomerOrdering } from "~/composables/useSiteSettings";
 import StaffNav from "~/components/StaffNav.vue";
 import StaffQuickBar from "~/components/StaffQuickBar.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
+import ThemeToggle from "~/components/ThemeToggle.vue";
+import { useThemeAttribute } from "~/composables/useTheme";
 
 const { cartCount, clear: clearCart } = useCart();
 // Si se activa "solo el personal crea pedidos", el carrito deja de existir para el cliente.
@@ -54,6 +59,9 @@ const canOrder = useCustomerOrdering();
 watch(canOrder, (enabled) => {
   if (!enabled) clearCart();
 });
+// Tema claro/oscuro elegido (o el del sistema): data-theme en <html> desde el servidor.
+useThemeAttribute();
+
 const { staff } = useStaffAuth();
 const { customer } = useAuth();
 const route = useRoute();
@@ -81,6 +89,7 @@ await useAsyncData("session", async () => {
 <style scoped>
 .app-shell { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
 .app-body { flex: 1 0 auto; }
+.topbar-end { display: flex; align-items: center; gap: 14px; }
 .topbar {
   position: sticky;
   top: 0;

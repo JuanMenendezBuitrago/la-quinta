@@ -106,12 +106,12 @@
                   </span>
                 </span>
               </div>
-              <span v-if="order.customer" class="order-customer">
-                <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="24" />
+              <span v-if="order.customer" class="order-customer order-customer--stacked">
+                <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="36" />
                 <strong>{{ order.customer.name }}</strong>
               </span>
-              <span v-else class="order-customer">
-                <strong class="muted">Sin cliente</strong>
+              <!-- Sin cliente: el boton de asignar ocupa el sitio del avatar, encima del texto -->
+              <span v-else class="order-customer order-customer--stacked">
                 <button
                   v-if="assigningId !== order.id"
                   class="assign-icon"
@@ -121,8 +121,9 @@
                   :disabled="busyOrderId === order.id"
                   @click="assigningId = order.id"
                 >
-                  <UserPlus :size="16" :stroke-width="1.8" aria-hidden="true" />
+                  <UserPlus :size="18" :stroke-width="1.8" aria-hidden="true" />
                 </button>
+                <strong class="muted">Sin cliente</strong>
               </span>
               <OrderItems :items="order.items" list />
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
@@ -469,6 +470,8 @@ watchEffect(() => {
 /* Aire entre encabezado, cliente y productos de cada tarjeta de la cola */
 .order-card .order-head { margin-bottom: 12px; }
 .order-card .order-customer { margin-bottom: 4px; }
+/* Cola: cliente centrado, con el avatar encima del nombre */
+.order-customer--stacked { flex-direction: column; justify-content: center; gap: 4px; text-align: center; }
 /* Productos del pedido en la cola: mas grandes que el texto secundario (14px), se leen de lejos */
 .order-card .order-items { margin: 10px 0 12px; font-size: 16px; line-height: 1.4; }
 .order-head-right { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -641,8 +644,8 @@ watchEffect(() => {
 .back-chevron:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .back-chevron:disabled { opacity: 0.45; cursor: not-allowed; }
 .assign-icon {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--field-border);
   border-radius: 50%;
   background: none;
@@ -655,7 +658,7 @@ watchEffect(() => {
 .assign-icon:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .assign-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .assign-icon:disabled { opacity: 0.45; cursor: not-allowed; }
-.danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
+.danger-solid { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
 
 .history-list { display: flex; flex-direction: column; gap: 10px; }
 /* Estado (entregado/cancelado) en la esquina superior derecha, alineado con el codigo */

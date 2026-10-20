@@ -143,5 +143,5 @@ const actions = computed<QuickAction[]>(() => {
   font-size: 10px;
   font-weight: 700;
 }
-.badge.danger { background: var(--danger); color: #fff; }
+.badge.danger { background: var(--danger); color: var(--on-danger); }
 </style>

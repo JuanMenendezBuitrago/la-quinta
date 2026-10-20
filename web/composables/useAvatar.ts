@@ -20,7 +20,7 @@ export interface AvatarPreset {
 const TONES = [
   { background: "var(--accent)", color: "var(--bg)" },
   { background: "var(--color4)", color: "var(--bg)" },
-  { background: "var(--accent-soft)", color: "#2f4948" },
+  { background: "var(--accent-soft)", color: "var(--on-accent-soft)" },
   { background: "var(--color5)", color: "var(--bg)" },
   { background: "var(--danger)", color: "var(--bg)" },
 ];

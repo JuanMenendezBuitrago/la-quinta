@@ -28,7 +28,7 @@ defineProps<{ slide: Pick<HeroSlide, "tag" | "title" | "text" | "tone" | "linkUr
   gap: 6px;
   border-radius: 14px;
 }
-.tone-teal { background: var(--accent-soft); color: #2f4948; }
+.tone-teal { background: var(--accent-soft); color: var(--on-accent-soft); }
 .tone-brown { background: var(--color4); color: var(--bg); }
 .tone-olive { background: var(--color5); color: var(--bg); }
 

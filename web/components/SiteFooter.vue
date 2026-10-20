@@ -79,10 +79,11 @@ const socials = computed(() => {
 <style scoped>
 .footer {
   margin-top: 40px;
-  background: var(--color4);
+  background: var(--footer-bg);
   /* Las reglas de abajo usan var(--text), var(--text-muted), etc.: se redefinen aqui para
-     contraste sobre el fondo marrón. Las custom properties atraviesan el scoping de Vue. */
-  --text: var(--surface);
+     contraste sobre el fondo del pie (marron; en modo oscuro, cafe oscuro). Las custom
+     properties atraviesan el scoping de Vue. */
+  --text: var(--footer-text);
   --text-muted: rgba(255, 255, 255, 0.9);
   --border-strong: rgba(255, 255, 255, 0.3);
   border-top: 1px solid var(--border-strong);

@@ -335,7 +335,8 @@ function openProduct(item: any) {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  color: var(--bg);
+  /* Blanco sobre la foto (lo pone .item-info); sin foto, el color de texto normal */
+  color: inherit;
   font-weight: 800;
   overflow: hidden;
 }
