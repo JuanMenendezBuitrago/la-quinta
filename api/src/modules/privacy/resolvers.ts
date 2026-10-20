@@ -10,6 +10,7 @@ import { removeAvatarFile } from "../users/avatar";
 import { UPLOAD_DIR } from "../uploads/router";
 import { Order } from "../orders/model";
 import { MenuItem } from "../menu/model";
+import { Review } from "../reviews/model";
 import { LoyaltyTransaction } from "../loyalty/model";
 
 /**
@@ -26,6 +27,7 @@ export const privacyResolvers = {
         LoyaltyTransaction.find({ customerId }).sort({ createdAt: 1 }).lean(),
       ]);
       if (!user) throw new Error("Cuenta no encontrada");
+      const reviews = await Review.find({ customerId }).sort({ createdAt: 1 }).lean();
       const favorites = await MenuItem.find({ _id: { $in: user.favoriteMenuItemIds ?? [] } }).select("name").lean();
       const orderCodes = new Map(orders.map((o) => [o._id.toString(), o.code]));
 
@@ -61,6 +63,13 @@ export const privacyResolvers = {
             creadoEl: o.createdAt,
             actualizadoEl: o.updatedAt,
           })),
+          opiniones: reviews.map((r) => ({
+            sobre: r.orderId ? `pedido ${orderCodes.get(r.orderId.toString()) ?? ""}`.trim() : "el local",
+            estrellas: r.rating,
+            comentario: r.comment ?? null,
+            creadaEl: r.createdAt,
+            actualizadaEl: r.updatedAt,
+          })),
           sellos: loyalty.map((t) => ({
             sellos: t.stamps,
             motivo: t.reason,
@@ -91,6 +100,9 @@ export const privacyResolvers = {
       if (!user) throw new Error("Cuenta no encontrada");
       // user es el documento de antes de anonimizar: con el se borra tambien su foto de avatar.
       await removeAvatarFile(user.avatar, UPLOAD_DIR);
+      // Opiniones: el comentario puede identificar a la persona y se borra; la puntuacion queda
+      // (anonima, como los pedidos) para la media del local.
+      await Review.updateMany({ customerId }, { $unset: { comment: 1 } });
 
       // La sesion deja de valer en la siguiente peticion (ver buildContextFromToken). Los pedidos
       // y los sellos no guardan datos personales propios: al anonimizar al usuario quedan anonimos.

@@ -272,6 +272,11 @@
         <StaffAdmin />
       </section>
 
+      <!-- Opiniones de los clientes (solo gestion) -->
+      <section v-else-if="activeTab === 'opiniones'">
+        <ReviewsAdmin />
+      </section>
+
       <!-- Cierre de caja (barra y gestion) -->
       <section v-else-if="activeTab === 'caja'">
         <CashClosingAdmin />
@@ -294,6 +299,7 @@ import MenuAdmin from "~/components/MenuAdmin.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
 import StaffLogin from "~/components/StaffLogin.vue";
 import CashClosingAdmin from "~/components/CashClosingAdmin.vue";
+import ReviewsAdmin from "~/components/ReviewsAdmin.vue";
 import CoffeeAdmin from "~/components/CoffeeAdmin.vue";
 import StaffAdmin from "~/components/StaffAdmin.vue";
 import NewsletterAdmin from "~/components/NewsletterAdmin.vue";

@@ -92,6 +92,34 @@
             </span>
           </div>
           <span class="status" :data-status="order.status">{{ statusLabel(order.status) }}</span>
+          <!-- Opinion sobre el pedido: solo ya entregado -->
+          <div v-if="order.status === 'ENTREGADO'" class="order-review">
+            <ReviewForm
+              v-if="editingOrderId === order.id"
+              :order-id="order.id"
+              :existing="reviewByOrder.get(order.id) ?? null"
+              cancellable
+              @saved="onReviewSaved"
+              @cancel="editingOrderId = ''"
+            />
+            <div v-else-if="reviewByOrder.get(order.id)" class="review-summary">
+              <StarRating :model-value="reviewByOrder.get(order.id)!.rating" display :size="16" />
+              <span v-if="reviewByOrder.get(order.id)!.comment" class="review-comment">«{{ reviewByOrder.get(order.id)!.comment }}»</span>
+              <button type="button" class="link-button" @click="editingOrderId = order.id">Editar</button>
+            </div>
+            <button v-else type="button" class="link-button rate" @click="editingOrderId = order.id">
+              <Star :size="14" :stroke-width="1.8" aria-hidden="true" />
+              ¿Qué tal tu pedido? Valóralo
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="review-section">
+        <p class="eyebrow">Tu opinión sobre La Quinta</p>
+        <div class="card">
+          <p class="muted review-intro">¿Cómo ha sido tu experiencia con nosotros? Solo la lee el equipo del local.</p>
+          <ReviewForm :key="generalReview?.id ?? 'nueva'" :existing="generalReview" @saved="onReviewSaved" />
         </div>
       </section>
 
@@ -110,6 +138,9 @@ import ImageLightbox from "~/components/ImageLightbox.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
 import AvatarPicker from "~/components/AvatarPicker.vue";
 import FavoritesList from "~/components/FavoritesList.vue";
+import ReviewForm, { type MyReview } from "~/components/ReviewForm.vue";
+import StarRating from "~/components/StarRating.vue";
+import { Star } from "lucide-vue-next";
 import { useImageUrl } from "~/composables/useImageUrl";
 import { tableLabel } from "~/composables/useTables";
 
@@ -172,6 +203,32 @@ const { result: loyaltyResult, refetch: refetchLoyalty } = useQuery(LOYALTY_QUER
 const { result: ordersResult, refetch: refetchOrders } = useQuery(ORDERS_QUERY, null, () => ({
   enabled: !!customer.value,
 }));
+
+const MY_REVIEWS = gql`
+  query MyReviews {
+    myReviews {
+      id
+      orderId
+      rating
+      comment
+    }
+  }
+`;
+const { result: reviewsResult } = useQuery<{ myReviews: MyReview[] }>(MY_REVIEWS, null, () => ({
+  enabled: !!customer.value,
+}));
+// Lo guardado aqui se superpone a lo que vino de la API: se ve al momento sin volver a pedir la
+// lista. Es un computed (no un watch que copie): asi el HTML del servidor ya sale con las opiniones
+// y la hidratacion no se descuadra.
+const localReviews = ref<MyReview[] | null>(null);
+const myReviews = computed(() => localReviews.value ?? reviewsResult.value?.myReviews ?? []);
+const reviewByOrder = computed(() => new Map(myReviews.value.filter((r) => r.orderId).map((r) => [r.orderId!, r])));
+const generalReview = computed(() => myReviews.value.find((r) => !r.orderId) ?? null);
+const editingOrderId = ref("");
+function onReviewSaved(review: MyReview) {
+  localReviews.value = [...myReviews.value.filter((r) => r.id !== review.id), review];
+  editingOrderId.value = "";
+}
 
 const loyalty = computed(() => loyaltyResult.value?.myLoyaltyStatus);
 const orders = computed(() => ordersResult.value?.myOrders ?? []);
@@ -247,7 +304,7 @@ function statusLabel(status: string) {
 .customer-code { font-family: var(--font-serif); font-size: 20px; color: var(--text); letter-spacing: 0.02em; }
 
 .hello { display: flex; align-items: center; gap: 14px; }
-.avatar-section, .loyalty-section, .favorites-section, .orders-section { margin-top: 32px; }
+.avatar-section, .loyalty-section, .favorites-section, .orders-section, .review-section { margin-top: 32px; }
 
 .loyalty-card {
   margin-top: 12px;
@@ -265,6 +322,7 @@ function statusLabel(status: string) {
 
 .order-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -272,6 +330,22 @@ function statusLabel(status: string) {
   border-bottom: 1px solid var(--border);
 }
 .order-row:last-child { border-bottom: none; }
+.order-review { flex-basis: 100%; }
+.review-summary { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; }
+.review-comment { color: var(--text-muted); font-style: italic; min-width: 0; overflow-wrap: anywhere; }
+.link-button {
+  border: none;
+  background: none;
+  padding: 2px 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.link-button.rate { display: inline-flex; align-items: center; gap: 6px; }
+.review-intro { margin: 0 0 10px; }
 .order-thumbs { display: flex; gap: 6px; flex-shrink: 0; }
 .order-thumb {
   width: 40px;

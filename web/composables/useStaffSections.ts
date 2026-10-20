@@ -17,6 +17,8 @@ export const STAFF_SECTIONS = [
   // Solo gestion: muestra datos personales (la politica de privacidad limita el acceso a quien lo necesita).
   { id: "clientes", label: "Clientes", group: "local", roles: ["gestion"] },
   { id: "personal", label: "Personal", group: "local", roles: ["gestion"] },
+  // Opiniones de los clientes (con su nombre: datos personales, solo gestion).
+  { id: "opiniones", label: "Opiniones", group: "local", roles: ["gestion"] },
   { id: "carta", label: "Carta", group: "web", roles: ["gestion"] },
   { id: "cafe", label: "Café en grano", group: "web", roles: ["gestion"] },
   { id: "portada", label: "Portada", group: "web", roles: ["gestion"] },
