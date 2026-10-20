@@ -1,7 +1,7 @@
 <template>
   <main class="container page-staff">
     <template v-if="!staff">
-      <header class="account-hero">
+      <header class="account-hero login-hero">
         <h1>Panel de personal</h1>
       </header>
       <StaffLogin />
@@ -78,7 +78,18 @@
             :class="[`status-${order.status}`, { 'order-card--new': order._isNew }]"
           >
             <div class="order-info">
-              <span class="order-code">{{ order.code }}</span>
+              <div class="order-head">
+                <span class="order-code">{{ order.code }}</span>
+                <!-- Quien lo movio por ultima vez (el NUEVO de un pedido web no tiene a nadie) -->
+                <span
+                  v-if="handledBy(order)"
+                  class="handled-by"
+                  :title="`Gestionado por ${handledBy(order)!.staffName}`"
+                >
+                  <UserAvatar :avatar="handledBy(order)!.staffAvatar" :name="handledBy(order)!.staffName" :size="22" />
+                  <span class="sr-only">Gestionado por {{ handledBy(order)!.staffName }}</span>
+                </span>
+              </div>
               <span v-if="order.customer" class="order-customer">
                 <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="24" />
                 <span><strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}</span>
@@ -319,6 +330,13 @@ const {
 } = useStaffOrders(isLoggedIn);
 
 const { lowCount, lastAlert: stockAlert } = useInventoryAlerts(isLoggedIn);
+
+/** Ultimo miembro del personal que cambio el estado del pedido (o lo tomo), si lo hay. */
+function handledBy(order: any): { staffName: string; staffAvatar?: string | null } | null {
+  const history: any[] = order.statusHistory ?? [];
+  for (let i = history.length - 1; i >= 0; i--) if (history[i].staffName) return history[i];
+  return null;
+}
 // En la propia pestaña de inventario el aviso sobra (ya se ve en rojo): no se guarda para despues.
 watch(stockAlert, (alert) => {
   if (alert && activeTab.value === "inventario") stockAlert.value = null;
@@ -399,6 +417,17 @@ watchEffect(() => {
 }
 .notif-button { display: inline-flex; align-items: center; gap: 8px; }
 .order-customer { display: flex; align-items: center; gap: 8px; }
+.login-hero { text-align: center; }
+.order-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.handled-by { display: inline-flex; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .notif-toggle { font-family: inherit; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
 .notif-toggle:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 .notif-status--muted {

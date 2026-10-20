@@ -1,7 +1,7 @@
 import { IncomingMessage } from "http";
 import { GraphQLError } from "graphql";
 import { verifyToken } from "../modules/users/auth";
-import { StaffRole, User } from "../modules/users/model";
+import { StaffRole, StaffUser, User } from "../modules/users/model";
 import { pubsub } from "../config/pubsub";
 
 export interface GraphQLContext {
@@ -43,14 +43,13 @@ async function buildContextFromToken(token: string | null): Promise<GraphQLConte
     customerId = null;
   }
 
-  return {
-    pubsub,
-    customerId,
-    staff:
-      payload?.kind === "staff" && payload.role
-        ? { id: payload.sub, role: payload.role }
-        : null,
-  };
+  // Igual con el personal: al desactivar una cuenta, su sesion abierta deja de valer al momento.
+  let staff = payload?.kind === "staff" && payload.role ? { id: payload.sub, role: payload.role } : null;
+  if (staff && !(await StaffUser.exists({ _id: staff.id, active: { $ne: false } }))) {
+    staff = null;
+  }
+
+  return { pubsub, customerId, staff };
 }
 
 /**

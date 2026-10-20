@@ -50,6 +50,7 @@ export const ordersTypeDefs = /* GraphQL */ `
     at: String!
     """Quien lo hizo; null en el NUEVO de un pedido web (lo crea el cliente) y en los reconstruidos."""
     staffName: String
+    staffAvatar: String
   }
 
   type Order {

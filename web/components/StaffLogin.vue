@@ -128,12 +128,16 @@ function submitEmail() {
 </script>
 
 <style scoped>
+/* Todo centrado, como la pantalla de acceso de un ordenador */
+.staff-login { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .accounts {
   list-style: none;
   margin: 12px 0 20px;
   padding: 0;
+  width: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, 140px);
+  justify-content: center;
   gap: 12px;
 }
 .accounts li { display: flex; }
@@ -156,7 +160,7 @@ function submitEmail() {
 .account:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .account-name { font-weight: 600; font-size: 14px; text-align: center; overflow-wrap: anywhere; }
 
-.login-card { max-width: 320px; display: flex; flex-direction: column; gap: 8px; }
+.login-card { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 8px; text-align: left; }
 .login-card.selected { align-items: center; text-align: center; }
 .login-card.selected input, .login-card.selected .button { width: 100%; }
 .selected-name { font-family: var(--font-futura-text); font-size: 18px; margin-bottom: 4px; }

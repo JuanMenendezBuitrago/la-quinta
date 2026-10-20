@@ -7,9 +7,9 @@
     <p v-if="loading" class="muted">Cargando la carta…</p>
     <p v-else-if="error" class="muted">No se pudo cargar la carta. ¿Está la API en marcha?</p>
 
-    <nav v-if="menu.length" ref="pillsNav" class="category-pills" aria-label="Categorías">
+    <nav v-if="sections.length" ref="pillsNav" class="category-pills" aria-label="Categorías">
       <button
-        v-for="category in menu"
+        v-for="category in sections"
         :key="category.id"
         type="button"
         class="pill"
@@ -17,14 +17,15 @@
         :data-cat-id="category.id"
         @click="selectCategory(category.id)"
       >
+        <Heart v-if="category.id === FAVORITES_ID" :size="13" :stroke-width="2" class="pill-heart" aria-hidden="true" />
         {{ category.name }}
       </button>
     </nav>
 
-    <section v-for="category in menu" :id="`cat-${category.id}`" :key="category.id" class="category">
+    <section v-for="category in sections" :id="`cat-${category.id}`" :key="category.id" class="category">
       <h2 class="category-title">{{ category.name }}</h2>
       <div class="items">
-        <article v-for="item in menuEntries(category.items)" :key="item.id" class="item" :title="item.description || undefined">
+        <article v-for="item in category.entries" :key="item.id" class="item" :title="item.description || undefined">
           <img
             v-if="item.imageUrl"
             :src="resolveImageUrl(item.imageUrl) ?? undefined"
@@ -47,6 +48,17 @@
             @click="onAdd(item)"
           >
             <Plus :size="14" :stroke-width="1.8" />
+          </button>
+          <button
+            class="fav-btn"
+            :class="{ active: isFavorite(item) }"
+            type="button"
+            :aria-pressed="isFavorite(item)"
+            :aria-label="isFavorite(item) ? `Quitar ${item.name} de favoritos` : `Añadir ${item.name} a favoritos`"
+            :title="customer ? undefined : 'Inicia sesión para guardar favoritos'"
+            @click="toggleFavorite(item)"
+          >
+            <Heart :size="14" :stroke-width="1.8" />
           </button>
         </article>
       </div>
@@ -71,7 +83,9 @@
 </template>
 
 <script setup lang="ts">
-import { Plus } from "lucide-vue-next";
+import { Heart, Plus } from "lucide-vue-next";
+import { useAuth } from "~/composables/useAuth";
+import { useFavorites } from "~/composables/useFavorites";
 import { useCart } from "~/composables/useCart";
 import { useCustomerOrdering } from "~/composables/useSiteSettings";
 import { MENU_QUERY, defaultCartOptions, menuEntries, type MenuCategory, type MenuEntry } from "~/composables/useMenu";
@@ -83,11 +97,21 @@ const { result, loading, error } = useQuery<{ menu: MenuCategory[] }>(MENU_QUERY
 const menu = computed(() => result.value?.menu ?? []);
 const { add, cartCount, totalCents } = useCart();
 const canOrder = useCustomerOrdering();
+const { customer } = useAuth();
+const { isFavorite, toggleFavorite } = useFavorites();
+
+// Con favoritos, una categoria "Favoritos" al principio (con su pildora) que los reune.
+const FAVORITES_ID = "favoritos";
+const sections = computed(() => {
+  const categories = menu.value.map((c) => ({ id: c.id, name: c.name, entries: menuEntries(c.items) }));
+  const favorites = categories.flatMap((c) => c.entries.filter((e) => isFavorite(e)));
+  return favorites.length ? [{ id: FAVORITES_ID, name: "Favoritos", entries: favorites }, ...categories] : categories;
+});
 
 const activeCategoryId = ref<string | null>(null);
 const pillsNav = ref<HTMLElement | null>(null);
 watch(
-  menu,
+  sections,
   (val) => {
     if (val.length && !activeCategoryId.value) activeCategoryId.value = val[0].id;
   },
@@ -143,8 +167,9 @@ function onScroll() {
 
 if (import.meta.client) {
   watch(
-    menu,
-    async (val) => {
+    () => sections.value.map((s) => s.id).join(","),
+    async () => {
+      const val = sections.value;
       if (!val.length) return;
       await nextTick();
       sectionEls = val
@@ -317,6 +342,28 @@ function openProduct(item: any) {
 .item-price { font-size: 12px; font-weight: 600; white-space: nowrap; }
 .item:not(:has(.item-image)) .item-price { color: var(--accent); }
 
+/* Corazon de favorito, arriba a la izquierda (el + de añadir va a la derecha) */
+.fav-btn {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--surface);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.fav-btn.active { background: var(--danger); color: var(--bg); }
+.fav-btn.active svg { fill: currentColor; }
+.fav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pill-heart { vertical-align: -2px; margin-right: 2px; }
+
 .add-btn {
   position: absolute;
   top: 6px;
@@ -339,6 +386,7 @@ function openProduct(item: any) {
   .item-name, .item-price { font-size: 14px; }
   .item-info { padding: 32px 12px 10px; }
   .add-btn { width: 34px; height: 34px; top: 8px; right: 8px; }
+  .fav-btn { width: 34px; height: 34px; top: 8px; left: 8px; }
 }
 
 .cart-bar {

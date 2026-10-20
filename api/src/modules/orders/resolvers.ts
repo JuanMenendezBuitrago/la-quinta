@@ -59,17 +59,21 @@ export const ordersResolvers = {
     createdAt: (doc: any) => new Date(doc.createdAt).toISOString(),
     updatedAt: (doc: any) => new Date(doc.updatedAt).toISOString(),
     deliveredAt: (doc: any) => iso(doc.deliveredAt),
-    // Una sola consulta por pedido para los nombres del personal que hizo cada cambio.
+    // Una sola consulta por pedido para el nombre y el avatar del personal que hizo cada cambio.
     statusHistory: async (doc: any) => {
       const history: any[] = doc.statusHistory ?? [];
       const staffIds = [...new Set(history.map((h) => h.staffId?.toString()).filter(Boolean))];
-      const staff = staffIds.length ? await StaffUser.find({ _id: { $in: staffIds } }).select("name").lean() : [];
-      const nameById = new Map(staff.map((s) => [s._id.toString(), s.name]));
-      return history.map((h) => ({
-        status: h.status,
-        at: new Date(h.at).toISOString(),
-        staffName: h.staffId ? nameById.get(h.staffId.toString()) ?? null : null,
-      }));
+      const staff = staffIds.length ? await StaffUser.find({ _id: { $in: staffIds } }).select("name avatar").lean() : [];
+      const staffById = new Map(staff.map((s) => [s._id.toString(), s]));
+      return history.map((h) => {
+        const who = h.staffId ? staffById.get(h.staffId.toString()) : undefined;
+        return {
+          status: h.status,
+          at: new Date(h.at).toISOString(),
+          staffName: who?.name ?? null,
+          staffAvatar: who?.avatar ?? null,
+        };
+      });
     },
     paidAt: (doc: any) => iso(doc.paidAt),
     paymentMethod: (doc: any) => doc.paymentMethod ?? null,

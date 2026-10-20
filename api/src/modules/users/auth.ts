@@ -152,6 +152,8 @@ async function issueStaffToken(staff: StaffUserDoc | null, password: string) {
     await redisClient.multi().incr(failsKey).expire(failsKey, STAFF_LOGIN_LOCK_SECONDS).exec();
     throw new Error("Credenciales invalidas");
   }
+  // Despues de la contraseña: asi solo quien la sabe se entera de que la cuenta existe.
+  if (staff.active === false) throw new Error("Esta cuenta esta desactivada. Habla con gestion.");
 
   await redisClient.del(failsKey);
   const token = signToken({ sub: staff._id.toString(), kind: "staff", role: staff.role });

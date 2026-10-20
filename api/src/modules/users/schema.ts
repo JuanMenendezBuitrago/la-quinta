@@ -15,6 +15,8 @@ export const usersTypeDefs = /* GraphQL */ `
     email: String!
     role: StaffRole!
     avatar: String
+    """Desactivada: no sale en la pantalla de acceso ni puede entrar."""
+    active: Boolean!
   }
 
   enum StaffRole {
@@ -57,6 +59,8 @@ export const usersTypeDefs = /* GraphQL */ `
   extend type Query {
     """Cliente autenticado actualmente (null si no hay sesion)."""
     me: Customer
+"""Ids de los productos favoritos del cliente con sesion (vacio sin sesion de cliente)."""
+    myFavoriteMenuItemIds: [ID!]!
     """Miembro del equipo autenticado actualmente (null si no hay sesion)."""
     myStaffProfile: Staff
     """Personal (barra y gestion): busca un cliente por su codigo, telefono o email EXACTOS, para
@@ -90,13 +94,16 @@ export const usersTypeDefs = /* GraphQL */ `
     setMyAvatar(preset: String): Customer!
     """Igual que setMyAvatar, para el miembro del personal con sesion."""
     setMyStaffAvatar(preset: String): Staff!
+    """Marca o desmarca productos como favoritos (varios a la vez: los tamaños de un mismo cafe).
+    Devuelve la lista completa de favoritos."""
+    setFavoriteMenuItems(menuItemIds: [ID!]!, favorite: Boolean!): [ID!]!
     """Login del equipo del local (usuario/contraseña)."""
     staffLogin(email: String!, password: String!): StaffAuthPayload!
     """Login del equipo eligiendo la cuenta en staffLoginOptions: solo pide la contraseña."""
     staffLoginById(id: ID!, password: String!): StaffAuthPayload!
     """Alta de personal (requiere rol gestion)."""
     createStaffUser(name: String!, email: String!, password: String!, role: StaffRole!): Staff!
-    """Edicion de personal: nombre, rol y/o contraseña (requiere rol gestion)."""
-    updateStaffUser(id: ID!, name: String, role: StaffRole, password: String): Staff!
+    """Edicion de personal: nombre, rol, contraseña y/o si la cuenta esta activa (requiere rol gestion)."""
+    updateStaffUser(id: ID!, name: String, role: StaffRole, password: String, active: Boolean): Staff!
   }
 `;

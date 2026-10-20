@@ -30,6 +30,7 @@
         <li>Tus pedidos: productos, importes, fechas, hora de recogida y estado.</li>
         <li>Tus sellos de fidelización y los canjes.</li>
         <li>Tu avatar, si eliges uno: una de nuestras ilustraciones o una foto que subas tú (opcional).</li>
+        <li>Los productos de la carta que marques como favoritos.</li>
       </ul>
       <p>No pedimos datos sensibles ni datos de pago: los pedidos se pagan en el local.</p>
     </section>

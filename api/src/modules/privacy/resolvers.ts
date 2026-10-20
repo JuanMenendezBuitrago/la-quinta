@@ -9,6 +9,7 @@ import { User } from "../users/model";
 import { removeAvatarFile } from "../users/avatar";
 import { UPLOAD_DIR } from "../uploads/router";
 import { Order } from "../orders/model";
+import { MenuItem } from "../menu/model";
 import { LoyaltyTransaction } from "../loyalty/model";
 
 /**
@@ -25,6 +26,7 @@ export const privacyResolvers = {
         LoyaltyTransaction.find({ customerId }).sort({ createdAt: 1 }).lean(),
       ]);
       if (!user) throw new Error("Cuenta no encontrada");
+      const favorites = await MenuItem.find({ _id: { $in: user.favoriteMenuItemIds ?? [] } }).select("name").lean();
       const orderCodes = new Map(orders.map((o) => [o._id.toString(), o.code]));
 
       return JSON.stringify(
@@ -36,6 +38,7 @@ export const privacyResolvers = {
             telefono: user.phone ?? null,
             codigoCliente: user.customerCode,
             avatar: user.avatar ?? null,
+            productosFavoritos: favorites.map((m) => m.name),
             creadaEl: user.createdAt,
             autorizacionTratamientoDatos: user.privacyConsent
               ? { aceptadaEl: user.privacyConsent.acceptedAt, versionPolitica: user.privacyConsent.policyVersion }
@@ -82,7 +85,7 @@ export const privacyResolvers = {
         { _id: customerId, deletedAt: { $exists: false } },
         {
           $set: { name: DELETED_CUSTOMER_NAME, deletedAt: new Date() },
-          $unset: { email: 1, phone: 1, avatar: 1, privacyConsent: 1, newsletterConsent: 1 },
+          $unset: { email: 1, phone: 1, avatar: 1, favoriteMenuItemIds: 1, privacyConsent: 1, newsletterConsent: 1 },
         }
       );
       if (!user) throw new Error("Cuenta no encontrada");

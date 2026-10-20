@@ -28,6 +28,7 @@ export interface UserDoc {
   phone?: string;
   customerCode: string; // codigo corto que el cliente enseña en el mostrador
   avatar?: string; // ver avatar.ts
+  favoriteMenuItemIds: Types.ObjectId[]; // productos de la carta marcados como favoritos
   privacyConsent?: PrivacyConsentDoc;
   newsletterConsent?: NewsletterConsentDoc;
   // Cuenta suprimida a peticion del titular: se anonimiza (sin nombre, email ni telefono) pero
@@ -43,6 +44,7 @@ const userSchema = new Schema<UserDoc>({
   phone: { type: String, unique: true, sparse: true, trim: true },
   customerCode: { type: String, required: true, unique: true },
   avatar: { type: String },
+  favoriteMenuItemIds: { type: [{ type: Schema.Types.ObjectId, ref: "MenuItem" }], default: [] },
   privacyConsent: {
     type: new Schema<PrivacyConsentDoc>(
       { acceptedAt: { type: Date, required: true }, policyVersion: { type: String, required: true } },
@@ -71,6 +73,10 @@ export interface StaffUserDoc {
   passwordHash: string;
   role: StaffRole;
   avatar?: string; // ver avatar.ts
+  // Cuenta desactivada (quien ya no trabaja en el local): no sale en la pantalla de acceso, no
+  // puede entrar y su sesion abierta deja de valer. Se desactiva en vez de borrar para no perder
+  // el rastro de quien hizo cada ajuste de sellos o canje.
+  active: boolean;
   createdAt: Date;
 }
 
@@ -80,6 +86,9 @@ const staffUserSchema = new Schema<StaffUserDoc>({
   passwordHash: { type: String, required: true },
   role: { type: String, enum: ["barra", "gestion"], required: true, default: "barra" },
   avatar: { type: String },
+  // Las cuentas creadas antes de existir este campo no lo tienen: en las consultas se filtra con
+  // { active: { $ne: false } } para contarlas como activas.
+  active: { type: Boolean, default: true },
   createdAt: { type: Date, default: () => new Date() },
 });
 

@@ -36,6 +36,17 @@
         <span v-if="isSelf" class="muted">No puedes cambiar tu propio rol.</span>
       </label>
 
+      <div v-if="form.id" class="field">
+        <label class="switch">
+          <input v-model="form.active" type="checkbox" role="switch" :disabled="isSelf" />
+          <span class="switch-track" aria-hidden="true"><span class="switch-thumb" /></span>
+          <span>Cuenta activa</span>
+        </label>
+        <span class="muted">
+          {{ isSelf ? "No puedes desactivar tu propia cuenta." : "Desactivada no aparece al entrar al panel, no puede iniciar sesión y se cierra la que tenga abierta." }}
+        </span>
+      </div>
+
       <!-- Solo el propio avatar: cada uno elige el suyo (puede ser una foto suya). Se guarda al
            elegirlo, sin esperar a "Guardar". -->
       <div v-if="isSelf" class="field">
@@ -55,12 +66,13 @@
       </div>
     </form>
 
-    <div class="card staff-row" v-for="user in staffUsers" :key="user.id">
+    <div class="card staff-row" :class="{ inactive: !user.active }" v-for="user in staffUsers" :key="user.id">
       <!-- El propio, desde la sesion: cambia al momento al elegir otro avatar -->
       <UserAvatar :avatar="user.id === myId ? staff?.avatar : user.avatar" :name="user.name" :size="40" />
       <div class="staff-info">
         <strong>{{ user.name }}</strong>
         <span v-if="user.id === myId" class="muted"> · tú</span>
+        <span v-if="!user.active" class="inactive-badge">Desactivada</span>
         <p class="muted">{{ user.email }} · {{ user.role }}</p>
       </div>
       <button class="button secondary" type="button" @click="startEdit(user)">Editar</button>
@@ -81,6 +93,7 @@ interface StaffUserAdmin {
   email: string;
   role: "barra" | "gestion";
   avatar?: string | null;
+  active: boolean;
 }
 
 const STAFF_USERS_QUERY = gql`
@@ -91,6 +104,7 @@ const STAFF_USERS_QUERY = gql`
       email
       role
       avatar
+      active
     }
   }
 `;
@@ -104,8 +118,8 @@ const CREATE_STAFF_USER = gql`
 `;
 
 const UPDATE_STAFF_USER = gql`
-  mutation UpdateStaffUser($id: ID!, $name: String, $role: StaffRole, $password: String) {
-    updateStaffUser(id: $id, name: $name, role: $role, password: $password) {
+  mutation UpdateStaffUser($id: ID!, $name: String, $role: StaffRole, $password: String, $active: Boolean) {
+    updateStaffUser(id: $id, name: $name, role: $role, password: $password, active: $active) {
       id
     }
   }
@@ -123,7 +137,7 @@ const saving = ref(false);
 const formError = ref("");
 
 function emptyForm() {
-  return { id: "" as string, name: "", email: "", password: "", role: "barra" as "barra" | "gestion" };
+  return { id: "" as string, name: "", email: "", password: "", role: "barra" as "barra" | "gestion", active: true };
 }
 const form = reactive(emptyForm());
 const isSelf = computed(() => !!form.id && form.id === myId.value);
@@ -135,7 +149,7 @@ function startCreate() {
 }
 
 function startEdit(user: StaffUserAdmin) {
-  Object.assign(form, { id: user.id, name: user.name, email: user.email, password: "", role: user.role });
+  Object.assign(form, { id: user.id, name: user.name, email: user.email, password: "", role: user.role, active: user.active });
   formError.value = "";
   formOpen.value = true;
 }
@@ -156,6 +170,7 @@ async function submitForm() {
         name: form.name.trim(),
         role: form.role,
         password: form.password || undefined,
+        active: form.active,
       });
     } else {
       const { mutate } = useMutation(CREATE_STAFF_USER);
@@ -180,6 +195,47 @@ async function submitForm() {
 .staff-admin-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .staff-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 10px; }
 .staff-info { flex: 1; }
+.staff-row.inactive .user-avatar, .staff-row.inactive strong { opacity: 0.55; }
+.inactive-badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--text-muted);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Interruptor: el checkbox real (role=switch) queda encima, invisible pero enfocable */
+.switch { position: relative; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; }
+.switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
+.switch-track {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--field-border);
+  background: var(--surface-alt);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+}
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.switch input:checked + .switch-track { background: var(--accent); border-color: var(--accent); }
+.switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); background: var(--bg); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch:has(input:disabled) { cursor: not-allowed; opacity: 0.6; }
+@media (prefers-reduced-motion: reduce) { .switch-track, .switch-thumb { transition: none; } }
 
 .staff-form { margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; max-width: 420px; }
 .field { display: flex; flex-direction: column; gap: 4px; }

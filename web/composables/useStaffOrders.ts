@@ -22,6 +22,10 @@ export interface CustomerMatch {
 const ORDER_FIELDS = `
   id
   code
+  statusHistory {
+    staffName
+    staffAvatar
+  }
   source
   serviceType
   table
