@@ -4,7 +4,8 @@ import { randomInt } from "crypto";
 import { env } from "../../config/env";
 import { getTransporter } from "../../config/mailer";
 import { redisClient } from "../../config/redis";
-import { User, StaffUser, StaffRole, PRIVACY_POLICY_VERSION, hasCurrentConsent } from "./model";
+import { Types } from "mongoose";
+import { User, StaffUser, StaffRole, StaffUserDoc, PRIVACY_POLICY_VERSION, hasCurrentConsent } from "./model";
 
 async function sendOtpEmail(to: string, code: string): Promise<void> {
   const mailer = getTransporter();
@@ -125,15 +126,46 @@ export async function verifyOtpAndIssueToken(
   return { token, user };
 }
 
-export async function loginStaff(email: string, password: string) {
-  const staff = await StaffUser.findOne({ email: email.toLowerCase() });
+/**
+ * Bloqueo por cuenta tras varios fallos seguidos. La pantalla de login lista las cuentas del
+ * personal (solo hay que adivinar la contraseña), asi que sin esto se podrian probar sin limite.
+ */
+const STAFF_LOGIN_MAX_FAILS = 5;
+const STAFF_LOGIN_LOCK_SECONDS = 5 * 60;
+
+function staffLoginFailsKey(staffId: string) {
+  return `staff-login-fails:${staffId}`;
+}
+
+async function issueStaffToken(staff: StaffUserDoc | null, password: string) {
   if (!staff) throw new Error("Credenciales invalidas");
+  const failsKey = staffLoginFailsKey(staff._id.toString());
+
+  const fails = Number(await redisClient.get(failsKey)) || 0;
+  if (fails >= STAFF_LOGIN_MAX_FAILS) {
+    throw new Error("Demasiados intentos fallidos. Espera unos minutos y vuelve a probar.");
+  }
 
   const valid = await bcrypt.compare(password, staff.passwordHash);
-  if (!valid) throw new Error("Credenciales invalidas");
+  if (!valid) {
+    // El plazo cuenta desde el ultimo fallo: el bloqueo se levanta solo pasados unos minutos.
+    await redisClient.multi().incr(failsKey).expire(failsKey, STAFF_LOGIN_LOCK_SECONDS).exec();
+    throw new Error("Credenciales invalidas");
+  }
 
+  await redisClient.del(failsKey);
   const token = signToken({ sub: staff._id.toString(), kind: "staff", role: staff.role });
   return { token, staff };
+}
+
+export async function loginStaff(email: string, password: string) {
+  return issueStaffToken(await StaffUser.findOne({ email: email.toLowerCase() }), password);
+}
+
+/** Login eligiendo la cuenta en la lista de la pantalla de acceso (sin escribir el email). */
+export async function loginStaffById(id: string, password: string) {
+  if (!Types.ObjectId.isValid(id)) throw new Error("Credenciales invalidas");
+  return issueStaffToken(await StaffUser.findById(id), password);
 }
 
 export async function hashPassword(password: string) {

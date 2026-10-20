@@ -42,6 +42,13 @@ export const usersTypeDefs = /* GraphQL */ `
     askPrivacyConsent: Boolean!
   }
 
+  """Cuenta del personal tal como se muestra en la pantalla de acceso: sin email ni rol."""
+  type StaffLoginOption {
+    id: ID!
+    name: String!
+    avatar: String
+  }
+
   type StaffAuthPayload {
     token: String!
     staff: Staff!
@@ -55,6 +62,8 @@ export const usersTypeDefs = /* GraphQL */ `
     """Personal (barra y gestion): busca un cliente por su codigo, telefono o email EXACTOS, para
     asociarlo a un pedido. No lista ni busca por partes: el listado de clientes es solo de gestion."""
     lookupCustomer(query: String!): CustomerMatch
+    """Publico: cuentas del personal para elegir en la pantalla de acceso (nombre y avatar)."""
+    staffLoginOptions: [StaffLoginOption!]!
     """Listado de personal del local (requiere rol gestion)."""
     staffUsers: [Staff!]!
     """Que datos pedir en el login a ese email/telefono (nombre, autorizacion de datos)."""
@@ -83,6 +92,8 @@ export const usersTypeDefs = /* GraphQL */ `
     setMyStaffAvatar(preset: String): Staff!
     """Login del equipo del local (usuario/contraseña)."""
     staffLogin(email: String!, password: String!): StaffAuthPayload!
+    """Login del equipo eligiendo la cuenta en staffLoginOptions: solo pide la contraseña."""
+    staffLoginById(id: ID!, password: String!): StaffAuthPayload!
     """Alta de personal (requiere rol gestion)."""
     createStaffUser(name: String!, email: String!, password: String!, role: StaffRole!): Staff!
     """Edicion de personal: nombre, rol y/o contraseña (requiere rol gestion)."""

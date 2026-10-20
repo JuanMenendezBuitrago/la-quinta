@@ -4,14 +4,7 @@
       <header class="account-hero">
         <h1>Panel de personal</h1>
       </header>
-      <div class="card login-card">
-        <input v-model="email" type="email" placeholder="Email del equipo" />
-        <input v-model="password" type="password" placeholder="Contraseña" style="margin-top: 8px" />
-        <button class="button" style="margin-top: 8px" :disabled="loggingIn" @click="doLogin">
-          {{ loggingIn ? "Entrando…" : "Entrar" }}
-        </button>
-        <p v-if="loginError" class="muted" style="color: var(--danger)">{{ loginError }}</p>
-      </div>
+      <StaffLogin />
     </template>
 
     <template v-else>
@@ -265,6 +258,7 @@ import { PAYMENT_LABELS, useStaffOrders, type CustomerMatch, type PaymentMethod 
 import { primeAudio } from "~/composables/useOrderChime";
 import MenuAdmin from "~/components/MenuAdmin.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
+import StaffLogin from "~/components/StaffLogin.vue";
 import CoffeeAdmin from "~/components/CoffeeAdmin.vue";
 import StaffAdmin from "~/components/StaffAdmin.vue";
 import NewsletterAdmin from "~/components/NewsletterAdmin.vue";
@@ -278,26 +272,7 @@ import InventoryAdmin from "~/components/InventoryAdmin.vue";
 import { formatQty, useInventoryAlerts } from "~/composables/useInventory";
 import { goToSection, STAFF_SECTIONS, useStaffBadges, useStaffSection } from "~/composables/useStaffSections";
 
-const { staff, login } = useStaffAuth();
-const email = ref("");
-const password = ref("");
-const loggingIn = ref(false);
-const loginError = ref("");
-
-async function doLogin() {
-  // Sincrono y antes del primer `await`: es el gesto de usuario que desbloquea el audio.
-  primeAudio();
-  loggingIn.value = true;
-  loginError.value = "";
-  try {
-    await login(email.value, password.value);
-  } catch (err: any) {
-    loginError.value = err?.message ?? "No se pudo iniciar sesión";
-  } finally {
-    loggingIn.value = false;
-  }
-}
-
+const { staff } = useStaffAuth();
 // Si la sesion ya estaba abierta (se restaura sola con la cookie, sin pasar por doLogin()),
 // el audio nunca se desbloquea y el aviso sonoro queda mudo en silencio. Con esto, el primer
 // toque/clic en cualquier parte del panel sirve tambien para desbloquearlo.
@@ -432,8 +407,6 @@ watchEffect(() => {
   color: var(--text-muted);
 }
 .notif-status--muted:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
-
-.login-card { max-width: 320px; }
 
 .service { margin: 4px 0 0; font-weight: 600; color: var(--accent-strong); }
 .assign-box { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }

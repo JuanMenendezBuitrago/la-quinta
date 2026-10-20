@@ -63,6 +63,21 @@ const STAFF_LOGIN = gql`
   }
 `;
 
+const STAFF_LOGIN_BY_ID = gql`
+  mutation StaffLoginById($id: ID!, $password: String!) {
+    staffLoginById(id: $id, password: $password) {
+      token
+      staff {
+        id
+        name
+        email
+        role
+        avatar
+      }
+    }
+  }
+`;
+
 const SESSION_QUERY = gql`
   query Session {
     me {
@@ -156,14 +171,24 @@ export function useStaffAuth() {
   const { onLogin, onLogout } = useApollo();
   const staff = useState<{ id: string; name: string; role: string; avatar?: string | null } | null>("lq-staff", () => null);
   const { mutate: staffLogin } = useMutation(STAFF_LOGIN);
+  const { mutate: staffLoginById } = useMutation(STAFF_LOGIN_BY_ID);
 
-  async function login(email: string, password: string) {
-    const result = await staffLogin({ email, password });
-    const payload = result?.data?.staffLogin;
+  async function startSession(payload: { token: string; staff: any } | undefined) {
     if (!payload) throw new Error("Credenciales invalidas");
     await onLogin(payload.token);
     staff.value = payload.staff;
     return payload.staff;
+  }
+
+  async function login(email: string, password: string) {
+    const result = await staffLogin({ email, password });
+    return startSession(result?.data?.staffLogin);
+  }
+
+  /** Cuenta elegida en la lista de la pantalla de acceso: solo hace falta la contraseña. */
+  async function loginById(id: string, password: string) {
+    const result = await staffLoginById({ id, password });
+    return startSession(result?.data?.staffLoginById);
   }
 
   async function logout() {
@@ -171,5 +196,5 @@ export function useStaffAuth() {
     staff.value = null;
   }
 
-  return { staff, login, logout };
+  return { staff, login, loginById, logout };
 }

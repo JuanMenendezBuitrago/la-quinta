@@ -36,6 +36,13 @@
         <span v-if="isSelf" class="muted">No puedes cambiar tu propio rol.</span>
       </label>
 
+      <!-- Solo el propio avatar: cada uno elige el suyo (puede ser una foto suya). Se guarda al
+           elegirlo, sin esperar a "Guardar". -->
+      <div v-if="isSelf" class="field">
+        <span class="muted">Tu avatar</span>
+        <AvatarPicker who="staff" :avatar="staff?.avatar" :name="staff?.name" />
+      </div>
+
       <p v-if="formError" class="muted" style="color: var(--danger)">{{ formError }}</p>
 
       <div class="form-actions">
@@ -49,6 +56,8 @@
     </form>
 
     <div class="card staff-row" v-for="user in staffUsers" :key="user.id">
+      <!-- El propio, desde la sesion: cambia al momento al elegir otro avatar -->
+      <UserAvatar :avatar="user.id === myId ? staff?.avatar : user.avatar" :name="user.name" :size="40" />
       <div class="staff-info">
         <strong>{{ user.name }}</strong>
         <span v-if="user.id === myId" class="muted"> · tú</span>
@@ -63,12 +72,15 @@
 <script setup lang="ts">
 import { gql } from "graphql-tag";
 import { useStaffAuth } from "~/composables/useAuth";
+import UserAvatar from "~/components/UserAvatar.vue";
+import AvatarPicker from "~/components/AvatarPicker.vue";
 
 interface StaffUserAdmin {
   id: string;
   name: string;
   email: string;
   role: "barra" | "gestion";
+  avatar?: string | null;
 }
 
 const STAFF_USERS_QUERY = gql`
@@ -78,6 +90,7 @@ const STAFF_USERS_QUERY = gql`
       name
       email
       role
+      avatar
     }
   }
 `;

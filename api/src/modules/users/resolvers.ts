@@ -1,6 +1,6 @@
 import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
 import { User, StaffUser, hasCurrentConsent } from "./model";
-import { requestOtp, verifyOtpAndIssueToken, loginStaff, hashPassword, findExistingCustomer } from "./auth";
+import { requestOtp, verifyOtpAndIssueToken, loginStaff, loginStaffById, hashPassword, findExistingCustomer } from "./auth";
 import { presetAvatarValue, removeAvatarFile } from "./avatar";
 import { UPLOAD_DIR } from "../uploads/router";
 
@@ -28,6 +28,10 @@ export const usersResolvers = {
         .select("name customerCode")
         .lean();
       return user ? { id: user._id.toString(), name: user.name, customerCode: user.customerCode } : null;
+    },
+    staffLoginOptions: async () => {
+      const staff = await StaffUser.find().select("name avatar").sort({ name: 1 }).lean();
+      return staff.map((s) => ({ id: s._id.toString(), name: s.name, avatar: s.avatar ?? null }));
     },
     staffUsers: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireStaff(ctx, ["gestion"]);
@@ -83,6 +87,10 @@ export const usersResolvers = {
     },
     staffLogin: async (_: unknown, args: { email: string; password: string }) => {
       const { token, staff } = await loginStaff(args.email, args.password);
+      return { token, staff };
+    },
+    staffLoginById: async (_: unknown, args: { id: string; password: string }) => {
+      const { token, staff } = await loginStaffById(args.id, args.password);
       return { token, staff };
     },
     createStaffUser: async (
