@@ -60,7 +60,8 @@
         <button class="button" type="submit" :disabled="saving">
           {{ saving ? "Guardando…" : "Guardar" }}
         </button>
-        <button class="button secondary" type="button" :disabled="saving" @click="cancelForm">
+        <button class="button secondary cancel" type="button" :disabled="saving" @click="cancelForm">
+          <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
           Cancelar
         </button>
       </div>
@@ -82,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import { Trash2 } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { useStaffAuth } from "~/composables/useAuth";
 import UserAvatar from "~/components/UserAvatar.vue";

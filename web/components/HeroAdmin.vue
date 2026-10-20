@@ -72,7 +72,7 @@
       <p v-if="formError" class="muted" style="color: var(--danger)">{{ formError }}</p>
       <div class="form-actions">
         <button class="button" type="submit" :disabled="saving">{{ saving ? "Guardando…" : "Guardar" }}</button>
-        <button class="button secondary" type="button" :disabled="saving" @click="closeForm">Cancelar</button>
+        <button class="button secondary cancel" type="button" :disabled="saving" @click="closeForm"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
       </div>
     </form>
 
@@ -104,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import { Trash2 } from "lucide-vue-next";
 import {
   ALL_HERO_SLIDES_QUERY,
   CREATE_HERO_SLIDE,

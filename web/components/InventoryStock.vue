@@ -16,7 +16,7 @@
       <p v-if="formError" class="error">{{ formError }}</p>
       <div class="actions">
         <button class="button" type="submit" :disabled="saving">{{ saving ? "Guardando…" : "Crear" }}</button>
-        <button class="button secondary" type="button" @click="creating = false">Cancelar</button>
+        <button class="button secondary cancel" type="button" @click="creating = false"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
       </div>
     </form>
 
@@ -63,7 +63,7 @@
             <p v-if="panelError" class="error">{{ panelError }}</p>
             <div class="actions">
               <button class="button" type="submit" :disabled="saving || !canSaveMovement">{{ saving ? "Guardando…" : "Guardar" }}</button>
-              <button class="button secondary" type="button" @click="close">Cancelar</button>
+              <button class="button secondary cancel" type="button" @click="close"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
             </div>
           </form>
 
@@ -73,7 +73,7 @@
             <p v-if="panelError" class="error">{{ panelError }}</p>
             <div class="actions">
               <button class="button" type="submit" :disabled="saving">{{ saving ? "Guardando…" : "Guardar" }}</button>
-              <button class="button secondary" type="button" @click="close">Cancelar</button>
+              <button class="button secondary cancel" type="button" @click="close"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
               <button class="button secondary push" type="button" :disabled="saving" @click="toggleActive(supply)">
                 {{ supply.active ? "Desactivar" : "Activar" }}
               </button>
@@ -108,6 +108,7 @@
 </template>
 
 <script setup lang="ts">
+import { Trash2 } from "lucide-vue-next";
 import {
   ADJUST_STOCK,
   CREATE_SUPPLY,

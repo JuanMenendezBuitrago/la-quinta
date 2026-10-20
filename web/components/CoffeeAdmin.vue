@@ -103,7 +103,7 @@
       <p v-if="formError" class="muted" style="color: var(--danger)">{{ formError }}</p>
       <div class="form-actions">
         <button class="button" type="submit" :disabled="saving || uploading">{{ saving ? "Guardando…" : "Guardar" }}</button>
-        <button class="button secondary" type="button" :disabled="saving" @click="formOpen = false">Cancelar</button>
+        <button class="button secondary cancel" type="button" :disabled="saving" @click="formOpen = false"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
       </div>
     </form>
 
@@ -132,7 +132,7 @@
         <template v-if="editingProcessId === p.id">
           <input v-model="processDraft" type="text" maxlength="40" aria-label="Nombre del proceso" @keydown.enter.prevent="renameProcess(p.id)" />
           <button class="button secondary" type="button" :disabled="processBusy" @click="renameProcess(p.id)">Guardar</button>
-          <button class="button secondary" type="button" @click="editingProcessId = ''">Cancelar</button>
+          <button class="button secondary cancel" type="button" @click="editingProcessId = ''"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
         </template>
         <template v-else>
           <span class="process-name">{{ p.name }}</span>
@@ -151,6 +151,7 @@
 </template>
 
 <script setup lang="ts">
+import { Trash2 } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { ROAST_LABELS } from "~/composables/useMenu";
 

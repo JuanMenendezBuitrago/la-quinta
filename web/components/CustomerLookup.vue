@@ -7,7 +7,18 @@
       aria-label="Código de cliente o teléfono"
       autocomplete="off"
     />
-    <button class="button secondary" type="submit" :disabled="!query.trim() || searching">
+    <!-- iconOnly (la cola, donde hay poco ancho): lupa en vez del texto -->
+    <button
+      v-if="iconOnly"
+      class="button secondary icon-search"
+      type="submit"
+      :disabled="!query.trim() || searching"
+      :aria-label="searching ? 'Buscando cliente…' : 'Buscar cliente'"
+      title="Buscar"
+    >
+      <Search :size="18" :stroke-width="1.8" aria-hidden="true" />
+    </button>
+    <button v-else class="button secondary" type="submit" :disabled="!query.trim() || searching">
       {{ searching ? "Buscando…" : "Buscar" }}
     </button>
     <p v-if="message" class="muted lookup-message">{{ message }}</p>
@@ -16,8 +27,10 @@
 
 <script setup lang="ts">
 import { gql } from "graphql-tag";
+import { Search } from "lucide-vue-next";
 import type { CustomerMatch } from "~/composables/useStaffOrders";
 
+withDefaults(defineProps<{ iconOnly?: boolean }>(), { iconOnly: false });
 const emit = defineEmits<{ (e: "found", customer: CustomerMatch): void }>();
 
 // Busqueda exacta por codigo, telefono o email (ver lookupCustomer en la API): el personal de
@@ -71,4 +84,6 @@ async function search() {
   font-family: inherit;
 }
 .lookup-message { grid-column: span 2; margin: 0; font-size: 13px; }
+.icon-search { width: 44px; height: 44px; padding: 0; border-color: var(--field-border); }
+.icon-search:disabled { cursor: not-allowed; }
 </style>

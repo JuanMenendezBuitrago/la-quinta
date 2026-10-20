@@ -66,7 +66,7 @@
       </p>
       <section v-if="activeTab === 'cola'" class="queue-board">
         <div v-for="group in groupedQueue" :id="`cola-${group.status}`" :key="group.status" class="queue-column">
-          <h2>{{ statusLabel(group.status) }} ({{ group.orders.length }})</h2>
+          <h2>{{ queueHeading(group.status, group.orders.length) }}</h2>
           <div v-if="!group.orders.length" class="order-card order-card--empty" :class="`status-${group.status}`">
             <Inbox :size="22" :stroke-width="1.6" />
             <span>Nada aquí ahora mismo.</span>
@@ -79,30 +79,62 @@
           >
             <div class="order-info">
               <div class="order-head">
-                <span class="order-code">{{ order.code }}</span>
-                <!-- Quien lo movio por ultima vez (el NUEVO de un pedido web no tiene a nadie) -->
-                <span
-                  v-if="handledBy(order)"
-                  class="handled-by"
-                  :title="`Gestionado por ${handledBy(order)!.staffName}`"
+                <!-- Volver al estado anterior: chevron en la esquina, lejos de los botones de avanzar -->
+                <button
+                  v-if="prevStatusLabel(order)"
+                  class="back-chevron"
+                  type="button"
+                  :aria-label="`${prevStatusLabel(order)}: ${order.code}`"
+                  :title="prevStatusLabel(order)"
+                  :disabled="busyOrderId === order.id"
+                  @click="goBack(order)"
                 >
-                  <UserAvatar :avatar="handledBy(order)!.staffAvatar" :name="handledBy(order)!.staffName" :size="22" />
-                  <span class="sr-only">Gestionado por {{ handledBy(order)!.staffName }}</span>
+                  <ChevronLeft :size="18" :stroke-width="2" aria-hidden="true" />
+                </button>
+                <span class="order-code">{{ order.code }}</span>
+                <!-- A la derecha: mesa u hora de recogida, y quien lo movio por ultima vez (el NUEVO
+                     de un pedido web no tiene a nadie) -->
+                <span class="order-head-right">
+                  <span class="service">{{ serviceLabel(order) }}</span>
+                  <span
+                    v-if="handledBy(order)"
+                    class="handled-by"
+                    :title="`Gestionado por ${handledBy(order)!.staffName}`"
+                  >
+                    <UserAvatar :avatar="handledBy(order)!.staffAvatar" :name="handledBy(order)!.staffName" :size="22" />
+                    <span class="sr-only">Gestionado por {{ handledBy(order)!.staffName }}</span>
+                  </span>
                 </span>
               </div>
               <span v-if="order.customer" class="order-customer">
                 <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="24" />
                 <span><strong>{{ order.customer.name }}</strong> · {{ order.customer.customerCode }}</span>
               </span>
-              <strong v-else class="muted">Sin cliente</strong>
+              <span v-else class="order-customer">
+                <strong class="muted">Sin cliente</strong>
+                <button
+                  v-if="assigningId !== order.id"
+                  class="assign-icon"
+                  type="button"
+                  :aria-label="`Asignar cliente al pedido ${order.code}`"
+                  title="Asignar cliente"
+                  :disabled="busyOrderId === order.id"
+                  @click="assigningId = order.id"
+                >
+                  <UserPlus :size="16" :stroke-width="1.8" aria-hidden="true" />
+                </button>
+              </span>
               <OrderItems :items="order.items" />
-              <p class="service">{{ serviceLabel(order) }}</p>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
               <p v-if="order.paidAt" class="paid-badge">Cobrado · {{ paymentLabel(order.paymentMethod) }}</p>
             </div>
 
             <div v-if="assigningId === order.id" class="assign-box">
-              <CustomerLookup @found="doAssign(order, $event)" />
+              <p class="assign-title">
+                <UserPlus :size="15" :stroke-width="1.8" aria-hidden="true" />
+                Asignar cliente
+              </p>
+              <CustomerLookup icon-only @found="doAssign(order, $event)" />
               <button class="button secondary" type="button" @click="assigningId = ''">No asignar</button>
             </div>
 
@@ -119,6 +151,7 @@
                   No, mantener
                 </button>
                 <button class="button danger-solid" type="button" :disabled="busyOrderId === order.id" @click="doCancel(order)">
+                  <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
                   {{ busyOrderId === order.id ? "Cancelando…" : "Sí, cancelar" }}
                 </button>
               </div>
@@ -148,6 +181,7 @@
                 :disabled="busyOrderId === order.id"
                 @click="payingId = order.id"
               >
+                <Banknote :size="16" :stroke-width="1.8" aria-hidden="true" />
                 Cobrar
               </button>
               <button
@@ -157,34 +191,18 @@
                 :disabled="busyOrderId === order.id"
                 @click="advance(order)"
               >
+                <!-- Check en los pasos que terminan algo: listo, y entregado (y pagado) -->
+                <Check v-if="order.status === 'EN_PREPARACION' || order.status === 'LISTO'" :size="16" :stroke-width="2" aria-hidden="true" />
                 {{ nextStatusLabel(order) }}
               </button>
               <button
-                v-if="prevStatusLabel(order)"
-                class="button secondary back-button"
-                type="button"
-                :disabled="busyOrderId === order.id"
-                @click="goBack(order)"
-              >
-                <Undo2 :size="14" :stroke-width="1.8" />
-                {{ prevStatusLabel(order) }}
-              </button>
-              <button
-                class="button secondary"
+                class="button secondary cancel"
                 type="button"
                 :disabled="busyOrderId === order.id"
                 @click="pendingCancelId = order.id"
               >
+                <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
                 Cancelar
-              </button>
-              <button
-                v-if="!order.customer && assigningId !== order.id"
-                class="button secondary"
-                type="button"
-                :disabled="busyOrderId === order.id"
-                @click="assigningId = order.id"
-              >
-                Asignar cliente
               </button>
             </div>
           </div>
@@ -263,7 +281,7 @@
 </template>
 
 <script setup lang="ts">
-import { Bell, BellOff, BellRing, Inbox, Undo2 } from "lucide-vue-next";
+import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, Inbox, Trash2, UserPlus } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import { PAYMENT_LABELS, useStaffOrders, type CustomerMatch, type PaymentMethod } from "~/composables/useStaffOrders";
 import { primeAudio } from "~/composables/useOrderChime";
@@ -330,6 +348,19 @@ const {
 } = useStaffOrders(isLoggedIn);
 
 const { lowCount, lastAlert: stockAlert } = useInventoryAlerts(isLoggedIn);
+
+// Encabezado de cada columna en lenguaje natural: "1 nuevo", "3 listos", "2 en preparación".
+const QUEUE_HEADINGS: Record<string, [singular: string, plural: string]> = {
+  NUEVO: ["nuevo", "nuevos"],
+  EN_PREPARACION: ["en preparación", "en preparación"],
+  LISTO: ["listo", "listos"],
+  POR_COBRAR: ["por cobrar", "por cobrar"],
+};
+function queueHeading(status: string, count: number) {
+  const words = QUEUE_HEADINGS[status];
+  if (!words) return `${statusLabel(status)} (${count})`;
+  return `${count} ${count === 1 ? words[0] : words[1]}`;
+}
 
 /** Ultimo miembro del personal que cambio el estado del pedido (o lo tomo), si lo hay. */
 function handledBy(order: any): { staffName: string; staffAvatar?: string | null } | null {
@@ -418,7 +449,10 @@ watchEffect(() => {
 .notif-button { display: inline-flex; align-items: center; gap: 8px; }
 .order-customer { display: flex; align-items: center; gap: 8px; }
 .login-hero { text-align: center; }
-.order-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.order-head { display: flex; align-items: center; gap: 8px; }
+/* Productos del pedido en la cola: mas grandes que el texto secundario (14px), se leen de lejos */
+.order-card .order-items { margin: 6px 0; font-size: 16px; line-height: 1.4; }
+.order-head-right { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .handled-by { display: inline-flex; }
 .sr-only {
   position: absolute;
@@ -437,8 +471,27 @@ watchEffect(() => {
 }
 .notif-status--muted:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
 
-.service { margin: 4px 0 0; font-weight: 600; color: var(--accent-strong); }
-.assign-box { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.service { font-size: 13px; font-weight: 600; color: var(--accent-strong); text-align: right; }
+/* Elegir cliente: recuadro teñido de turquesa (como la confirmacion de cancelar, en rojo) */
+.assign-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.assign-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-strong);
+}
 
 .action-error {
   display: flex;
@@ -540,8 +593,9 @@ watchEffect(() => {
 }
 .order-card--new { animation: order-pulse 0.9s ease-out 2; }
 
-.order-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.order-actions .button { min-height: 44px; padding-left: 16px; padding-right: 16px; }
+/* Un boton por fila y a todo el ancho de la tarjeta: blancos grandes para tocar con prisa */
+.order-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.order-actions .button { width: 100%; min-height: 44px; padding-left: 16px; padding-right: 16px; }
 .cancel-confirm {
   padding: 10px 12px;
   border-radius: 6px;
@@ -550,7 +604,38 @@ watchEffect(() => {
 }
 .cancel-confirm p { margin: 0 0 10px; font-size: 14px; }
 .nowrap { white-space: nowrap; }
-.back-button { display: inline-flex; align-items: center; gap: 6px; }
+.back-chevron {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin: -6px 0 -6px -8px;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: none;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.back-chevron:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.back-chevron:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.back-chevron:disabled { opacity: 0.45; cursor: not-allowed; }
+.assign-icon {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--field-border);
+  border-radius: 50%;
+  background: none;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.assign-icon:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.assign-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.assign-icon:disabled { opacity: 0.45; cursor: not-allowed; }
 .danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
 
 .history-list { display: flex; flex-direction: column; gap: 10px; }

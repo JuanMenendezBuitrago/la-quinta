@@ -64,7 +64,7 @@
             <p v-if="error" class="error">{{ error }}</p>
             <div class="actions">
               <button class="button" type="submit" :disabled="saving || !canSave">{{ saving ? "Guardando…" : "Guardar" }}</button>
-              <button class="button secondary" type="button" :disabled="saving" @click="editingId = ''">Cancelar</button>
+              <button class="button secondary cancel" type="button" :disabled="saving" @click="editingId = ''"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
               <button v-if="recipeFor(item.id)" class="button secondary danger push" type="button" :disabled="saving" @click="save(item.id, true)">
                 Quitar receta
               </button>
@@ -79,6 +79,7 @@
 </template>
 
 <script setup lang="ts">
+import { Trash2 } from "lucide-vue-next";
 import {
   formatQty,
   RECIPE_MENU_QUERY,
