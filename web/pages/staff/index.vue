@@ -30,11 +30,25 @@
             <Bell :size="16" :stroke-width="1.8" />
             Activar notificaciones
           </button>
-          <span v-else-if="notificationPermission === 'granted'" class="notif-status">
-            <BellRing :size="14" :stroke-width="1.8" />
-            Notificaciones activadas
-          </span>
-          <span v-else-if="notificationPermission === 'denied'" class="notif-status notif-status--off">
+          <!-- Con permiso: la pastilla es un interruptor (silencia los avisos en este dispositivo) -->
+          <button
+            v-else-if="notificationPermission === 'granted'"
+            type="button"
+            class="notif-status notif-toggle"
+            :class="{ 'notif-status--muted': notificationsMuted }"
+            :aria-pressed="!notificationsMuted"
+            :title="notificationsMuted ? 'Pulsa para volver a activarlas' : 'Pulsa para desactivarlas en este dispositivo'"
+            @click="toggleNotificationsMuted"
+          >
+            <BellOff v-if="notificationsMuted" :size="14" :stroke-width="1.8" />
+            <BellRing v-else :size="14" :stroke-width="1.8" />
+            {{ notificationsMuted ? "Notificaciones desactivadas" : "Notificaciones activadas" }}
+          </button>
+          <span
+            v-else-if="notificationPermission === 'denied'"
+            class="notif-status notif-status--off"
+            title="Se pueden permitir de nuevo desde los ajustes del sitio en el navegador"
+          >
             <BellOff :size="14" :stroke-width="1.8" />
             Notificaciones bloqueadas por el navegador
           </span>
@@ -322,6 +336,8 @@ const {
   formatDateTime,
   notificationPermission,
   requestNotificationPermission,
+  notificationsMuted,
+  toggleNotificationsMuted,
 } = useStaffOrders(isLoggedIn);
 
 const { lowCount, lastAlert: stockAlert } = useInventoryAlerts(isLoggedIn);
@@ -404,6 +420,14 @@ watchEffect(() => {
   color: var(--danger);
 }
 .notif-button { display: inline-flex; align-items: center; gap: 8px; }
+.notif-toggle { font-family: inherit; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+.notif-toggle:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.notif-status--muted {
+  border-color: var(--field-border);
+  background: transparent;
+  color: var(--text-muted);
+}
+.notif-status--muted:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
 
 .login-card { max-width: 320px; }
 

@@ -126,6 +126,8 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
   const {
     permission: notificationPermission,
     requestPermission: requestNotificationPermission,
+    muted: notificationsMuted,
+    toggleMuted: toggleNotificationsMuted,
     showNewOrderNotification,
   } = useOrderNotifications();
 
@@ -337,5 +339,7 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     formatDateTime,
     notificationPermission,
     requestNotificationPermission,
+    notificationsMuted,
+    toggleNotificationsMuted,
   };
 }

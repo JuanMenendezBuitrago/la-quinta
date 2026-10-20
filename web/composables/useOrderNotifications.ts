@@ -11,6 +11,27 @@ export function useOrderNotifications() {
     supported ? Notification.permission : "unsupported"
   );
 
+  // El permiso del navegador no se puede retirar desde la pagina: para "desactivarlas" se
+  // silencian aqui, por dispositivo (localStorage), sin tocar el permiso.
+  const MUTED_KEY = "lq-order-notifications-muted";
+  const muted = ref(false);
+  if (supported) {
+    try {
+      muted.value = localStorage.getItem(MUTED_KEY) === "1";
+    } catch {
+      // almacenamiento bloqueado (modo privado, etc.): quedan activas
+    }
+  }
+  function toggleMuted() {
+    muted.value = !muted.value;
+    try {
+      if (muted.value) localStorage.setItem(MUTED_KEY, "1");
+      else localStorage.removeItem(MUTED_KEY);
+    } catch {
+      // sin almacenamiento se aplica igual, solo hasta recargar
+    }
+  }
+
   /** Debe llamarse desde un clic real del usuario (los navegadores no la conceden si no). */
   async function requestPermission() {
     if (!supported) return;
@@ -23,7 +44,7 @@ export function useOrderNotifications() {
 
   /** Nunca lanza: un fallo aqui no debe impedir el resto de avisos (sonido, pulso). */
   function showNewOrderNotification(order: { customer?: { name?: string }; items?: { name: string; quantity: number }[] }) {
-    if (!supported || permission.value !== "granted") return;
+    if (!supported || permission.value !== "granted" || muted.value) return;
     try {
       const items = order.items?.map((i) => `${i.quantity}× ${i.name}`).join(", ") ?? "";
       const notification = new Notification("Nuevo pedido — La Quinta", {
@@ -41,5 +62,5 @@ export function useOrderNotifications() {
     }
   }
 
-  return { supported, permission, requestPermission, showNewOrderNotification };
+  return { supported, permission, requestPermission, muted, toggleMuted, showNewOrderNotification };
 }
