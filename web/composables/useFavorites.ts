@@ -1,6 +1,8 @@
 import { gql } from "graphql-tag";
 import { useAuth } from "~/composables/useAuth";
-import type { MenuEntry } from "~/composables/useMenu";
+
+/** Lo minimo de una entrada de la carta (o del producto de la ficha ampliada) para los favoritos. */
+type FavoriteTarget = { id: string; sizes?: { menuItemId: string }[] | null };
 
 const MY_FAVORITES = gql`
   query MyFavoriteMenuItemIds {
@@ -15,7 +17,7 @@ const SET_FAVORITES = gql`
 `;
 
 /** Ids de producto de una entrada de la carta: un cafe con varios tamaños son varios productos. */
-function entryMenuItemIds(entry: MenuEntry): string[] {
+function entryMenuItemIds(entry: FavoriteTarget): string[] {
   return entry.sizes ? entry.sizes.map((s) => s.menuItemId) : [entry.id];
 }
 
@@ -26,6 +28,9 @@ function entryMenuItemIds(entry: MenuEntry): string[] {
 export function useFavorites() {
   const { customer } = useAuth();
   const ids = useState<string[]>("lq-favorites", () => []);
+  // De que cliente son los favoritos cargados: la carta y la ficha ampliada usan esto a la vez
+  // y sin esta marca cada una volveria a pedirlos al iniciar sesion.
+  const loadedFor = useState<string | null>("lq-favorites-for", () => null);
   const { mutate: setFavorites } = useMutation(SET_FAVORITES);
 
   if (import.meta.client) {
@@ -34,8 +39,11 @@ export function useFavorites() {
       async (customerId) => {
         if (!customerId) {
           ids.value = [];
+          loadedFor.value = null;
           return;
         }
+        if (loadedFor.value === customerId) return;
+        loadedFor.value = customerId;
         try {
           const { defaultClient } = useNuxtApp().$apollo;
           const { data } = await defaultClient.query({ query: MY_FAVORITES, fetchPolicy: "network-only" });
@@ -51,11 +59,11 @@ export function useFavorites() {
   const idSet = computed(() => new Set(ids.value));
 
   /** Un cafe con varios tamaños es favorito si lo es cualquiera de ellos. */
-  function isFavorite(entry: MenuEntry) {
+  function isFavorite(entry: FavoriteTarget) {
     return entryMenuItemIds(entry).some((id) => idSet.value.has(id));
   }
 
-  async function toggleFavorite(entry: MenuEntry) {
+  async function toggleFavorite(entry: FavoriteTarget) {
     if (!customer.value) {
       await navigateTo("/cuenta");
       return;

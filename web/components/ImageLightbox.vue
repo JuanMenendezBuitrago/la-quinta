@@ -34,6 +34,17 @@
                 <div class="lightbox-heading">
                   <h3 class="lightbox-name">{{ product.name }}</h3>
                   <span class="lightbox-price price">{{ formatPrice(unitPriceCents) }}</span>
+                  <button
+                    class="lightbox-fav"
+                    :class="{ active: isFavorite(product) }"
+                    type="button"
+                    :aria-pressed="isFavorite(product)"
+                    :aria-label="isFavorite(product) ? `Quitar ${product.name} de favoritos` : `Añadir ${product.name} a favoritos`"
+                    :title="customer ? undefined : 'Inicia sesión para guardar favoritos'"
+                    @click="onFavoriteClick"
+                  >
+                    <Heart :size="16" :stroke-width="1.8" />
+                  </button>
                 </div>
                 <p v-if="product.description" class="lightbox-desc">{{ product.description }}</p>
                 <!-- Bolsas de cafe en grano: la ficha del cafe -->
@@ -111,7 +122,9 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, X } from "lucide-vue-next";
+import { ChevronLeft, ChevronRight, Heart, X } from "lucide-vue-next";
+import { useAuth } from "~/composables/useAuth";
+import { useFavorites } from "~/composables/useFavorites";
 import { cartLineKey, useCart } from "~/composables/useCart";
 import { ROAST_LABELS, cartOption, defaultCartOptions, missingModifiers } from "~/composables/useMenu";
 import { useCustomerOrdering } from "~/composables/useSiteSettings";
@@ -128,6 +141,15 @@ const props = withDefaults(
   { direction: 1 }
 );
 const emit = defineEmits<{ (e: "close"): void; (e: "prev"): void; (e: "next"): void }>();
+
+const { customer } = useAuth();
+const { isFavorite, toggleFavorite } = useFavorites();
+// Sin sesion, toggleFavorite lleva a "Mi cuenta": se cierra antes la ficha para no dejarla abierta encima.
+function onFavoriteClick() {
+  if (!props.product) return;
+  if (!customer.value) emit("close");
+  toggleFavorite(props.product);
+}
 
 // Gesto de swipe horizontal para pasar de producto sin volver a la lista. Se mide en
 // touchstart/touchend (no se sigue el dedo en vivo) para no interferir con el scroll
@@ -285,7 +307,24 @@ function formatPrice(priceCents: number) {
 /* Sin foto: la tarjeta de info es todo el contenido, sin franja negra encima */
 .lightbox-image + .lightbox-info { border-top: 1px solid var(--border); }
 
-.lightbox-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.lightbox-heading { display: flex; align-items: center; gap: 12px; }
+.lightbox-name { flex: 1; }
+.lightbox-fav {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--field-border);
+  background: transparent;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.lightbox-fav.active { background: var(--danger); border-color: var(--danger); color: var(--bg); }
+.lightbox-fav.active svg { fill: currentColor; }
+.lightbox-fav:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .lightbox-name { margin: 0; }
 .lightbox-price { color: var(--accent); font-size: 15px; font-weight: 600; white-space: nowrap; }
 .lightbox-desc { color: var(--text-muted); font-size: 13.5px; line-height: 1.5; margin: 8px 0 0; }
