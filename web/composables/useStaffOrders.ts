@@ -16,6 +16,7 @@ export interface CustomerMatch {
   id: string;
   name: string;
   customerCode: string;
+  avatar?: string | null;
 }
 
 // Campos compartidos por la cola en vivo y el historial: mismo tipo `Order` en ambos casos.

@@ -34,6 +34,7 @@ export const usersTypeDefs = /* GraphQL */ `
     id: ID!
     name: String!
     customerCode: String!
+    avatar: String
   }
 
   """Lo que hay que pedir en el paso del codigo del login."""

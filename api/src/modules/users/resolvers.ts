@@ -32,9 +32,11 @@ export const usersResolvers = {
           ? [{ email: query.toLowerCase() }]
           : [{ phone: query }, { phone: query.replace(/[\s-]/g, "") }];
       const user = await User.findOne({ $or: or, deletedAt: { $exists: false } })
-        .select("name customerCode")
+        .select("name customerCode avatar")
         .lean();
-      return user ? { id: user._id.toString(), name: user.name, customerCode: user.customerCode } : null;
+      return user
+        ? { id: user._id.toString(), name: user.name, customerCode: user.customerCode, avatar: user.avatar ?? null }
+        : null;
     },
     staffLoginOptions: async () => {
       const staff = await StaffUser.find({ active: { $ne: false } }).select("name avatar").sort({ name: 1 }).lean();

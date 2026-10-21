@@ -119,7 +119,10 @@
     <p v-if="loading" class="muted">Cargando carta…</p>
     <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
 
-    <form v-if="formOpen" class="card item-form" @submit.prevent="submitForm">
+    <!-- Nuevo producto: aqui arriba. Al editar uno, el formulario se abre justo debajo de el (en su hueco
+         #item-form-slot-<id>, que existe siempre, aunque vacio, para que Teleport lo encuentre). -->
+    <Teleport v-if="formOpen" defer :to="form.id ? `#item-form-slot-${form.id}` : 'body'" :disabled="!form.id">
+    <form class="card item-form" @submit.prevent="submitForm">
       <h3>{{ form.id ? "Editar producto" : "Nuevo producto" }}</h3>
 
       <label class="field">
@@ -200,10 +203,12 @@
         </button>
       </div>
     </form>
+    </Teleport>
 
     <section v-for="category in categories" :key="category.id" class="category">
       <h3>{{ category.name }}</h3>
-      <div class="card item-row" v-for="item in category.items" :key="item.id" :class="{ unavailable: !item.available }">
+      <template v-for="item in category.items" :key="item.id">
+      <div class="card item-row" :class="{ unavailable: !item.available, editing: formOpen && form.id === item.id }">
         <img v-if="item.imageUrl" :src="resolveImageUrl(item.imageUrl) ?? undefined" alt="" class="thumb" />
         <div class="item-info">
           <strong>{{ item.name }}</strong>
@@ -229,6 +234,8 @@
           <button class="button secondary" type="button" @click="pendingDeleteId = item.id">Borrar</button>
         </div>
       </div>
+      <div :id="`item-form-slot-${item.id}`" />
+      </template>
       <p v-if="!category.items.length" class="muted">Sin productos en esta categoría.</p>
     </section>
     </div>
@@ -661,6 +668,7 @@ function formatPrice(priceCents: number) {
 .category { margin-top: 24px; }
 .item-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
 .item-row.unavailable { opacity: 0.55; }
+.item-row.editing { border-color: var(--accent); opacity: 1; }
 .item-info { flex: 1; }
 .item-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }

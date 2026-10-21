@@ -41,6 +41,7 @@ const LOOKUP = gql`
       id
       name
       customerCode
+      avatar
     }
   }
 `;

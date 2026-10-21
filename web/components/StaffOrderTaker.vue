@@ -45,6 +45,11 @@
 
     <aside class="wide-aside wide-aside--sticky">
     <section ref="ticketEl" class="card ticket">
+      <!-- En cuanto se identifica al cliente, arriba del ticket: se ve de un vistazo para quien es -->
+      <div v-if="customer" class="ticket-customer">
+        <UserAvatar :avatar="customer.avatar" :name="customer.name" :size="56" />
+        <strong>{{ customer.name }}</strong>
+      </div>
       <h3>Ticket</h3>
       <p v-if="!lines.length" class="muted add-items">Añade productos de la carta.</p>
       <ul v-else class="ticket-lines">
@@ -122,6 +127,7 @@ import { gql } from "graphql-tag";
 import { orderLinesInput, useCart } from "~/composables/useCart";
 import { MENU_QUERY, defaultCartOptions, missingModifiers, type MenuCategory, type MenuItem } from "~/composables/useMenu";
 import LineOptionsPicker from "~/components/LineOptionsPicker.vue";
+import UserAvatar from "~/components/UserAvatar.vue";
 import { type CustomerMatch } from "~/composables/useStaffOrders";
 import { BAR_TABLE, TABLES } from "~/composables/useTables";
 
@@ -380,6 +386,8 @@ input {
 }
 .places button.wide { grid-column: span 3; }
 .places button.active { background: var(--accent); color: var(--bg); }
+.ticket-customer { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.ticket-customer strong { font-size: 17px; overflow-wrap: anywhere; }
 .customer-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ticket-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
@@ -399,4 +407,13 @@ input {
 }
 /* Diseño ancho: el ticket ya esta siempre a la vista (columna fija), sobra la barra "Ver ticket" */
 @media (min-width: 1000px) and (orientation: landscape) { .sticky-bar { display: none; } }
+/* Diseño ancho: tarjetas de producto mas grandes, en tres columnas */
+@media (min-width: 1000px) and (orientation: landscape) {
+  .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .tile-add { min-height: 104px; padding: 14px 14px 12px; gap: 10px; }
+  .tile.selected .tile-add { padding: 13px 13px 11px; }
+  .tile-name { font-size: 17px; }
+  .tile-price { font-size: 15px; }
+  .tile-qty { min-width: 28px; height: 28px; font-size: 15px; }
+}
 </style>
