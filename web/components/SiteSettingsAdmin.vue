@@ -71,11 +71,12 @@
           <span class="social-label">{{ social.label }}</span>
           <input v-model="form[social.key]" type="url" :placeholder="social.placeholder" />
           <button
-            class="button secondary"
+            class="button secondary delete"
             type="button"
             :disabled="!form[social.key]"
             @click="form[social.key] = ''"
           >
+            <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
             Borrar
           </button>
         </div>
@@ -102,6 +103,7 @@
 </template>
 
 <script setup lang="ts">
+import { Trash2 } from "lucide-vue-next";
 import {
   SITE_SETTINGS_QUERY,
   UPDATE_SITE_SETTINGS,

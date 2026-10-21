@@ -31,6 +31,7 @@
           {{ exporting ? "Preparando…" : "Descargar mis datos" }}
         </button>
         <button v-if="!confirmingDelete" class="button secondary danger" type="button" @click="confirmingDelete = true">
+          <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
           Eliminar mi cuenta
         </button>
       </div>
@@ -44,6 +45,7 @@
         </p>
         <div class="actions">
           <button class="button danger-solid" type="button" :disabled="deleting" @click="deleteAccount">
+            <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
             {{ deleting ? "Eliminando…" : "Sí, eliminar mi cuenta" }}
           </button>
           <button class="button secondary" type="button" :disabled="deleting" @click="confirmingDelete = false">
@@ -62,6 +64,7 @@
 </template>
 
 <script setup lang="ts">
+import { Trash2 } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { useAuth } from "~/composables/useAuth";
 

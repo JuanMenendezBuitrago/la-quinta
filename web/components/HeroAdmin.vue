@@ -92,14 +92,14 @@
 
       <div v-if="pendingDeleteId === slide.id" class="row-actions">
         <span class="muted">¿Eliminar?</span>
-        <button class="button secondary" type="button" :disabled="busy" @click="remove(slide.id)">Sí</button>
+        <button class="button secondary delete" type="button" :disabled="busy" @click="remove(slide.id)"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Sí</button>
         <button class="button secondary" type="button" @click="pendingDeleteId = ''">No</button>
       </div>
       <div v-else class="row-actions">
         <button class="button secondary icon" type="button" :disabled="busy || i === 0" aria-label="Subir" @click="move(slide.id, 'UP')">↑</button>
         <button class="button secondary icon" type="button" :disabled="busy || i === slides.length - 1" aria-label="Bajar" @click="move(slide.id, 'DOWN')">↓</button>
         <button class="button secondary" type="button" :disabled="busy || formOpen" @click="startEdit(slide)">Editar</button>
-        <button class="button secondary" type="button" :disabled="busy" @click="pendingDeleteId = slide.id">Eliminar</button>
+        <button class="button secondary delete" type="button" :disabled="busy" @click="pendingDeleteId = slide.id"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Eliminar</button>
       </div>
     </div>
     <p v-if="actionError" class="muted" style="color: var(--danger)">{{ actionError }}</p>

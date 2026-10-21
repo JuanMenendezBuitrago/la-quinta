@@ -121,7 +121,7 @@
           <span class="process-name">{{ p.name }}</span>
           <span class="muted">{{ p.coffeeCount === 1 ? "1 café" : `${p.coffeeCount} cafés` }}</span>
           <button class="button secondary" type="button" @click="startRenameProcess(p)">Renombrar</button>
-          <button class="button secondary" type="button" :disabled="processBusy || p.coffeeCount > 0" @click="deleteProcess(p.id)">Borrar</button>
+          <button class="button secondary delete" type="button" :disabled="processBusy || p.coffeeCount > 0" @click="deleteProcess(p.id)"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Borrar</button>
         </template>
       </div>
       <form class="process-row" @submit.prevent="createProcess">

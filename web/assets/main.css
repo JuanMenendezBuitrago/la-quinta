@@ -198,8 +198,9 @@ h3 { font-size: 17px; }
 /* Relleno completo al pasar el raton: con el turquesa oscuro, solo oscurecer el texto apenas se nota. */
 .button.secondary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 /* Cancelar (un pedido o una edicion): en rojo y con icono de papelera, para no confundirlo con el resto */
-.button.secondary.cancel { color: var(--danger); border-color: var(--danger); }
-.button.secondary.cancel:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--bg); }
+/* Cancelar y borrar: en rojo, con el icono de la papelera */
+.button.secondary.cancel, .button.secondary.delete { color: var(--danger); border-color: var(--danger); }
+.button.secondary.cancel:hover:not(:disabled), .button.secondary.delete:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--bg); }
 
 input, select, textarea {
   width: 100%;

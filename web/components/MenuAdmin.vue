@@ -85,7 +85,8 @@
       </form>
 
       <p v-if="!groups.length && !groupFormOpen" class="muted">Todavía no hay personalizaciones.</p>
-      <div v-for="group in groups" :key="group.id" class="card category-row">
+      <!-- Botones debajo de la descripcion (no a la derecha): las opciones necesitan todo el ancho -->
+      <div v-for="group in groups" :key="group.id" class="card category-row group-row">
         <div class="item-info">
           <span class="category-name">{{ group.name }}</span>
           <span class="muted"> · {{ group.minSelect ? "obligatoria" : "opcional" }}</span>
@@ -100,21 +101,24 @@
         </div>
         <div v-if="pendingGroupDeleteId === group.id" class="category-actions">
           <span class="muted">¿Borrar? Se quitará de los productos</span>
-          <button class="button secondary" type="button" @click="confirmRemoveGroup(group)">Sí</button>
+          <button class="button secondary delete" type="button" @click="confirmRemoveGroup(group)"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Sí</button>
           <button class="button secondary" type="button" @click="pendingGroupDeleteId = ''">No</button>
         </div>
         <div v-else class="category-actions">
           <button class="button secondary" type="button" :disabled="groupFormOpen" @click="startEditGroup(group)">Editar</button>
-          <button class="button secondary" type="button" @click="pendingGroupDeleteId = group.id">Borrar</button>
+          <button class="button secondary delete" type="button" @click="pendingGroupDeleteId = group.id"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Borrar</button>
         </div>
       </div>
     </section>
     </aside>
 
     <div class="wide-main">
-    <div class="menu-admin-header">
-      <button class="button" :disabled="formOpen" @click="startCreate()">+ Nuevo producto</button>
-    </div>
+    <!-- En la cabecera de la seccion, a la derecha (solo en cliente: Teleport fuera de #teleports no se renderiza en SSR) -->
+    <ClientOnly>
+      <Teleport to="#staff-hero-actions">
+        <button class="button" :disabled="formOpen" @click="startCreate()">+ Nuevo producto</button>
+      </Teleport>
+    </ClientOnly>
 
     <p v-if="loading" class="muted">Cargando carta…</p>
     <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
@@ -226,12 +230,12 @@
         </div>
         <div v-else-if="pendingDeleteId === item.id" class="item-actions">
           <span class="muted">¿Borrar?</span>
-          <button class="button secondary" type="button" :disabled="deleting" @click="confirmRemove(item)">Sí</button>
+          <button class="button secondary delete" type="button" :disabled="deleting" @click="confirmRemove(item)"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Sí</button>
           <button class="button secondary" type="button" :disabled="deleting" @click="pendingDeleteId = ''">No</button>
         </div>
         <div v-else class="item-actions">
           <button class="button secondary" type="button" @click="startEdit(item, category.id)">Editar</button>
-          <button class="button secondary" type="button" @click="pendingDeleteId = item.id">Borrar</button>
+          <button class="button secondary delete" type="button" @click="pendingDeleteId = item.id"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Borrar</button>
         </div>
       </div>
       <div :id="`item-form-slot-${item.id}`" />
@@ -644,7 +648,6 @@ function formatPrice(priceCents: number) {
 
 <style scoped>
 .menu-admin { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
-.menu-admin-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .menu-admin .wide-main, .menu-admin .wide-aside { gap: 0; }
 @media (min-width: 1000px) and (orientation: landscape) {
   .menu-admin .categories-admin { margin-top: 0; }
@@ -655,6 +658,10 @@ function formatPrice(priceCents: number) {
 .category-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
 .category-name { font-weight: 600; }
 .category-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.group-row { flex-direction: column; align-items: stretch; }
+/* Editar y Borrar (o Si y No al confirmar) a medias; el aviso de borrar, a todo el ancho encima */
+.group-row .category-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.group-row .category-actions > span { grid-column: 1 / -1; }
 .category-form { margin: 12px 0; display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
 
 .groups-admin { margin-top: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }

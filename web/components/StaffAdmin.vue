@@ -2,9 +2,14 @@
   <!-- Pantallas anchas apaisadas: alta y edicion a la izquierda; listado en la columna de la derecha -->
   <section class="staff-admin wide-layout">
     <div class="wide-main staff-main">
-    <div class="staff-admin-header">
-      <button class="button" @click="startCreate()">+ Nueva cuenta</button>
-    </div>
+    <!-- En la cabecera de la seccion, a la derecha (solo en cliente: Teleport fuera de #teleports no se renderiza en SSR) -->
+    <ClientOnly>
+      <Teleport to="#staff-hero-actions">
+        <button class="button" @click="startCreate()">+ Nueva cuenta</button>
+      </Teleport>
+    </ClientOnly>
+    <!-- Solo en pantallas anchas: la columna del formulario no queda vacia -->
+    <p v-if="!formOpen" class="muted form-placeholder">Pulsa «Editar» en una cuenta o crea una nueva.</p>
 
     <form v-if="formOpen" class="card staff-form" @submit.prevent="submitForm">
       <h3>{{ form.id ? "Editar cuenta" : "Nueva cuenta" }}</h3>
@@ -229,9 +234,9 @@ async function submitForm() {
 </script>
 
 <style scoped>
-.staff-admin-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .staff-main { gap: 0; }
-.staff-main .staff-form { margin-top: 16px; }
+.form-placeholder { display: none; margin: 0; }
+@media (min-width: 1000px) and (orientation: landscape) { .form-placeholder { display: block; } }
 .staff-list { gap: 0; }
 .staff-list .staff-row:first-of-type { margin-top: 0; }
 .staff-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 10px; }
@@ -284,6 +289,12 @@ async function submitForm() {
 @media (max-width: 700px) { .form-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .form-actions { display: flex; gap: 8px; margin-top: 4px; }
+/* Si la columna no da para Guardar y Cancelar en fila (~252 px), se apilan a todo el ancho */
+.form-side { container-type: inline-size; }
+@container (max-width: 260px) {
+  .form-actions { flex-direction: column; }
+  .form-actions .button { width: 100%; }
+}
 
 select {
   width: 100%;

@@ -50,6 +50,8 @@
             Notificaciones bloqueadas por el navegador
           </span>
         </div>
+        <!-- Acciones de la seccion en la cabecera, a la derecha: las secciones las ponen aqui con Teleport -->
+        <div id="staff-hero-actions" class="staff-hero-actions" />
       </header>
 
       <p v-if="stockAlert && activeTab !== 'inventario'" class="stock-alert" role="alert">
@@ -469,6 +471,8 @@ watchEffect(() => {
 
 .account-hero { margin-bottom: 22px; }
 .staff-hero { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 0; }
+.staff-hero-actions { display: flex; gap: 8px; margin-left: auto; }
+.staff-hero-actions:empty { display: none; }
 .staff-who { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 /* Estado de las notificaciones: pastilla con icono, turquesa si estan activas y roja si no. */
 .notif-status {

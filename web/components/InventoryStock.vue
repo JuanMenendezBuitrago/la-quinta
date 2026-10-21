@@ -77,7 +77,7 @@
               <button class="button secondary push" type="button" :disabled="saving" @click="toggleActive(supply)">
                 {{ supply.active ? "Desactivar" : "Activar" }}
               </button>
-              <button class="button secondary danger" type="button" :disabled="saving" @click="remove(supply)">Borrar</button>
+              <button class="button secondary delete" type="button" :disabled="saving" @click="remove(supply)"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Borrar</button>
             </div>
           </form>
 
@@ -336,7 +336,6 @@ async function loadMovements(supply: Supply, more: boolean) {
 .error { color: var(--danger); margin: 0; font-size: 14px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .actions .push { margin-left: auto; }
-.danger { color: var(--danger); border-color: var(--danger); }
 
 .group { margin-bottom: 20px; }
 .group h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin: 0 0 6px; }
