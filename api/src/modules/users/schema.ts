@@ -67,6 +67,10 @@ export const usersTypeDefs = /* GraphQL */ `
     """Personal (barra y gestion): busca un cliente por su codigo, telefono o email EXACTOS, para
     asociarlo a un pedido. No lista ni busca por partes: el listado de clientes es solo de gestion."""
     lookupCustomer(query: String!): CustomerMatch
+    """Personal (barra y gestion): clientes para asociar a un pedido. Codigo, telefono o email exactos
+    (como lookupCustomer) o, si no, parte del nombre (minimo 3 letras, sin distinguir tildes ni
+    mayusculas). Como mucho 8, por nombre."""
+    searchCustomers(query: String!): [CustomerMatch!]!
     """Publico: cuentas del personal para elegir en la pantalla de acceso (nombre y avatar)."""
     staffLoginOptions: [StaffLoginOption!]!
     """Listado de personal del local (requiere rol gestion)."""

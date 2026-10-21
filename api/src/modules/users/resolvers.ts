@@ -6,6 +6,28 @@ import { presetAvatarValue, removeAvatarFile } from "./avatar";
 import { UPLOAD_DIR } from "../uploads/router";
 import { MenuItem } from "../menu/model";
 
+const MAX_NAME_MATCHES = 8;
+
+/** Filtro de codigo, telefono o email EXACTOS (lo que el cliente le dice al personal). */
+function exactCustomerFilter(query: string) {
+  const byCode = /^(lq-?)?\d{4}$/i.test(query) ? `LQ-${query.replace(/\D/g, "")}` : null;
+  if (byCode) return [{ customerCode: byCode }];
+  if (query.includes("@")) return [{ email: query.toLowerCase() }];
+  return [{ phone: query }, { phone: query.replace(/[\s-]/g, "") }];
+}
+
+// "jose" encuentra "José": cada vocal (y la n) admite sus variantes con tilde.
+const ACCENTS: Record<string, string> = { a: "aáàä", e: "eéèë", i: "iíìï", o: "oóòö", u: "uúùü", n: "nñ" };
+function accentInsensitivePattern(text: string) {
+  return [...text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")]
+    .map((ch) => (ACCENTS[ch] ? `[${ACCENTS[ch]}]` : ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+    .join("");
+}
+
+function toMatch(user: { _id: Types.ObjectId; name: string; customerCode: string; avatar?: string | null }) {
+  return { id: user._id.toString(), name: user.name, customerCode: user.customerCode, avatar: user.avatar ?? null };
+}
+
 export const usersResolvers = {
   Query: {
     me: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
@@ -25,18 +47,30 @@ export const usersResolvers = {
       requireStaff(ctx, ["barra", "gestion"]);
       const query = args.query.trim();
       if (!query) return null;
-      const byCode = /^(lq-?)?\d{4}$/i.test(query) ? `LQ-${query.replace(/\D/g, "")}` : null;
-      const or: Record<string, string>[] = byCode
-        ? [{ customerCode: byCode }]
-        : query.includes("@")
-          ? [{ email: query.toLowerCase() }]
-          : [{ phone: query }, { phone: query.replace(/[\s-]/g, "") }];
-      const user = await User.findOne({ $or: or, deletedAt: { $exists: false } })
+      const user = await User.findOne({ $or: exactCustomerFilter(query), deletedAt: { $exists: false } })
         .select("name customerCode avatar")
         .lean();
-      return user
-        ? { id: user._id.toString(), name: user.name, customerCode: user.customerCode, avatar: user.avatar ?? null }
-        : null;
+      return user ? toMatch(user) : null;
+    },
+    searchCustomers: async (_: unknown, args: { query: string }, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["barra", "gestion"]);
+      const query = args.query.trim().slice(0, 80);
+      if (!query) return [];
+      const exact = await User.findOne({ $or: exactCustomerFilter(query), deletedAt: { $exists: false } })
+        .select("name customerCode avatar")
+        .lean();
+      if (exact) return [toMatch(exact)];
+      // Por nombre solo con 3 letras o mas: con menos saldria media lista de clientes.
+      if (query.replace(/[^\p{L}]/gu, "").length < 3) return [];
+      const users = await User.find({
+        name: { $regex: accentInsensitivePattern(query), $options: "i" },
+        deletedAt: { $exists: false },
+      })
+        .select("name customerCode avatar")
+        .sort({ name: 1 })
+        .limit(MAX_NAME_MATCHES)
+        .lean();
+      return users.map(toMatch);
     },
     staffLoginOptions: async () => {
       const staff = await StaffUser.find({ active: { $ne: false } }).select("name avatar").sort({ name: 1 }).lean();

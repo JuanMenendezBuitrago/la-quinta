@@ -1,5 +1,7 @@
 <template>
   <section class="inventory">
+    <!-- Movil y vertical: pestañas fijas arriba; en pantalla ancha, los chips de siempre -->
+    <MobileTabs v-model="activeView" :tabs="views" label="Vistas del inventario" class="inventory-tabs" />
     <nav class="chips" aria-label="Vistas del inventario">
       <button
         v-for="view in views"
@@ -21,6 +23,7 @@
 
 <script setup lang="ts">
 import { useStaffAuth } from "~/composables/useAuth";
+import MobileTabs from "~/components/MobileTabs.vue";
 import InventoryStock from "~/components/InventoryStock.vue";
 import InventoryCount from "~/components/InventoryCount.vue";
 import InventoryRecipes from "~/components/InventoryRecipes.vue";
@@ -41,6 +44,8 @@ const activeView = ref("stock");
 <style scoped>
 .inventory { max-width: 760px; }
 .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 14px; }
+.inventory-tabs { margin-bottom: 24px; }
+@media (max-width: 999px), (orientation: portrait) { .chips { display: none; } }
 .chip {
   flex-shrink: 0;
   border: 1px solid var(--border);

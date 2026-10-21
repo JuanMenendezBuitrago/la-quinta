@@ -2,8 +2,13 @@
   <div class="stock-view">
     <div class="toolbar">
       <input v-model="search" class="search" type="search" placeholder="Buscar insumo" aria-label="Buscar insumo" />
-      <button v-if="isGestion && !creating" class="button" type="button" @click="startCreate">Nuevo insumo</button>
     </div>
+    <!-- En la cabecera de la seccion, a la derecha (solo en cliente: Teleport fuera de #teleports no se renderiza en SSR) -->
+    <ClientOnly>
+      <Teleport v-if="isGestion" to="#staff-hero-actions">
+        <button class="button" type="button" :disabled="creating" @click="startCreate">+ Nuevo insumo</button>
+      </Teleport>
+    </ClientOnly>
 
     <!-- Alta de insumo (gestion) -->
     <form v-if="creating" class="card supply-form" @submit.prevent="saveNew">
@@ -22,7 +27,7 @@
 
     <p v-if="loading && !supplies.length" class="muted">Cargando inventario…</p>
     <EmptyState v-else-if="!supplies.length" :icon="Package" title="Todavía no hay insumos">
-      {{ isGestion ? "Crea el primero con «Nuevo insumo»." : "Gestión debe darlos de alta." }}
+      {{ isGestion ? "Crea el primero con «+ Nuevo insumo»." : "Gestión debe darlos de alta." }}
     </EmptyState>
     <EmptyState v-else-if="!groups.length" :icon="SearchX" title="Ningún insumo coincide con la búsqueda" />
 
@@ -330,7 +335,6 @@ async function loadMovements(supply: Supply, more: boolean) {
   font-size: 15px;
   font-family: inherit;
 }
-.toolbar .button { flex-shrink: 0; }
 .supply-form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
 .supply-form h3 { margin: 0; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
