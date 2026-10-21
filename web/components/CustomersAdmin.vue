@@ -52,8 +52,9 @@
     </aside>
 
     <!-- Ficha de un cliente -->
-    <div v-if="selectedId" class="wide-main">
-      <button class="button secondary back" type="button" @click="closeDetail">
+    <div v-if="selectedId" class="wide-main customer-detail" :data-tab="detailTab">
+      <!-- En movil, con la ficha cargada, se vuelve con el chevron junto al nombre (ver detail-name) -->
+      <button class="button secondary back" :class="{ 'has-detail': detail }" type="button" @click="closeDetail">
         <span class="back-narrow">← Clientes</span><span class="back-wide">Cerrar ficha</span>
       </button>
 
@@ -63,6 +64,9 @@
       <template v-if="detail">
         <header class="detail-header">
           <h2 class="detail-name">
+            <button class="back-chevron" type="button" aria-label="Volver a clientes" title="Volver a clientes" @click="closeDetail">
+              <ChevronLeft :size="28" :stroke-width="2" aria-hidden="true" />
+            </button>
             <UserAvatar :avatar="detail.customer.avatar" :name="detail.customer.name" :size="44" />
             {{ detail.customer.name }}
           </h2>
@@ -73,14 +77,17 @@
           </p>
         </header>
 
-        <div class="stats">
+        <!-- Movil y vertical: una parte de la ficha cada vez (en pantalla ancha, todo a la vez) -->
+        <MobileTabs v-model="detailTab" :tabs="detailTabs" label="Partes de la ficha" />
+
+        <div class="stats detail-part" data-part="resumen">
           <div class="card stat"><span class="stat-value">{{ detail.customer.ordersCount }}</span><span class="muted">pedidos</span></div>
           <div class="card stat"><span class="stat-value">{{ detail.customer.deliveredCount }}</span><span class="muted">entregados</span></div>
           <div class="card stat"><span class="stat-value">{{ detail.customer.cancelledCount }}</span><span class="muted">cancelados</span></div>
           <div class="card stat"><span class="stat-value">{{ formatPrice(detail.customer.spentCents) }}</span><span class="muted">gastado</span></div>
         </div>
 
-        <section class="card stamps-card">
+        <section class="card stamps-card detail-part" data-part="resumen">
           <div class="stamps-head">
             <div>
               <p class="eyebrow">Sellos</p>
@@ -112,9 +119,9 @@
           </p>
         </section>
 
-        <section class="detail-section">
+        <section class="detail-section detail-part" data-part="pedidos">
           <h3>Pedidos</h3>
-          <EmptyState v-if="!detail.orders.length" compact :icon="ShoppingBag" title="Todavía no ha hecho ningún pedido" />
+          <EmptyState v-if="!detail.orders.length" :icon="ShoppingBag" title="Todavía no ha hecho ningún pedido">Aparecerán aquí cuando se le asocie un pedido.</EmptyState>
           <div v-for="order in detail.orders" :key="order.id" class="card row">
             <div class="row-info">
               <span class="code">{{ order.code }}</span>
@@ -125,9 +132,9 @@
           </div>
         </section>
 
-        <section class="detail-section">
+        <section class="detail-section detail-part" data-part="sellos">
           <h3>Historial de sellos</h3>
-          <EmptyState v-if="!detail.stamps.length" compact :icon="Stamp" title="Sin movimientos de sellos" />
+          <EmptyState v-if="!detail.stamps.length" :icon="Stamp" title="Sin movimientos de sellos">Los sellos ganados, canjeados y ajustados se registran aquí.</EmptyState>
           <div v-for="m in detail.stamps" :key="m.id" class="card row">
             <div class="row-info">
               <strong>{{ REASON_LABELS[m.reason] ?? m.reason }}</strong>
@@ -150,7 +157,8 @@
 </template>
 
 <script setup lang="ts">
-import { SearchX, ShoppingBag, Stamp, UserSearch, Users } from "lucide-vue-next";
+import MobileTabs from "~/components/MobileTabs.vue";
+import { ChevronLeft, SearchX, ShoppingBag, Stamp, UserSearch, Users } from "lucide-vue-next";
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import UserAvatar from "~/components/UserAvatar.vue";
@@ -298,8 +306,17 @@ async function loadDetail() {
   }
 }
 
+// Pestañas de la ficha en movil; cada cliente se abre por el resumen.
+const detailTab = ref("resumen");
+const detailTabs = computed(() => [
+  { id: "resumen", label: "Resumen" },
+  { id: "pedidos", label: "Pedidos", count: detail.value?.orders.length ?? null },
+  { id: "sellos", label: "Sellos", count: detail.value?.stamps.length ?? null },
+]);
+
 function openDetail(id: string) {
   selectedId.value = id;
+  detailTab.value = "resumen";
   detail.value = null;
   stampsMessage.value = "";
   adjustStamps.value = null;
@@ -359,9 +376,35 @@ async function adjust() {
 </script>
 
 <style scoped>
+/* Ficha en movil: solo la parte de la pestaña elegida; el titulo de seccion sobra (lo dice la pestaña) */
+@media (max-width: 999px), (orientation: portrait) {
+  .customer-detail[data-tab="resumen"] .detail-part:not([data-part="resumen"]),
+  .customer-detail[data-tab="pedidos"] .detail-part:not([data-part="pedidos"]),
+  .customer-detail[data-tab="sellos"] .detail-part:not([data-part="sellos"]) { display: none; }
+  .customer-detail .detail-section > h3 { display: none; }
+  .customer-detail .mobile-tabs { margin: 10px 0 16px; }
+}
 .customers-admin .wide-main, .customers-admin .wide-aside { gap: 0; }
 .hidden-narrow { display: none; }
 .back-wide { display: none; }
+.back.has-detail { display: none; }
+.back-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  margin-left: -10px; /* el icono, no la zona de toque, alineado con el texto de debajo */
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+.back-chevron:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.back-chevron:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .detail-placeholder { display: none; }
 .customer-row.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
 @media (min-width: 1000px) and (orientation: landscape) {
@@ -369,6 +412,9 @@ async function adjust() {
   .detail-placeholder { display: flex; }
   .back-narrow { display: none; }
   .back-wide { display: inline; }
+  /* En pantalla ancha la ficha se cierra con "Cerrar ficha" */
+  .back.has-detail { display: inline-flex; }
+  .back-chevron { display: none; }
 }
 .list-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .list-header h2 { margin: 0; }

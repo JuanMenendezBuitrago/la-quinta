@@ -56,7 +56,8 @@ function select(id: string) {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Arriba: si unas pestañas llevan numero y otras no, los nombres quedan a la misma altura */
+  justify-content: flex-start;
   gap: 3px;
   min-height: 44px;
   padding: 6px 6px 7px;
