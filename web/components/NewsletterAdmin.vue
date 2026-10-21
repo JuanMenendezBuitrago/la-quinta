@@ -1,5 +1,7 @@
 <template>
-  <section class="newsletter-admin">
+  <!-- Pantallas anchas apaisadas: redactar a la izquierda; envios anteriores a la derecha -->
+  <section class="newsletter-admin wide-layout">
+    <div class="wide-main">
     <p class="muted intro">
       <strong>{{ overview?.subscriberCount ?? "…" }}</strong>
       {{ overview?.subscriberCount === 1 ? "cliente ha" : "clientes han" }} autorizado recibir novedades por email.
@@ -54,7 +56,9 @@
       </div>
       <p v-if="sending" class="muted">Hay un envío en curso: podrás mandar otro cuando termine.</p>
     </form>
+    </div>
 
+    <aside class="wide-aside campaigns">
     <h2 class="history-title">Envíos</h2>
     <p v-if="!overview?.campaigns.length" class="muted">Todavía no se ha enviado ninguno.</p>
     <article v-for="c in overview?.campaigns ?? []" :key="c.id" class="card campaign">
@@ -67,6 +71,7 @@
         {{ c.sentCount }} de {{ c.recipients }} enviados<template v-if="c.failedCount"> · {{ c.failedCount }} fallidos</template>
       </p>
     </article>
+    </aside>
   </section>
 </template>
 
@@ -202,6 +207,11 @@ textarea {
 
 .history-title { margin: 32px 0 6px; }
 .campaign { margin-top: 10px; max-width: 620px; }
+.campaigns { gap: 0; }
+@media (min-width: 1000px) and (orientation: landscape) {
+  .history-title { margin-top: 0; }
+  .newsletter-form, .campaign { max-width: none; }
+}
 .campaign p { margin: 4px 0 0; font-size: 13px; }
 .campaign-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .campaign-status {

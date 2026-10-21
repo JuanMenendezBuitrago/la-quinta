@@ -4,13 +4,17 @@ import path from "path";
 import { Router } from "express";
 import multer from "multer";
 import { verifyToken } from "../users/auth";
+import { Types } from "mongoose";
 import { StaffUser, User } from "../users/model";
 import { AVATAR_UPLOAD_PREFIX, removeAvatarFile } from "../users/avatar";
+import { RECEIPT_UPLOAD_PREFIX } from "../expenses/model";
 
 export const UPLOAD_DIR = path.join(__dirname, "../../../uploads");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 const AVATAR_DIR = path.join(UPLOAD_DIR, "avatars");
 fs.mkdirSync(AVATAR_DIR, { recursive: true });
+const RECEIPT_DIR = path.join(UPLOAD_DIR, "receipts");
+fs.mkdirSync(RECEIPT_DIR, { recursive: true });
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -98,7 +102,8 @@ const avatarUpload = multer({
 /**
  * Cualquier cliente o miembro del personal con sesion sube su propia foto de avatar. La guarda
  * directamente en su cuenta (y borra la anterior): asi nadie puede apuntar su avatar a la foto
- * de otro, cosa que pasaria si la ruta se mandara despues por GraphQL.
+ * de otro, cosa que pasaria si la ruta se mandara despues por GraphQL. Gestion puede ademas
+ * subirla para otro miembro del personal con ?staffId=<id>.
  */
 uploadsRouter.post("/avatar", (req, res) => {
   const authHeader = req.headers.authorization;
@@ -106,6 +111,11 @@ uploadsRouter.post("/avatar", (req, res) => {
   const payload = token ? verifyToken(token) : null;
   if (!payload) {
     res.status(401).json({ error: "No autorizado" });
+    return;
+  }
+  const targetStaffId = typeof req.query.staffId === "string" ? req.query.staffId : null;
+  if (targetStaffId && (payload.kind !== "staff" || payload.role !== "gestion" || !Types.ObjectId.isValid(targetStaffId))) {
+    res.status(403).json({ error: "Solo gestion puede cambiar el avatar de otra persona" });
     return;
   }
 
@@ -130,7 +140,7 @@ uploadsRouter.post("/avatar", (req, res) => {
       // Devuelve el documento anterior: hace falta su avatar para borrar la foto vieja.
       const previous =
         payload.kind === "staff"
-          ? await StaffUser.findByIdAndUpdate(payload.sub, { avatar }).lean()
+          ? await StaffUser.findByIdAndUpdate(targetStaffId ?? payload.sub, { avatar }).lean()
           : await User.findOneAndUpdate({ _id: payload.sub, deletedAt: { $exists: false } }, { avatar }).lean();
       if (!previous) {
         await removeAvatarFile(avatar, UPLOAD_DIR);
@@ -143,5 +153,49 @@ uploadsRouter.post("/avatar", (req, res) => {
       await removeAvatarFile(avatar, UPLOAD_DIR);
       res.status(500).json({ error: "No se pudo guardar el avatar" });
     }
+  });
+});
+
+/**
+ * Foto del recibo de un gasto: cualquier miembro del personal (barra tambien registra gastos).
+ * La web ya la reescala y la vuelve a codificar (quita los EXIF); aqui solo se limita tipo y tamaño.
+ * Devuelve la ruta, que createExpense/updateExpense guardan en el gasto.
+ */
+const RECEIPT_MAX_FILE_SIZE = 2 * 1024 * 1024;
+const receiptUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, RECEIPT_DIR),
+    filename: (_req, file, cb) => cb(null, `${crypto.randomUUID()}${AVATAR_MIME_EXTENSIONS[file.mimetype]}`),
+  }),
+  limits: { fileSize: RECEIPT_MAX_FILE_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (!AVATAR_MIME_EXTENSIONS[file.mimetype]) {
+      cb(new Error("Formato de imagen no soportado (usa JPG, PNG o WEBP)"));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+uploadsRouter.post("/receipt", (req, res) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const payload = token ? verifyToken(token) : null;
+  if (!payload || payload.kind !== "staff") {
+    res.status(401).json({ error: "No autorizado" });
+    return;
+  }
+
+  receiptUpload.single("file")(req, res, (err: unknown) => {
+    if (err) {
+      const tooBig = err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE";
+      res.status(400).json({ error: tooBig ? "La foto es demasiado grande (maximo 2 MB)" : err instanceof Error ? err.message : "No se pudo subir la foto" });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: "No se envio ningun archivo" });
+      return;
+    }
+    res.json({ url: `${RECEIPT_UPLOAD_PREFIX}${req.file.filename}` });
   });
 });

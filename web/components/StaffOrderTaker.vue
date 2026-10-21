@@ -1,5 +1,7 @@
 <template>
-  <section class="order-taker">
+  <!-- Pantallas anchas apaisadas: productos a la izquierda; ticket a la derecha, fijo al hacer scroll -->
+  <section class="order-taker wide-layout">
+    <div class="wide-main">
     <p v-if="lastCode" class="card sent-notice" role="status">
       Pedido <strong class="code">{{ lastCode }}</strong> enviado a la cola.
       <button class="button secondary" type="button" @click="lastCode = ''">Cerrar</button>
@@ -39,6 +41,9 @@
     </ul>
 
     <!-- Ticket -->
+    </div>
+
+    <aside class="wide-aside wide-aside--sticky">
     <section ref="ticketEl" class="card ticket">
       <h3>Ticket</h3>
       <p v-if="!lines.length" class="muted add-items">Añade productos de la carta.</p>
@@ -102,8 +107,9 @@
         <button v-if="lines.length" class="button secondary" type="button" :disabled="submitting" @click="reset">Vaciar</button>
       </div>
     </section>
+    </aside>
 
-    <!-- Resumen fijo: con la lista larga, el ticket queda lejos -->
+    <!-- Resumen fijo: con la lista larga, el ticket queda lejos (en el diseño ancho no hace falta) -->
     <div v-if="cartCount" class="sticky-bar">
       <span>{{ cartCount }} {{ cartCount === 1 ? "producto" : "productos" }} · {{ formatPrice(totalCents) }}</span>
       <button class="button" type="button" @click="ticketEl?.scrollIntoView({ behavior: 'smooth', block: 'start' })">Ver ticket</button>
@@ -230,6 +236,10 @@ function formatPrice(priceCents: number) {
 
 <style scoped>
 .order-taker { max-width: 720px; padding-bottom: 72px; }
+.order-taker .wide-main { gap: 0; }
+@media (min-width: 1000px) and (orientation: landscape) {
+  .order-taker { max-width: none; padding-bottom: 0; }
+}
 input {
   width: 100%;
   min-width: 0;
@@ -387,4 +397,6 @@ input {
   border-top: 1px solid var(--border-strong);
   z-index: 10;
 }
+/* Diseño ancho: el ticket ya esta siempre a la vista (columna fija), sobra la barra "Ver ticket" */
+@media (min-width: 1000px) and (orientation: landscape) { .sticky-bar { display: none; } }
 </style>

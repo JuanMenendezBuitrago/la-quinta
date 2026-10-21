@@ -1,12 +1,8 @@
 <template>
-  <section class="menu-admin">
-    <div class="menu-admin-header">
-      <button class="button" :disabled="formOpen" @click="startCreate()">+ Nuevo producto</button>
-    </div>
-
-    <p v-if="loading" class="muted">Cargando carta…</p>
-    <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
-
+  <!-- Pantallas anchas apaisadas: productos a la izquierda; categorias y personalizaciones a la derecha.
+       En movil, categorias y personalizaciones primero (como antes) y despues los productos. -->
+  <section class="menu-admin wide-layout">
+    <aside class="wide-aside">
     <section class="categories-admin">
       <div class="categories-header">
         <h3>Categorías</h3>
@@ -113,6 +109,15 @@
         </div>
       </div>
     </section>
+    </aside>
+
+    <div class="wide-main">
+    <div class="menu-admin-header">
+      <button class="button" :disabled="formOpen" @click="startCreate()">+ Nuevo producto</button>
+    </div>
+
+    <p v-if="loading" class="muted">Cargando carta…</p>
+    <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
 
     <form v-if="formOpen" class="card item-form" @submit.prevent="submitForm">
       <h3>{{ form.id ? "Editar producto" : "Nuevo producto" }}</h3>
@@ -226,6 +231,7 @@
       </div>
       <p v-if="!category.items.length" class="muted">Sin productos en esta categoría.</p>
     </section>
+    </div>
   </section>
 </template>
 
@@ -632,6 +638,10 @@ function formatPrice(priceCents: number) {
 <style scoped>
 .menu-admin { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
 .menu-admin-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.menu-admin .wide-main, .menu-admin .wide-aside { gap: 0; }
+@media (min-width: 1000px) and (orientation: landscape) {
+  .menu-admin .categories-admin { margin-top: 0; }
+}
 
 .categories-admin { margin-top: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
 .categories-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
@@ -655,7 +665,7 @@ function formatPrice(priceCents: number) {
 .item-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
 
-.item-form { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; max-width: 420px; }
+.item-form { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .image-preview { width: 96px; height: 96px; object-fit: cover; border-radius: 8px; margin-top: 4px; }
 .field-inline { display: flex; align-items: center; gap: 8px; }

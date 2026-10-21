@@ -18,9 +18,16 @@ export interface CashClosingDoc {
   transferCents: number;
   // Pedidos para llevar o web entregados antes de que se pidiera el metodo de pago al entregar.
   unknownMethodCents: number;
+  // Gastos que entraron en este cierre (ver modules/expenses). Solo los de CAJA salen del cajon.
+  expensesCount: number;
+  expensesCashCents: number;
+  expensesOtherCents: number; // todos los que no son de CAJA (suma de los tres siguientes)
+  expensesCardCents: number;
+  expensesTransferCents: number;
+  expensesOtherMethodCents: number; // metodo OTRO
   openingFloatCents: number;
   countedCashCents: number;
-  // contado - (fondo + efectivo cobrado): negativo = falta dinero, positivo = sobra.
+  // contado - (fondo + efectivo cobrado - gastos de caja): negativo = falta dinero, positivo = sobra.
   differenceCents: number;
   note?: string;
   createdAt: Date;
@@ -38,6 +45,13 @@ const cashClosingSchema = new Schema<CashClosingDoc>({
   cardCents: { type: Number, required: true },
   transferCents: { type: Number, required: true },
   unknownMethodCents: { type: Number, required: true },
+  // Cierres anteriores a los gastos no los tienen: cuentan como 0.
+  expensesCount: { type: Number, default: 0 },
+  expensesCashCents: { type: Number, default: 0 },
+  expensesOtherCents: { type: Number, default: 0 },
+  expensesCardCents: { type: Number, default: 0 },
+  expensesTransferCents: { type: Number, default: 0 },
+  expensesOtherMethodCents: { type: Number, default: 0 },
   openingFloatCents: { type: Number, required: true, min: 0 },
   countedCashCents: { type: Number, required: true, min: 0 },
   differenceCents: { type: Number, required: true },

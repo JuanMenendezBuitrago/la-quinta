@@ -13,7 +13,7 @@
     </template>
 
     <template v-else>
-      <header class="account-hero">
+      <header class="account-hero wide-head">
         <p class="eyebrow">Mi cuenta</p>
         <h1 class="hello">
           <UserAvatar :avatar="customer.avatar" :name="customer.name" :size="48" />
@@ -21,109 +21,117 @@
         </h1>
       </header>
 
-      <div class="card customer-card">
-        <div>
-          <span class="customer-code-label">Código de cliente</span>
-          <div class="customer-code">{{ customer.customerCode }}</div>
-        </div>
-        <button class="button secondary" @click="logout">Cerrar sesión</button>
-      </div>
-
-      <section class="avatar-section">
-        <p class="eyebrow">Tu avatar</p>
-        <div class="card">
-          <AvatarPicker who="customer" :avatar="customer.avatar" :name="customer.name" />
-        </div>
-      </section>
-
-      <section class="loyalty-section">
-        <p class="eyebrow">Fidelización</p>
-        <div v-if="loyalty" class="card loyalty-card">
-          <div class="stamps-grid">
-            <span
-              v-for="i in loyalty.rewardThreshold"
-              :key="i"
-              class="stamp"
-              :class="{ filled: i <= loyalty.balance }"
-            />
-          </div>
-          <p class="stamps-label">{{ loyalty.balance }} de {{ loyalty.rewardThreshold }} sellos</p>
-          <button v-if="loyalty.rewardAvailable" class="button" :disabled="redeeming" @click="redeem">
-            {{ redeeming ? "Canjeando…" : "Canjear recompensa" }}
-          </button>
-        </div>
-      </section>
-
-      <section class="favorites-section">
-        <p class="eyebrow">Tus favoritos</p>
-        <div class="card">
-          <FavoritesList />
-        </div>
-      </section>
-
-      <section class="orders-section">
-        <p class="eyebrow">Pedidos recientes</p>
-        <p v-if="!orders?.length" class="muted">Todavía no has hecho ningún pedido.</p>
-        <div v-for="order in orders" :key="order.id" class="order-row">
-          <div v-if="orderImages(order).length" class="order-thumbs">
-            <img
-              v-for="img in orderImages(order)"
-              :key="img"
-              :src="img"
-              alt=""
-              class="order-thumb"
-              role="button"
-              tabindex="0"
-              @click="openLightbox(img)"
-              @keydown.enter="openLightbox(img)"
-            />
-          </div>
-          <div class="order-info">
-            <span class="order-name">{{
-              order.items
-                .map((i: any) => {
-                  const changed = (i.options ?? []).filter((o: any) => !o.isDefault).map((o: any) => o.name);
-                  return `${i.quantity}× ${i.name}${changed.length ? ` (${changed.join(", ")})` : ""}`;
-                })
-                .join(", ")
-            }}</span>
-            <span class="order-date">
-              {{ order.code }} · {{ formatDate(order.pickupSlot) }}{{ order.table ? ` · ${tableLabel(order.table)}` : "" }}
-            </span>
-          </div>
-          <span class="status" :data-status="order.status">{{ statusLabel(order.status) }}</span>
-          <!-- Opinion sobre el pedido: solo ya entregado -->
-          <div v-if="order.status === 'ENTREGADO'" class="order-review">
-            <ReviewForm
-              v-if="editingOrderId === order.id"
-              :order-id="order.id"
-              :existing="reviewByOrder.get(order.id) ?? null"
-              cancellable
-              @saved="onReviewSaved"
-              @cancel="editingOrderId = ''"
-            />
-            <div v-else-if="reviewByOrder.get(order.id)" class="review-summary">
-              <StarRating :model-value="reviewByOrder.get(order.id)!.rating" display :size="16" />
-              <span v-if="reviewByOrder.get(order.id)!.comment" class="review-comment">«{{ reviewByOrder.get(order.id)!.comment }}»</span>
-              <button type="button" class="link-button" @click="editingOrderId = order.id">Editar</button>
+      <!-- Pantallas anchas apaisadas: pedidos, favoritos y opinion a la izquierda; codigo, sellos,
+           avatar y datos a la derecha. En movil, el orden de siempre (style="order"). -->
+      <div class="wide-layout wide-layout--ordered account-layout">
+        <div class="wide-main">
+          <section style="order: 4" class="favorites-section">
+            <p class="eyebrow">Tus favoritos</p>
+            <div class="card">
+              <FavoritesList />
             </div>
-            <button v-else type="button" class="link-button rate" @click="editingOrderId = order.id">
-              <Star :size="14" :stroke-width="1.8" aria-hidden="true" />
-              ¿Qué tal tu pedido? Valóralo
-            </button>
+          </section>
+
+          <section style="order: 5" class="orders-section">
+            <p class="eyebrow">Pedidos recientes</p>
+            <p v-if="!orders?.length" class="muted">Todavía no has hecho ningún pedido.</p>
+            <div v-for="order in orders" :key="order.id" class="order-row">
+              <div v-if="orderImages(order).length" class="order-thumbs">
+                <img
+                  v-for="img in orderImages(order)"
+                  :key="img"
+                  :src="img"
+                  alt=""
+                  class="order-thumb"
+                  role="button"
+                  tabindex="0"
+                  @click="openLightbox(img)"
+                  @keydown.enter="openLightbox(img)"
+                />
+              </div>
+              <div class="order-info">
+                <span class="order-name">{{
+                  order.items
+                    .map((i: any) => {
+                      const changed = (i.options ?? []).filter((o: any) => !o.isDefault).map((o: any) => o.name);
+                      return `${i.quantity}× ${i.name}${changed.length ? ` (${changed.join(", ")})` : ""}`;
+                    })
+                    .join(", ")
+                }}</span>
+                <span class="order-date">
+                  {{ order.code }} · {{ formatDate(order.pickupSlot) }}{{ order.table ? ` · ${tableLabel(order.table)}` : "" }}
+                </span>
+              </div>
+              <span class="status" :data-status="order.status">{{ statusLabel(order.status) }}</span>
+              <!-- Opinion sobre el pedido: solo ya entregado -->
+              <div v-if="order.status === 'ENTREGADO'" class="order-review">
+                <ReviewForm
+                  v-if="editingOrderId === order.id"
+                  :order-id="order.id"
+                  :existing="reviewByOrder.get(order.id) ?? null"
+                  cancellable
+                  @saved="onReviewSaved"
+                  @cancel="editingOrderId = ''"
+                />
+                <div v-else-if="reviewByOrder.get(order.id)" class="review-summary">
+                  <StarRating :model-value="reviewByOrder.get(order.id)!.rating" display :size="16" />
+                  <span v-if="reviewByOrder.get(order.id)!.comment" class="review-comment">«{{ reviewByOrder.get(order.id)!.comment }}»</span>
+                  <button type="button" class="link-button" @click="editingOrderId = order.id">Editar</button>
+                </div>
+                <button v-else type="button" class="link-button rate" @click="editingOrderId = order.id">
+                  <Star :size="14" :stroke-width="1.8" aria-hidden="true" />
+                  ¿Qué tal tu pedido? Valóralo
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section style="order: 6" class="review-section">
+            <p class="eyebrow">Tu opinión sobre La Quinta</p>
+            <div class="card">
+              <p class="muted review-intro">¿Cómo ha sido tu experiencia con nosotros? Solo la lee el equipo del local.</p>
+              <ReviewForm :key="generalReview?.id ?? 'nueva'" :existing="generalReview" @saved="onReviewSaved" />
+            </div>
+          </section>
+
+        </div>
+        <aside class="wide-aside">
+          <div style="order: 1" class="card customer-card">
+            <div>
+              <span class="customer-code-label">Código de cliente</span>
+              <div class="customer-code">{{ customer.customerCode }}</div>
+            </div>
+            <button class="button secondary" @click="logout">Cerrar sesión</button>
           </div>
-        </div>
-      </section>
 
-      <section class="review-section">
-        <p class="eyebrow">Tu opinión sobre La Quinta</p>
-        <div class="card">
-          <p class="muted review-intro">¿Cómo ha sido tu experiencia con nosotros? Solo la lee el equipo del local.</p>
-          <ReviewForm :key="generalReview?.id ?? 'nueva'" :existing="generalReview" @saved="onReviewSaved" />
-        </div>
-      </section>
+          <section style="order: 3" class="loyalty-section">
+            <p class="eyebrow">Fidelización</p>
+            <div v-if="loyalty" class="card loyalty-card">
+              <div class="stamps-grid">
+                <span
+                  v-for="i in loyalty.rewardThreshold"
+                  :key="i"
+                  class="stamp"
+                  :class="{ filled: i <= loyalty.balance }"
+                />
+              </div>
+              <p class="stamps-label">{{ loyalty.balance }} de {{ loyalty.rewardThreshold }} sellos</p>
+              <button v-if="loyalty.rewardAvailable" class="button" :disabled="redeeming" @click="redeem">
+                {{ redeeming ? "Canjeando…" : "Canjear recompensa" }}
+              </button>
+            </div>
+          </section>
 
-      <MyDataSection @deleted="accountDeleted = true" />
+          <section style="order: 2" class="avatar-section">
+            <p class="eyebrow">Tu avatar</p>
+            <div class="card">
+              <AvatarPicker who="customer" :avatar="customer.avatar" :name="customer.name" />
+            </div>
+          </section>
+
+          <MyDataSection style="order: 7" @deleted="accountDeleted = true" />
+        </aside>
+      </div>
     </template>
 
     <ImageLightbox :url="lightboxUrl" @close="closeLightbox" />
@@ -305,6 +313,11 @@ function statusLabel(status: string) {
 
 .hello { display: flex; align-items: center; gap: 14px; }
 .avatar-section, .loyalty-section, .favorites-section, .orders-section, .review-section { margin-top: 32px; }
+.account-layout { row-gap: 0; }
+.account-layout .wide-main, .account-layout .wide-aside { gap: 0; }
+@media (min-width: 1000px) and (orientation: landscape) {
+  .account-layout .wide-main > :first-child, .account-layout .wide-aside > :first-child { margin-top: 0; }
+}
 
 .loyalty-card {
   margin-top: 12px;

@@ -90,7 +90,9 @@ const socials = computed(() => {
   /* deja sitio a la barra fija del carrito */
   padding: 36px 20px calc(90px + env(safe-area-inset-bottom, 0px));
 }
-.footer-inner { max-width: 720px; margin: 0 auto; }
+/* Mismo ancho que el contenido de .container (720 px menos su padding); en las paginas anchas
+   lo ensancha main.css */
+.footer-inner { max-width: 680px; margin: 0 auto; }
 .footer-logo { display: block; height: 30px; width: auto; max-width: 100%; margin-bottom: 24px; }
 
 .footer-grid {

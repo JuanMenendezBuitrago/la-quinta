@@ -1,8 +1,60 @@
 <template>
-  <section class="customers-admin">
+  <section class="customers-admin wide-layout">
+    <!-- Listado. En movil, con una ficha abierta se oculta (la ficha ocupa la pantalla); en pantallas
+         anchas apaisadas sigue en la columna de la derecha y la ficha se abre a la izquierda. -->
+    <aside class="wide-aside wide-aside--sticky" :class="{ 'hidden-narrow': selectedId }">
+      <div class="list-header">
+        <h2>Clientes <span v-if="total !== null" class="muted">({{ total }})</span></h2>
+      </div>
+      <input
+        v-model="search"
+        class="search"
+        type="search"
+        placeholder="Buscar por nombre, email, teléfono o código"
+        aria-label="Buscar clientes"
+      />
+
+      <p v-if="listLoading && !customers.length" class="muted">Cargando clientes…</p>
+      <p v-if="listError" class="muted" style="color: var(--danger)">{{ listError }}</p>
+      <p v-if="!listLoading && !listError && !customers.length" class="muted">
+        {{ search.trim() ? "Ningún cliente coincide con la búsqueda." : "Todavía no hay clientes registrados." }}
+      </p>
+
+      <button v-for="c in customers" :key="c.id" type="button" class="card row customer-row" :class="{ selected: c.id === selectedId }" @click="openDetail(c.id)">
+        <UserAvatar :avatar="c.avatar" :name="c.name" :size="36" />
+        <div class="row-info">
+          <strong>{{ c.name }}</strong> <span class="code">{{ c.customerCode }}</span>
+          <p class="muted">{{ c.email || c.phone }}</p>
+          <p class="muted">
+            {{ c.ordersCount }} {{ c.ordersCount === 1 ? "pedido" : "pedidos" }}
+            · {{ formatPrice(c.spentCents) }}
+            <template v-if="c.lastOrderAt"> · último {{ formatDate(c.lastOrderAt) }}</template>
+          </p>
+        </div>
+        <div class="row-side">
+          <span class="stamps-pill" :class="{ reward: c.rewardAvailable }">
+            {{ c.stampsBalance }} {{ c.stampsBalance === 1 ? "sello" : "sellos" }}
+          </span>
+          <span v-if="c.rewardAvailable" class="muted reward-label">Recompensa</span>
+        </div>
+      </button>
+
+      <button
+        v-if="total !== null && customers.length < total"
+        class="button secondary load-more"
+        type="button"
+        :disabled="listLoading"
+        @click="loadMore"
+      >
+        {{ listLoading ? "Cargando…" : "Cargar más" }}
+      </button>
+    </aside>
+
     <!-- Ficha de un cliente -->
-    <template v-if="selectedId">
-      <button class="button secondary back" type="button" @click="closeDetail">← Clientes</button>
+    <div v-if="selectedId" class="wide-main">
+      <button class="button secondary back" type="button" @click="closeDetail">
+        <span class="back-narrow">← Clientes</span><span class="back-wide">Cerrar ficha</span>
+      </button>
 
       <p v-if="detailLoading && !detail" class="muted">Cargando cliente…</p>
       <p v-if="detailError" class="muted" style="color: var(--danger)">{{ detailError }}</p>
@@ -88,56 +140,11 @@
           </div>
         </section>
       </template>
-    </template>
-
-    <!-- Listado -->
-    <template v-else>
-      <div class="list-header">
-        <h2>Clientes <span v-if="total !== null" class="muted">({{ total }})</span></h2>
-      </div>
-      <input
-        v-model="search"
-        class="search"
-        type="search"
-        placeholder="Buscar por nombre, email, teléfono o código"
-        aria-label="Buscar clientes"
-      />
-
-      <p v-if="listLoading && !customers.length" class="muted">Cargando clientes…</p>
-      <p v-if="listError" class="muted" style="color: var(--danger)">{{ listError }}</p>
-      <p v-if="!listLoading && !listError && !customers.length" class="muted">
-        {{ search.trim() ? "Ningún cliente coincide con la búsqueda." : "Todavía no hay clientes registrados." }}
-      </p>
-
-      <button v-for="c in customers" :key="c.id" type="button" class="card row customer-row" @click="openDetail(c.id)">
-        <UserAvatar :avatar="c.avatar" :name="c.name" :size="36" />
-        <div class="row-info">
-          <strong>{{ c.name }}</strong> <span class="code">{{ c.customerCode }}</span>
-          <p class="muted">{{ c.email || c.phone }}</p>
-          <p class="muted">
-            {{ c.ordersCount }} {{ c.ordersCount === 1 ? "pedido" : "pedidos" }}
-            · {{ formatPrice(c.spentCents) }}
-            <template v-if="c.lastOrderAt"> · último {{ formatDate(c.lastOrderAt) }}</template>
-          </p>
-        </div>
-        <div class="row-side">
-          <span class="stamps-pill" :class="{ reward: c.rewardAvailable }">
-            {{ c.stampsBalance }} {{ c.stampsBalance === 1 ? "sello" : "sellos" }}
-          </span>
-          <span v-if="c.rewardAvailable" class="muted reward-label">Recompensa</span>
-        </div>
-      </button>
-
-      <button
-        v-if="total !== null && customers.length < total"
-        class="button secondary load-more"
-        type="button"
-        :disabled="listLoading"
-        @click="loadMore"
-      >
-        {{ listLoading ? "Cargando…" : "Cargar más" }}
-      </button>
-    </template>
+    </div>
+    <!-- Solo en pantallas anchas: la columna de la ficha no queda vacia -->
+    <div v-else class="wide-main detail-placeholder">
+      <p class="muted">Elige un cliente del listado para ver su ficha.</p>
+    </div>
   </section>
 </template>
 
@@ -349,7 +356,17 @@ async function adjust() {
 </script>
 
 <style scoped>
-.customers-admin { max-width: 720px; }
+.customers-admin .wide-main, .customers-admin .wide-aside { gap: 0; }
+.hidden-narrow { display: none; }
+.back-wide { display: none; }
+.detail-placeholder { display: none; }
+.customer-row.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+@media (min-width: 1000px) and (orientation: landscape) {
+  .customers-admin .wide-aside.hidden-narrow { display: flex; }
+  .detail-placeholder { display: flex; }
+  .back-narrow { display: none; }
+  .back-wide { display: inline; }
+}
 .list-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .list-header h2 { margin: 0; }
 

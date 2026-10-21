@@ -220,3 +220,51 @@ input:focus, select:focus, textarea:focus {
 .muted { color: var(--text-muted); font-size: 14px; }
 
 .price, .tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* El pie, tan ancho como el contenido de la pagina: el de los diseños anchos y el de la cola */
+@media (min-width: 1000px) and (orientation: landscape) {
+  body:has(.wide-layout, .wide-head) .footer-inner { max-width: min(1160px, calc(100vw - 40px)); }
+}
+@media (min-width: 900px) {
+  body:has(.queue-board) .footer-inner { max-width: min(1160px, calc(100vw - 40px)); }
+}
+
+/*
+ * Variante .wide-layout--ordered: cuando el orden del HTML en movil no coincide con el reparto en
+ * columnas, en pantalla estrecha las columnas se "disuelven" (display: contents) y cada bloque se
+ * coloca con su propio `order` (style="order: N").
+ */
+@media (max-width: 999px), (orientation: portrait) {
+  .wide-layout--ordered > .wide-main, .wide-layout--ordered > .wide-aside { display: contents; }
+}
+
+/*
+ * Diseño ancho de dos columnas (pantallas apaisadas de 1000 px o mas): mas ancho que los 720 px de
+ * la pagina, con el contenido principal a la izquierda (.wide-main) y el secundario en una columna
+ * a la derecha (.wide-aside). En el resto, una sola columna con el orden del HTML.
+ * Se centra con margenes (no con transform, que romperia los position: fixed de dentro).
+ */
+.wide-layout { display: flex; flex-direction: column; gap: 16px; }
+.wide-main, .wide-aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (min-width: 1000px) and (orientation: landscape) {
+  .wide-layout {
+    --wide-width: min(1160px, calc(100vw - 40px));
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-areas: "main aside";
+    align-items: start;
+    gap: 28px;
+    width: var(--wide-width);
+    margin-left: calc((100% - var(--wide-width)) / 2);
+  }
+  .wide-main { grid-area: main; }
+  .wide-aside { grid-area: aside; }
+  /* Columna lateral que acompaña al hacer scroll (ticket, filtros...) */
+  .wide-aside--sticky { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; }
+  /* Cabecera de la pagina con el mismo ancho que las columnas */
+  .wide-head {
+    --wide-width: min(1160px, calc(100vw - 40px));
+    width: var(--wide-width);
+    margin-left: calc((100% - var(--wide-width)) / 2);
+  }
+}

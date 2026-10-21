@@ -3,6 +3,7 @@ import { env } from "../../config/env";
 import { Order } from "../orders/model";
 import { StaffUser } from "../users/model";
 import { CashClosing, CashClosingDoc } from "./model";
+import { Expense } from "../expenses/model";
 
 // Tope de cordura para los importes que se escriben a mano (100 millones de pesos).
 const MAX_AMOUNT_CENTS = 100_000_000;
@@ -51,7 +52,56 @@ async function summarize(start: Date, end: Date) {
     else sum.unknownMethodCents += o.totalCents;
   }
   const totalCents = sum.cashCents + sum.cardCents + sum.transferCents + sum.unknownMethodCents;
-  return { ordersCount: orders.length, totalCents, ...sum };
+  return { ordersCount: orders.length, totalCents, ...sum, ...(await summarizeExpenses(end)) };
+}
+
+/** Gastos aun sin cierre registrados antes de `end`: los que se lleva el cierre (ver modules/expenses). */
+function pendingExpensesFilter(end: Date) {
+  return { closingId: null, createdAt: { $lt: end } };
+}
+async function summarizeExpenses(end: Date) {
+  const expenses = await Expense.find(pendingExpensesFilter(end)).select("_id amountCents method").lean();
+  const by = { CAJA: 0, TARJETA: 0, TRANSFERENCIA: 0, OTRO: 0 };
+  for (const e of expenses) by[e.method] += e.amountCents;
+  return {
+    expensesCount: expenses.length,
+    expensesCashCents: by.CAJA,
+    expensesCardCents: by.TARJETA,
+    expensesTransferCents: by.TRANSFERENCIA,
+    expensesOtherMethodCents: by.OTRO,
+    expensesOtherCents: by.TARJETA + by.TRANSFERENCIA + by.OTRO,
+    expenseIds: expenses.map((e) => e._id),
+  };
+}
+
+/** Campos derivados, iguales para el resumen en vivo y para un cierre guardado. */
+type Figures = {
+  totalCents: number;
+  cashCents: number;
+  cardCents: number;
+  transferCents: number;
+  unknownMethodCents: number;
+  expensesCashCents?: number;
+  expensesCardCents?: number;
+  expensesTransferCents?: number;
+  expensesOtherMethodCents?: number;
+  expensesOtherCents?: number;
+};
+
+/** Saldo por metodo: lo que entro y salio por cada via, para cuadrar cajon, datafono y banco. */
+function balances(s: Figures) {
+  const row = (method: string, inCents: number, outCents = 0) => ({ method, inCents, outCents, balanceCents: inCents - outCents });
+  return [
+    row("EFECTIVO", s.cashCents, s.expensesCashCents),
+    row("TARJETA", s.cardCents, s.expensesCardCents),
+    row("TRANSFERENCIA", s.transferCents, s.expensesTransferCents),
+    row("OTRO", s.unknownMethodCents, s.expensesOtherMethodCents),
+  ];
+}
+
+function withTotals<T extends Figures & { expensesCashCents: number; expensesOtherCents: number }>(s: T) {
+  const expensesTotalCents = s.expensesCashCents + s.expensesOtherCents;
+  return { ...s, expensesTotalCents, netCents: s.totalCents - expensesTotalCents, balances: balances(s) };
 }
 
 function validAmount(value: number, label: string) {
@@ -65,7 +115,13 @@ export const cashResolvers = {
     periodStart: (doc: CashClosingDoc) => doc.periodStart.toISOString(),
     periodEnd: (doc: CashClosingDoc) => doc.periodEnd.toISOString(),
     createdAt: (doc: CashClosingDoc) => doc.createdAt.toISOString(),
-    expectedCashInDrawerCents: (doc: CashClosingDoc) => doc.openingFloatCents + doc.cashCents,
+    expectedCashInDrawerCents: (doc: CashClosingDoc) => doc.openingFloatCents + doc.cashCents - (doc.expensesCashCents ?? 0),
+    expensesCount: (doc: CashClosingDoc) => doc.expensesCount ?? 0,
+    expensesCashCents: (doc: CashClosingDoc) => doc.expensesCashCents ?? 0,
+    expensesOtherCents: (doc: CashClosingDoc) => doc.expensesOtherCents ?? 0,
+    expensesTotalCents: (doc: CashClosingDoc) => (doc.expensesCashCents ?? 0) + (doc.expensesOtherCents ?? 0),
+    netCents: (doc: CashClosingDoc) => doc.totalCents - (doc.expensesCashCents ?? 0) - (doc.expensesOtherCents ?? 0),
+    balances: (doc: CashClosingDoc) => balances(doc),
     note: (doc: CashClosingDoc) => doc.note || null,
   },
   Query: {
@@ -73,7 +129,8 @@ export const cashResolvers = {
       requireStaff(ctx, ["barra", "gestion"]);
       const now = new Date();
       const start = await currentPeriodStart(now);
-      return { periodStart: start.toISOString(), periodEnd: now.toISOString(), ...(await summarize(start, now)) };
+      const { expenseIds: _ids, ...summary } = await summarize(start, now);
+      return { periodStart: start.toISOString(), periodEnd: now.toISOString(), ...withTotals(summary) };
     },
     cashClosings: async (_: unknown, args: { limit?: number }, ctx: GraphQLContext) => {
       requireStaff(ctx, ["barra", "gestion"]);
@@ -96,11 +153,12 @@ export const cashResolvers = {
       // puede haber cambiado si entretanto se cobro otro pedido.
       const now = new Date();
       const periodStart = await currentPeriodStart(now);
-      const summary = await summarize(periodStart, now);
+      const { expenseIds, ...summary } = await summarize(periodStart, now);
       const member = await StaffUser.findById(staff.id).select("name").lean();
 
+      let closing;
       try {
-        return await CashClosing.create({
+        closing = await CashClosing.create({
           periodStart,
           periodEnd: now,
           staffId: staff.id,
@@ -108,13 +166,17 @@ export const cashResolvers = {
           ...summary,
           openingFloatCents,
           countedCashCents,
-          differenceCents: countedCashCents - (openingFloatCents + summary.cashCents),
+          differenceCents: countedCashCents - (openingFloatCents + summary.cashCents - summary.expensesCashCents),
           note,
         });
       } catch (err: any) {
         if (err?.code === 11000) throw new Error("Alguien acaba de cerrar la caja. Recarga para ver el nuevo periodo.");
         throw err;
       }
+      // Justo los gastos sumados pasan a este cierre y quedan bloqueados (uno registrado mientras
+      // tanto se queda para el siguiente).
+      await Expense.updateMany({ _id: { $in: expenseIds }, closingId: null }, { $set: { closingId: closing._id } });
+      return closing;
     },
   },
 };

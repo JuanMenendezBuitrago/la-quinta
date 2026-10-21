@@ -1,11 +1,10 @@
 <template>
-  <section class="staff-admin">
+  <!-- Pantallas anchas apaisadas: alta y edicion a la izquierda; listado en la columna de la derecha -->
+  <section class="staff-admin wide-layout">
+    <div class="wide-main staff-main">
     <div class="staff-admin-header">
-      <button class="button" :disabled="formOpen" @click="startCreate()">+ Nueva cuenta</button>
+      <button class="button" @click="startCreate()">+ Nueva cuenta</button>
     </div>
-
-    <p v-if="loading" class="muted">Cargando personal…</p>
-    <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
 
     <form v-if="formOpen" class="card staff-form" @submit.prevent="submitForm">
       <h3>{{ form.id ? "Editar cuenta" : "Nueva cuenta" }}</h3>
@@ -38,11 +37,17 @@
             <span v-if="isSelf" class="muted">No puedes cambiar tu propio rol.</span>
           </label>
 
-          <!-- Solo el propio avatar: cada uno elige el suyo (puede ser una foto suya). Se guarda al
+          <!-- Avatar de la cuenta que se edita (gestion puede cambiar el de cualquiera). Se guarda al
                elegirlo, sin esperar a "Guardar". -->
-          <div v-if="isSelf" class="field">
-            <span class="muted">Tu avatar</span>
-            <AvatarPicker who="staff" :avatar="staff?.avatar" :name="staff?.name" />
+          <div v-if="form.id" class="field">
+            <span class="muted">{{ isSelf ? "Tu avatar" : "Avatar" }}</span>
+            <AvatarPicker
+              who="staff"
+              :staff-id="form.id"
+              :avatar="isSelf ? staff?.avatar : form.avatar"
+              :name="form.name"
+              @changed="onAvatarChanged"
+            />
           </div>
         </div>
         <div class="form-side">
@@ -69,7 +74,11 @@
         </div>
       </div>
     </form>
+    </div>
 
+    <aside class="wide-aside wide-aside--sticky staff-list">
+    <p v-if="loading" class="muted">Cargando personal…</p>
+    <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
     <div class="card staff-row" :class="{ inactive: !user.active }" v-for="user in staffUsers" :key="user.id">
       <!-- El propio, desde la sesion: cambia al momento al elegir otro avatar -->
       <UserAvatar :avatar="user.id === myId ? staff?.avatar : user.avatar" :name="user.name" :size="40" />
@@ -82,6 +91,7 @@
       <button class="button secondary" type="button" @click="startEdit(user)">Editar</button>
     </div>
     <p v-if="!loading && !staffUsers.length" class="muted">No hay cuentas de personal todavía.</p>
+    </aside>
   </section>
 </template>
 
@@ -142,7 +152,15 @@ const saving = ref(false);
 const formError = ref("");
 
 function emptyForm() {
-  return { id: "" as string, name: "", email: "", password: "", role: "barra" as "barra" | "gestion", active: true };
+  return {
+    id: "" as string,
+    name: "",
+    email: "",
+    password: "",
+    role: "barra" as "barra" | "gestion",
+    active: true,
+    avatar: null as string | null | undefined,
+  };
 }
 const form = reactive(emptyForm());
 const isSelf = computed(() => !!form.id && form.id === myId.value);
@@ -154,9 +172,23 @@ function startCreate() {
 }
 
 function startEdit(user: StaffUserAdmin) {
-  Object.assign(form, { id: user.id, name: user.name, email: user.email, password: "", role: user.role, active: user.active });
+  Object.assign(form, {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    password: "",
+    role: user.role,
+    active: user.active,
+    avatar: user.avatar,
+  });
   formError.value = "";
   formOpen.value = true;
+}
+
+// El avatar se guarda en el momento: se refleja en el formulario y en el listado.
+function onAvatarChanged(avatar: string | null) {
+  form.avatar = avatar;
+  refetch();
 }
 
 function cancelForm() {
@@ -197,7 +229,11 @@ async function submitForm() {
 </script>
 
 <style scoped>
-.staff-admin-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.staff-admin-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.staff-main { gap: 0; }
+.staff-main .staff-form { margin-top: 16px; }
+.staff-list { gap: 0; }
+.staff-list .staff-row:first-of-type { margin-top: 0; }
 .staff-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 10px; }
 .staff-info { flex: 1; }
 .staff-row.inactive .user-avatar, .staff-row.inactive strong { opacity: 0.55; }

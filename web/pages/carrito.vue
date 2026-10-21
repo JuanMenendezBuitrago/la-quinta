@@ -1,6 +1,6 @@
 <template>
   <main class="container page-cart">
-    <header class="cart-header">
+    <header class="cart-header wide-head">
       <NuxtLink to="/" class="back-link" aria-label="Volver a la carta">
         <ChevronLeft :size="18" :stroke-width="1.4" />
       </NuxtLink>
@@ -13,6 +13,10 @@
     </p>
 
     <template v-else>
+      <!-- Pantallas anchas apaisadas: productos a la izquierda; donde, hora y confirmar a la derecha,
+           fijo al hacer scroll (y el boton de confirmar dentro de la columna, no en la barra inferior) -->
+      <div class="wide-layout cart-layout">
+      <div class="wide-main">
       <p v-if="lines.length === 0" class="muted">Todavía no has añadido nada de la carta.</p>
 
       <div v-else class="order-lines">
@@ -51,6 +55,9 @@
         </div>
       </div>
 
+      </div>
+
+      <aside v-if="lines.length || confirmedOrder" class="wide-aside wide-aside--sticky">
       <div v-if="lines.length" class="pickup-card">
         <div class="where" role="radiogroup" aria-label="Recoger en tienda o pedir desde la mesa">
           <button type="button" role="radio" :aria-checked="!atTable" :class="{ active: !atTable }" @click="atTable = false">
@@ -124,6 +131,8 @@
             {{ atTable ? "Te avisaremos cuando esté listo y te lo llevamos." : "Te avisaremos cuando esté listo para recoger." }}
           </template>
         </p>
+      </div>
+      </aside>
       </div>
       <div v-if="showCheckoutBar" class="bottom-spacer" />
     </template>
@@ -408,4 +417,12 @@ async function submitOrder() {
 .checkout-bar .button { width: 100%; }
 .checkout-note { margin: 8px 0 0; font-size: 12px; color: var(--text-muted); }
 .bottom-spacer { height: 96px; }
+.cart-layout { row-gap: 0; }
+.cart-layout .wide-aside { gap: 0; }
+@media (min-width: 1000px) and (orientation: landscape) {
+  .cart-layout .pickup-card, .cart-layout .confirm-card { margin-top: 0; }
+  /* El boton de confirmar va en la columna, bajo los datos de entrega */
+  .checkout-bar { position: static; margin-top: 16px; border: 1px solid var(--border-strong); border-radius: 12px; }
+  .bottom-spacer { display: none; }
+}
 </style>

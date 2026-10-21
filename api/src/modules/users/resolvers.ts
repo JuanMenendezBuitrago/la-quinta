@@ -99,6 +99,16 @@ export const usersResolvers = {
       const user = await User.findByIdAndUpdate(customerId, update, { new: true }).select("favoriteMenuItemIds").lean();
       return (user?.favoriteMenuItemIds ?? []).map((id) => id.toString());
     },
+    setStaffAvatar: async (_: unknown, args: { id: string; preset?: string | null }, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["gestion"]);
+      if (!Types.ObjectId.isValid(args.id)) throw new Error("Usuario no encontrado");
+      const avatar = presetAvatarValue(args.preset);
+      const update = avatar ? { $set: { avatar } } : { $unset: { avatar: 1 } };
+      const previous = await StaffUser.findByIdAndUpdate(args.id, update).lean();
+      if (!previous) throw new Error("Usuario no encontrado");
+      await removeAvatarFile(previous.avatar, UPLOAD_DIR);
+      return StaffUser.findById(args.id).exec();
+    },
     setMyStaffAvatar: async (_: unknown, args: { preset?: string | null }, ctx: GraphQLContext) => {
       const staff = requireStaff(ctx, ["barra", "gestion"]);
       const avatar = presetAvatarValue(args.preset);

@@ -1,11 +1,15 @@
 <template>
-  <section class="settings-admin">
+  <!-- Pantallas anchas apaisadas: pedidos, direccion y horario a la izquierda; contacto, redes y
+       datos legales a la derecha -->
+  <section class="settings-admin wide-head">
     <p class="muted">Configuración de la web: pedidos de clientes y datos del pie de página.</p>
 
     <p v-if="loading" class="muted">Cargando…</p>
     <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
 
     <form v-if="settings" class="card settings-form" @submit.prevent="submit">
+      <div class="settings-columns">
+      <div class="settings-col">
       <div class="field">
         <span class="muted">Pedidos</span>
         <label class="day-toggle">
@@ -41,6 +45,9 @@
           <span v-else class="muted closed-label">Cerrado</span>
         </div>
       </div>
+      </div>
+
+      <div class="settings-col">
 
       <label class="field">
         <span class="muted">Teléfono</span>
@@ -74,6 +81,8 @@
         <input v-model="form.legalName" type="text" placeholder="Razón social o nombre del titular" />
         <input v-model="form.taxId" type="text" placeholder="NIT o cédula" />
         <input v-model="form.privacyEmail" type="email" placeholder="Email para solicitudes sobre datos (si vacío, el de contacto)" />
+      </div>
+      </div>
       </div>
 
       <p v-if="formError" class="muted" style="color: var(--danger)">{{ formError }}</p>
@@ -211,6 +220,11 @@ onBeforeUnmount(() => {
 <style scoped>
 .settings-admin { max-width: 480px; }
 .settings-form { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
+.settings-columns, .settings-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+@media (min-width: 1000px) and (orientation: landscape) {
+  .settings-admin { max-width: none; }
+  .settings-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+}
 .field { display: flex; flex-direction: column; gap: 6px; }
 
 .schedule-row, .social-row {

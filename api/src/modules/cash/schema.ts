@@ -11,6 +11,24 @@ export const cashTypeDefs = /* GraphQL */ `
     transferCents: Int!
     """Pedidos para llevar o web entregados sin indicar el metodo (anteriores a pedirlo al entregar)."""
     unknownMethodCents: Int!
+    """Gastos pendientes (los que entrarian en el cierre) o del cierre: numero, pagados de la caja y el resto."""
+    expensesCount: Int!
+    expensesCashCents: Int!
+    expensesOtherCents: Int!
+    expensesTotalCents: Int!
+    """Por metodo: lo cobrado, lo pagado y el saldo (para cuadrar con el cajon, el datafono o el banco)."""
+    balances: [MethodBalance!]!
+    """Cobrado menos gastos."""
+    netCents: Int!
+  }
+
+"""Saldo de un metodo en el periodo. EFECTIVO: cobrado en efectivo y gastos pagados de la caja.
+  OTRO: cobrado sin metodo (pedidos antiguos) y gastos con metodo Otro."""
+  type MethodBalance {
+    method: String!
+    inCents: Int!
+    outCents: Int!
+    balanceCents: Int!
   }
 
   type CashClosing {
@@ -24,9 +42,18 @@ export const cashTypeDefs = /* GraphQL */ `
     cardCents: Int!
     transferCents: Int!
     unknownMethodCents: Int!
+    """Gastos pendientes (los que entrarian en el cierre) o del cierre: numero, pagados de la caja y el resto."""
+    expensesCount: Int!
+    expensesCashCents: Int!
+    expensesOtherCents: Int!
+    expensesTotalCents: Int!
+    """Por metodo: lo cobrado, lo pagado y el saldo (para cuadrar con el cajon, el datafono o el banco)."""
+    balances: [MethodBalance!]!
+    """Cobrado menos gastos."""
+    netCents: Int!
     openingFloatCents: Int!
     countedCashCents: Int!
-    """Fondo inicial + efectivo cobrado: lo que deberia haber en el cajon."""
+    """Fondo inicial + efectivo cobrado - gastos pagados de la caja: lo que deberia haber en el cajon."""
     expectedCashInDrawerCents: Int!
     """Contado - esperado: negativo = falta dinero, positivo = sobra."""
     differenceCents: Int!

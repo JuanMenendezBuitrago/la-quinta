@@ -8,7 +8,11 @@
     </template>
 
     <template v-else>
-      <header class="account-hero staff-hero">
+      <!-- En las secciones que usan mas ancho que la pagina (cola, caja), el titulo se alinea con ellas -->
+      <header
+        class="account-hero staff-hero"
+        :class="{ 'staff-hero--queue': activeTab === 'cola', 'wide-head': WIDE_SECTIONS.includes(activeTab) }"
+      >
         <div>
           <p class="eyebrow">Panel de personal</p>
           <h1>{{ sectionLabel }}</h1>
@@ -413,6 +417,9 @@ async function doCancel(order: any) {
 // Secciones y grupos del menu: composables/useStaffSections.ts. El menu (components/StaffNav.vue,
 // en la barra superior) cambia la seccion en la URL; aqui solo se lee.
 const activeTab = useStaffSection();
+// Secciones con diseño ancho de dos columnas en pantallas apaisadas (.wide-layout en assets/main.css):
+// su titulo se alinea con las columnas.
+const WIDE_SECTIONS: string[] = ["caja", "tomar", "opiniones", "personal", "portada", "cafe", "novedades", "clientes", "carta", "pie"];
 const sectionLabel = computed(() => STAFF_SECTIONS.find((s) => s.id === activeTab.value)?.label ?? "");
 const selectTab = goToSection;
 
@@ -552,7 +559,7 @@ watchEffect(() => {
 .queue-board { display: flex; flex-direction: column; gap: 28px; }
 /* 4 columnas no caben en los 720 px del panel: en escritorio el tablero usa mas ancho que la pagina */
 @media (min-width: 900px) {
-  .queue-board {
+  .queue-board, .staff-hero--queue {
     width: min(1160px, calc(100vw - 40px));
     position: relative;
     left: 50%;

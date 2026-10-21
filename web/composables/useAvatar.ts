@@ -84,6 +84,15 @@ const SET_MY_STAFF_AVATAR = gql`
   }
 `;
 
+const SET_STAFF_AVATAR = gql`
+  mutation SetStaffAvatar($id: ID!, $preset: String) {
+    setStaffAvatar(id: $id, preset: $preset) {
+      id
+      avatar
+    }
+  }
+`;
+
 /** Lado del recorte: suficiente para verse nitido a 2x en el tamaño mas grande en que se muestra. */
 const AVATAR_SIDE = 256;
 
@@ -125,17 +134,34 @@ async function squareJpeg(file: File): Promise<Blob> {
  * de sesion (useAuth / useStaffAuth comparten estos useState) para que la barra superior cambie al
  * momento. Se llama durante el setup del componente: useRuntimeConfig y useCookie lo necesitan.
  */
-export function useAvatarEditor(who: "customer" | "staff") {
+export function useAvatarEditor(
+  who: "customer" | "staff",
+  options: {
+    /** Gestion editando a otro miembro del personal: su id (sin el, la cuenta con sesion). */
+    staffId?: () => string | null | undefined;
+    /** Avisa del avatar nuevo (p. ej. para refrescar el listado del personal). */
+    onChange?: (avatar: string | null) => void;
+  } = {}
+) {
   const config = useRuntimeConfig();
   const token = useCookie("lq_auth_token");
-  const session = useState<{ avatar?: string | null } | null>(who === "customer" ? "lq-customer" : "lq-staff");
+  const session = useState<{ id?: string; avatar?: string | null } | null>(who === "customer" ? "lq-customer" : "lq-staff");
   const { mutate: setCustomerAvatar } = useMutation(SET_MY_AVATAR);
-  const { mutate: setStaffAvatar } = useMutation(SET_MY_STAFF_AVATAR);
+  const { mutate: setMyStaffAvatar } = useMutation(SET_MY_STAFF_AVATAR);
+  const { mutate: setOtherStaffAvatar } = useMutation(SET_STAFF_AVATAR);
   const saving = ref(false);
   const error = ref("");
 
+  /** Otra cuenta del personal (no la de la sesion). */
+  function otherStaffId() {
+    const id = who === "staff" ? options.staffId?.() : null;
+    return id && id !== session.value?.id ? id : null;
+  }
+
   function applyAvatar(avatar: string | null) {
-    if (session.value) session.value = { ...session.value, avatar };
+    // La barra superior y el menu muestran el avatar de la sesion: solo cambia si es el suyo.
+    if (!otherStaffId() && session.value) session.value = { ...session.value, avatar };
+    options.onChange?.(avatar);
   }
 
   /** null quita el avatar (se vuelven a ver las iniciales). */
@@ -143,10 +169,13 @@ export function useAvatarEditor(who: "customer" | "staff") {
     saving.value = true;
     error.value = "";
     try {
+      const otherId = otherStaffId();
       const result =
         who === "customer"
           ? (await setCustomerAvatar({ preset: presetId }))?.data?.setMyAvatar
-          : (await setStaffAvatar({ preset: presetId }))?.data?.setMyStaffAvatar;
+          : otherId
+            ? (await setOtherStaffAvatar({ id: otherId, preset: presetId }))?.data?.setStaffAvatar
+            : (await setMyStaffAvatar({ preset: presetId }))?.data?.setMyStaffAvatar;
       applyAvatar(result?.avatar ?? null);
     } catch (err: any) {
       error.value = err?.message ?? "No se pudo guardar el avatar";
@@ -169,7 +198,9 @@ export function useAvatarEditor(who: "customer" | "staff") {
       const body = new FormData();
       body.append("file", blob, "avatar.jpg");
       const uploadsBase = String(config.public.graphqlHttp).replace(/\/graphql\/?$/, "");
-      const res = await fetch(`${uploadsBase}/uploads/avatar`, {
+      const otherId = otherStaffId();
+      const target = otherId ? `?staffId=${encodeURIComponent(otherId)}` : "";
+      const res = await fetch(`${uploadsBase}/uploads/avatar${target}`, {
         method: "POST",
         headers: token.value ? { Authorization: `Bearer ${token.value}` } : {},
         body,

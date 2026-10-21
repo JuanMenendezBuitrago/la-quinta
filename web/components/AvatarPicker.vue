@@ -44,10 +44,20 @@ import { Camera, Trash2 } from "lucide-vue-next";
 import { AVATAR_PRESETS, parseAvatar, useAvatarEditor } from "~/composables/useAvatar";
 import UserAvatar from "~/components/UserAvatar.vue";
 
-const props = defineProps<{ who: "customer" | "staff"; avatar?: string | null; name?: string | null }>();
+const props = defineProps<{
+  who: "customer" | "staff";
+  avatar?: string | null;
+  name?: string | null;
+  /** Gestion editando el avatar de otro miembro del personal. */
+  staffId?: string | null;
+}>();
+const emit = defineEmits<{ (e: "changed", avatar: string | null): void }>();
 
 const uid = useId();
-const { saving, error, choosePreset, uploadFromInput } = useAvatarEditor(props.who);
+const { saving, error, choosePreset, uploadFromInput } = useAvatarEditor(props.who, {
+  staffId: () => props.staffId,
+  onChange: (avatar) => emit("changed", avatar),
+});
 const isPhoto = computed(() => parseAvatar(props.avatar).kind === "image");
 </script>
 

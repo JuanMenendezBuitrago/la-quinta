@@ -1,5 +1,7 @@
 <template>
-  <section class="hero-admin">
+  <!-- Pantallas anchas apaisadas: diapositivas a la izquierda; alta y edicion (con vista previa) a la derecha -->
+  <section class="hero-admin wide-layout">
+    <aside class="wide-aside wide-aside--sticky">
     <div class="hero-admin-header">
       <button class="button" type="button" :disabled="formOpen" @click="startCreate">+ Nueva diapositiva</button>
     </div>
@@ -7,9 +9,6 @@
       Ofertas, eventos y novedades que se muestran arriba de la carta. Solo se ven las activas y
       dentro de sus fechas; con fechas, una oferta aparece y desaparece sola.
     </p>
-
-    <p v-if="loading && !slides.length" class="muted">Cargando…</p>
-    <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
 
     <!-- Formulario con vista previa en vivo -->
     <form v-if="formOpen" class="card slide-form" @submit.prevent="submit">
@@ -75,8 +74,12 @@
         <button class="button secondary cancel" type="button" :disabled="saving" @click="closeForm"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
       </div>
     </form>
+    </aside>
 
     <!-- Listado -->
+    <div class="wide-main slide-list">
+    <p v-if="loading && !slides.length" class="muted">Cargando…</p>
+    <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
     <p v-if="!loading && !loadError && !slides.length" class="muted">
       No hay diapositivas: la portada de la carta no muestra el carrusel.
     </p>
@@ -100,6 +103,7 @@
       </div>
     </div>
     <p v-if="actionError" class="muted" style="color: var(--danger)">{{ actionError }}</p>
+    </div>
   </section>
 </template>
 
@@ -266,6 +270,11 @@ function remove(id: string) {
 
 <style scoped>
 .hero-admin { max-width: 640px; }
+@media (min-width: 1000px) and (orientation: landscape) { .hero-admin { max-width: none; } }
+.hero-admin .wide-aside { gap: 12px; }
+.hero-admin .slide-form { margin-bottom: 0; }
+.slide-list { gap: 0; }
+.slide-list .slide-row:first-of-type { margin-top: 0; }
 .hero-admin-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .hero-admin-header h2 { margin: 0; }
 .intro { margin: 8px 0 16px; font-size: 14px; }

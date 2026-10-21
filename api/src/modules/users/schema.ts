@@ -94,6 +94,9 @@ export const usersTypeDefs = /* GraphQL */ `
     setMyAvatar(preset: String): Customer!
     """Igual que setMyAvatar, para el miembro del personal con sesion."""
     setMyStaffAvatar(preset: String): Staff!
+    """Gestion: elige (o quita, con null) el avatar ilustrado de otro miembro del personal. Su foto
+    se sube por POST /uploads/avatar?staffId=<id>."""
+    setStaffAvatar(id: ID!, preset: String): Staff!
     """Marca o desmarca productos como favoritos (varios a la vez: los tamaños de un mismo cafe).
     Devuelve la lista completa de favoritos."""
     setFavoriteMenuItems(menuItemIds: [ID!]!, favorite: Boolean!): [ID!]!

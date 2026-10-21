@@ -1,5 +1,7 @@
 <template>
-  <section class="coffee-admin">
+  <!-- Pantallas anchas apaisadas: cafes a la izquierda; alta, edicion y procesos a la derecha -->
+  <section class="coffee-admin wide-layout wide-layout--ordered">
+    <aside class="wide-aside wide-aside--sticky">
     <p class="muted intro">
       Café tostado en grano que se vende en bolsas. Cada tamaño aparece en la carta como un producto
       («Café Huila 250 g») de la categoría «Café en grano», y su stock se lleva en Inventario en
@@ -9,9 +11,6 @@
     <div class="header">
       <button class="button" :disabled="formOpen" @click="startCreate">+ Nuevo café</button>
     </div>
-
-    <p v-if="loading && !coffees.length" class="muted">Cargando…</p>
-    <p v-if="error" class="muted" style="color: var(--danger)">No se pudieron cargar los cafés.</p>
 
     <form v-if="formOpen" class="card coffee-form" @submit.prevent="submit">
       <h3>{{ form.id ? "Editar café" : "Nuevo café" }}</h3>
@@ -107,25 +106,9 @@
       </div>
     </form>
 
-    <p v-if="!loading && !coffees.length && !formOpen" class="muted">Todavía no hay cafés en grano.</p>
-
-    <div v-for="coffee in coffees" :key="coffee.id" class="card coffee-row" :class="{ unavailable: !coffee.available }">
-      <img v-if="coffee.imageUrl" :src="resolveImageUrl(coffee.imageUrl) ?? undefined" alt="" class="thumb" />
-      <div class="coffee-info">
-        <strong>{{ coffee.name }}</strong>
-        <span v-if="!coffee.available" class="muted"> · no está a la venta</span>
-        <p v-if="details(coffee)" class="muted">{{ details(coffee) }}</p>
-        <p class="sizes">
-          <span v-for="p in coffee.presentations" :key="p.grams" class="size" :class="{ off: !p.available }">
-            {{ p.grams }} g · {{ formatPrice(p.priceCents) }}{{ p.available ? "" : " (oculto)" }}
-          </span>
-        </p>
-      </div>
-      <button class="button secondary" type="button" :disabled="formOpen" @click="startEdit(coffee)">Editar</button>
-    </div>
-
     <!-- Procesos: la tabla de la que se elige el de cada cafe -->
-    <section class="processes">
+    <!-- En movil sigue al final, despues del listado (order) -->
+    <section class="processes" style="order: 1">
       <h3>Procesos</h3>
       <p class="muted">Los que se pueden elegir en la ficha de cada café. Solo se borra uno si ningún café lo usa.</p>
       <div v-for="p in processes" :key="p.id" class="process-row">
@@ -147,6 +130,29 @@
       </form>
       <p v-if="processError" class="muted" style="color: var(--danger)">{{ processError }}</p>
     </section>
+    </aside>
+
+    <div class="wide-main coffee-list">
+    <p v-if="loading && !coffees.length" class="muted">Cargando…</p>
+    <p v-if="error" class="muted" style="color: var(--danger)">No se pudieron cargar los cafés.</p>
+    <p v-if="!loading && !coffees.length && !formOpen" class="muted">Todavía no hay cafés en grano.</p>
+
+    <div v-for="coffee in coffees" :key="coffee.id" class="card coffee-row" :class="{ unavailable: !coffee.available }">
+      <img v-if="coffee.imageUrl" :src="resolveImageUrl(coffee.imageUrl) ?? undefined" alt="" class="thumb" />
+      <div class="coffee-info">
+        <strong>{{ coffee.name }}</strong>
+        <span v-if="!coffee.available" class="muted"> · no está a la venta</span>
+        <p v-if="details(coffee)" class="muted">{{ details(coffee) }}</p>
+        <p class="sizes">
+          <span v-for="p in coffee.presentations" :key="p.grams" class="size" :class="{ off: !p.available }">
+            {{ p.grams }} g · {{ formatPrice(p.priceCents) }}{{ p.available ? "" : " (oculto)" }}
+          </span>
+        </p>
+      </div>
+      <button class="button secondary" type="button" :disabled="formOpen" @click="startEdit(coffee)">Editar</button>
+    </div>
+
+    </div>
   </section>
 </template>
 
@@ -360,7 +366,9 @@ function formatPrice(priceCents: number) {
 </script>
 
 <style scoped>
-.coffee-admin { max-width: 720px; }
+.coffee-admin, .coffee-admin .wide-aside, .coffee-list { row-gap: 0; }
+.coffee-list .coffee-row:first-of-type { margin-top: 0; }
+@media (min-width: 1000px) and (orientation: landscape) { .coffee-admin .wide-aside .coffee-form { margin-bottom: 0; } }
 .intro { font-size: 14px; margin: 0 0 14px; }
 .header { margin-bottom: 14px; }
 

@@ -1,5 +1,7 @@
 <template>
-  <section class="reviews">
+  <!-- Pantallas anchas apaisadas: listado a la izquierda; media, reparto y filtros a la derecha -->
+  <section class="reviews wide-layout">
+    <aside class="wide-aside wide-aside--sticky">
     <div class="filters" role="group" aria-label="Tipo de opinión">
       <button
         v-for="k in KINDS"
@@ -39,6 +41,9 @@
       </ul>
     </div>
 
+    </aside>
+
+    <div class="wide-main">
     <p v-if="loadError" class="muted error" role="alert">{{ loadError }}</p>
     <p v-else-if="!loading && !items.length" class="muted">
       {{ rating ? `No hay opiniones de ${rating} ${rating === 1 ? "estrella" : "estrellas"}.` : "Todavía no hay opiniones." }}
@@ -62,6 +67,7 @@
     <button v-if="items.length < total" class="button secondary" type="button" :disabled="loading" @click="loadMore">
       {{ loading ? "Cargando…" : "Cargar más" }}
     </button>
+    </div>
   </section>
 </template>
 
@@ -149,7 +155,7 @@ function loadMore() {
 </script>
 
 <style scoped>
-.reviews { display: flex; flex-direction: column; gap: 12px; max-width: 640px; }
+.reviews .wide-main, .reviews .wide-aside { gap: 12px; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; }
 .chip {
   border: 1px solid var(--field-border);
