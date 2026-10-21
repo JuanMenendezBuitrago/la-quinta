@@ -88,6 +88,11 @@
             {{ p.label }}
           </button>
         </div>
+        <!-- En mesa o barra, pero piden algo para llevar: se empaqueta y lleva el recargo -->
+        <label v-if="place && place !== 'LLEVAR'" class="takeaway-check">
+          <input v-model="takeaway" type="checkbox" />
+          <span>Para llevar</span>
+        </label>
       </div>
 
       <div class="field">
@@ -194,7 +199,9 @@ const PLACES = [...TABLES, { id: "LLEVAR", label: "Para llevar" }];
 const place = ref("");
 // Lo que mostrara el pedido al crearlo (lo calcula la API): solo en "Para llevar".
 const packagingFee = usePackagingFee();
-const packagingCents = computed(() => (place.value === "LLEVAR" ? packagingFee.value : 0));
+const takeaway = ref(false);
+const isTakeaway = computed(() => place.value === "LLEVAR" || (!!place.value && takeaway.value));
+const packagingCents = computed(() => (isTakeaway.value ? packagingFee.value : 0));
 const customer = ref<CustomerMatch | null>(null);
 const note = ref("");
 const ticketEl = ref<HTMLElement | null>(null);
@@ -210,6 +217,7 @@ const canSubmit = computed(
 function reset() {
   clear();
   place.value = "";
+  takeaway.value = false;
   customer.value = null;
   note.value = "";
   search.value = "";
@@ -226,6 +234,7 @@ async function submit() {
         items: orderLinesInput(lines.value),
         serviceType: place.value === "LLEVAR" ? "LLEVAR" : "MESA",
         table: place.value === "LLEVAR" ? null : place.value,
+        takeaway: isTakeaway.value,
         customerId: customer.value?.id ?? null,
         note: note.value.trim() || null,
       },
@@ -393,6 +402,8 @@ input {
 .places button.active { background: var(--accent); color: var(--bg); }
 .ticket-customer { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 .ticket-customer strong { font-size: 17px; overflow-wrap: anywhere; }
+.takeaway-check { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 15px; font-weight: 600; cursor: pointer; align-self: flex-start; }
+.takeaway-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
 .customer-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ticket-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 

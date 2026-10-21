@@ -1,6 +1,6 @@
 import type { OrderClosedPayload } from "../../config/events";
 import { User } from "../users/model";
-import type { OrderDoc } from "./model";
+import { isTakeaway, type OrderDoc } from "./model";
 
 /**
  * Instantanea de un pedido para los eventos internos ORDER_DELIVERED / ORDER_COMPLETED / ORDER_CANCELLED.
@@ -10,7 +10,7 @@ import type { OrderDoc } from "./model";
 export async function buildClosedPayload<S extends OrderClosedPayload["status"]>(
   order: Pick<
     OrderDoc,
-    "_id" | "code" | "customerId" | "items" | "totalCents" | "packagingCents" | "pickupSlot" | "source" | "serviceType" | "table" | "paidAt" | "paymentMethod"
+    "_id" | "code" | "customerId" | "items" | "totalCents" | "packagingCents" | "takeaway" | "pickupSlot" | "source" | "serviceType" | "table" | "paidAt" | "paymentMethod"
   >,
   status: S,
   closedAt: Date | null
@@ -24,6 +24,7 @@ export async function buildClosedPayload<S extends OrderClosedPayload["status"]>
     customerId: order.customerId?.toString() ?? null,
     totalCents: order.totalCents,
     packagingCents: order.packagingCents ?? 0,
+    takeaway: isTakeaway(order),
     code: order.code,
     customerName: customer?.name ?? "",
     customerCode: customer?.customerCode ?? "",

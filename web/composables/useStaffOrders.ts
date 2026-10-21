@@ -34,6 +34,7 @@ const ORDER_FIELDS = `
   status
   totalCents
   packagingCents
+  takeaway
   pickupSlot
   updatedAt
   paidAt

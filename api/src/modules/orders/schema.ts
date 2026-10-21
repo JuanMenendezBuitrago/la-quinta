@@ -70,6 +70,8 @@ export const ordersTypeDefs = /* GraphQL */ `
     totalCents: Int!
     """Recargo por empaque de este pedido (el vigente al crearlo; 0 en mesa o barra)."""
     packagingCents: Int!
+    """Va empaquetado: para llevar, recogida web, o mesa/barra marcado "para llevar"."""
+    takeaway: Boolean!
     pickupSlot: String!
     status: OrderStatus!
     """Todos los cambios de estado en orden. Los pedidos anteriores solo tienen creacion, entrega y cancelacion."""
@@ -99,6 +101,9 @@ export const ordersTypeDefs = /* GraphQL */ `
     """Cliente registrado, si da su codigo o telefono (ver lookupCustomer)."""
     customerId: ID
     note: String
+    """Mesa o barra, pero se lo llevan (empaquetado): lleva el recargo por empaque y descuenta
+    vasos, tapas... como un pedido para llevar. Con serviceType LLEVAR no hace falta."""
+    takeaway: Boolean
   }
 
   extend type Query {

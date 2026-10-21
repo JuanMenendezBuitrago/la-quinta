@@ -1,6 +1,6 @@
 import { withFilter } from "graphql-subscriptions";
 import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
-import { ALLOWED_FROM, CUSTOMER_TABLES, Order, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
+import { ALLOWED_FROM, CUSTOMER_TABLES, isTakeaway, Order, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
 import { tryComplete } from "./complete";
 import { buildOrderLines, createWithUniqueCode, type OrderLineRequest } from "./create";
 import { MenuItem } from "../menu/model";
@@ -60,6 +60,7 @@ export const ordersResolvers = {
     updatedAt: (doc: any) => new Date(doc.updatedAt).toISOString(),
     deliveredAt: (doc: any) => iso(doc.deliveredAt),
     packagingCents: (doc: any) => doc.packagingCents ?? 0,
+    takeaway: (doc: any) => isTakeaway(doc),
     // Una sola consulta por pedido para el nombre y el avatar del personal que hizo cada cambio.
     statusHistory: async (doc: any) => {
       const history: any[] = doc.statusHistory ?? [];
@@ -133,6 +134,7 @@ export const ordersResolvers = {
         items: lines,
         totalCents: totalCents + packagingCents,
         packagingCents,
+        takeaway: !table,
         pickupSlot,
         status: "NUEVO",
       });
@@ -150,6 +152,7 @@ export const ordersResolvers = {
           table?: string | null;
           customerId?: string | null;
           note?: string | null;
+          takeaway?: boolean | null;
         };
       },
       ctx: GraphQLContext
@@ -161,7 +164,9 @@ export const ordersResolvers = {
       if (input.customerId && !(await activeCustomerExists(input.customerId))) throw new Error("Cliente no encontrado");
 
       const { lines, totalCents } = await buildOrderLines(input.items);
-      const packagingCents = input.serviceType === "LLEVAR" ? await packagingFeeCents() : 0;
+      // Mesa o barra con "para llevar" marcado: se empaqueta igual que un pedido para llevar.
+      const takeaway = input.serviceType === "LLEVAR" || input.takeaway === true;
+      const packagingCents = takeaway ? await packagingFeeCents() : 0;
       // Lo toma el personal en el local: la recogida es ahora y no se valida contra el horario.
       const order = await createWithUniqueCode({
         customerId: (input.customerId || null) as any,
@@ -173,6 +178,7 @@ export const ordersResolvers = {
         items: lines,
         totalCents: totalCents + packagingCents,
         packagingCents,
+        takeaway,
         pickupSlot: new Date(),
         status: "NUEVO",
       });

@@ -89,6 +89,8 @@ export interface OrderDoc {
   // Productos + recargo por empaque (packagingCents, solo en pedidos para llevar).
   totalCents: number;
   packagingCents?: number;
+  // Va empaquetado. Sin valor (pedidos anteriores): para llevar o web de recogida (ver isTakeaway).
+  takeaway?: boolean;
   pickupSlot: Date;
   status: OrderStatus;
   // Todos los cambios de estado en orden, empezando por el NUEVO de la creacion.
@@ -148,6 +150,7 @@ const orderSchema = new Schema<OrderDoc>({
   items: { type: [orderLineSchema], required: true, validate: (v: unknown[]) => v.length > 0 },
   totalCents: { type: Number, required: true, min: 0 },
   packagingCents: { type: Number, default: 0, min: 0 },
+  takeaway: { type: Boolean },
   pickupSlot: { type: Date, required: true },
   status: {
     type: String,
@@ -242,4 +245,9 @@ export async function backfillStatusHistory() {
     },
   ]);
   if (result.modifiedCount) console.log(`[orders] historial de estados reconstruido en ${result.modifiedCount} pedidos`);
+}
+
+/** Va empaquetado: lo marcado al crearlo o, en pedidos anteriores, "para llevar" o web sin mesa. */
+export function isTakeaway(order: Pick<OrderDoc, "takeaway" | "serviceType">) {
+  return order.takeaway ?? (order.serviceType ? order.serviceType === "LLEVAR" : true);
 }

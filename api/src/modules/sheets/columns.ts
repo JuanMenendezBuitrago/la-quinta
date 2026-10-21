@@ -20,10 +20,13 @@ function text(value: string): string {
   return /^[=+\-@]/.test(value) ? `'${value}` : value;
 }
 
-/** "Web", "Mesa 7" o "Para llevar". Vacio en pedidos encolados antes de guardar el origen. */
-export function originLabel(p: Pick<OrderClosedPayload, "source" | "serviceType" | "table">): string {
+/** "Web", "Mesa 7", "Mesa 7 (para llevar)" o "Para llevar". Vacio en pedidos encolados antes de guardar el origen. */
+export function originLabel(p: Pick<OrderClosedPayload, "source" | "serviceType" | "table" | "takeaway">): string {
   // Las sillas de la barra se guardan como servicio en mesa con table = "Barra".
-  if (p.serviceType === "MESA") return text(p.table === "Barra" ? "Barra" : `Mesa ${p.table ?? ""}`.trim());
+  if (p.serviceType === "MESA") {
+    const place = p.table === "Barra" ? "Barra" : `Mesa ${p.table ?? ""}`.trim();
+    return text(p.takeaway ? `${place} (para llevar)` : place);
+  }
   if (p.serviceType === "LLEVAR") return "Para llevar";
   if (p.source === "WEB") return "Web";
   return "";

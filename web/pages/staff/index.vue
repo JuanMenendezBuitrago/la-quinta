@@ -130,7 +130,10 @@
                 <strong class="muted">Sin cliente</strong>
               </span>
               <OrderItems :items="order.items" list />
-              <p v-if="order.packagingCents" class="muted packaging-note">+ Empaque para llevar ({{ formatPrice(order.packagingCents) }})</p>
+              <!-- Para llevar ya lo dice la cabecera; aqui, sobre todo, mesa o barra que se lo llevan -->
+              <p v-if="order.packagingCents || (order.takeaway && order.serviceType === 'MESA')" class="muted packaging-note">
+                + Empaque para llevar{{ order.packagingCents ? ` (${formatPrice(order.packagingCents)})` : "" }}
+              </p>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
               <p v-if="order.paidAt" class="paid-badge">Cobrado · {{ paymentLabel(order.paymentMethod) }}</p>
             </div>

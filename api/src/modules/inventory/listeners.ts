@@ -15,8 +15,9 @@ export async function consumeForOrder(payload: OrderDeliveredPayload) {
   const hasSwaps = payload.items.some((i) => i.optionSwaps?.length);
   if (!recipes.length && !hasSwaps) return;
 
-  // Vasos, tapas...: "para llevar" y los pedidos web para recoger (sin servicio); no en mesa.
-  const takeaway = payload.serviceType ? payload.serviceType === "LLEVAR" : true;
+  // Vasos, tapas...: "para llevar", los pedidos web para recoger (sin servicio) y los de mesa o
+  // barra marcados para llevar; no en mesa. Eventos anteriores a `takeaway`: segun el servicio.
+  const takeaway = payload.takeaway ?? (payload.serviceType ? payload.serviceType === "LLEVAR" : true);
 
   // Opciones distintas de la de por defecto (un Latte con avena): que insumo es cada una.
   const swapOptionIds = payload.items.flatMap((i) => (i.optionSwaps ?? []).flatMap((s) => [s.fromOptionId, s.toOptionId]));

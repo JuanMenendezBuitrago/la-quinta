@@ -39,6 +39,8 @@ export interface OrderClosedPayload {
   customerId: string | null; // null: pedido del personal sin cliente registrado
   totalCents: number;
   packagingCents?: number;
+  // Va empaquetado (vasos, tapas... en el inventario).
+  takeaway?: boolean;
   // Instantanea del pedido para los modulos que necesitan registrarlo (p. ej. "sheets")
   // sin tener que importar los modelos de "orders" o "users".
   code: string;
