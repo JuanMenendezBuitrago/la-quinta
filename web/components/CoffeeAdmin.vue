@@ -8,11 +8,17 @@
       bolsas. El nombre, precio y disponibilidad de esos productos se cambian aquí.
     </p>
 
-    <div class="header">
-      <button class="button" :disabled="formOpen" @click="startCreate">+ Nuevo café</button>
-    </div>
+    <!-- En la cabecera de la seccion, a la derecha (solo en cliente: Teleport fuera de #teleports no se renderiza en SSR) -->
+    <ClientOnly>
+      <Teleport to="#staff-hero-actions">
+        <button class="button" :disabled="formOpen" @click="startCreate">+ Nuevo café</button>
+      </Teleport>
+    </ClientOnly>
 
-    <form v-if="formOpen" class="card coffee-form" @submit.prevent="submit">
+    <!-- Nuevo cafe: aqui, en la columna lateral. Al editar uno, el formulario se abre justo debajo de el
+         (en su hueco #coffee-form-slot-<id>, que existe siempre, aunque vacio, para que Teleport lo encuentre). -->
+    <Teleport v-if="formOpen" defer :to="form.id ? `#coffee-form-slot-${form.id}` : 'body'" :disabled="!form.id">
+    <form class="card coffee-form" @submit.prevent="submit">
       <h3>{{ form.id ? "Editar café" : "Nuevo café" }}</h3>
 
       <label class="field">
@@ -105,6 +111,7 @@
         <button class="button secondary cancel" type="button" :disabled="saving" @click="formOpen = false"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
       </div>
     </form>
+    </Teleport>
 
     <!-- Procesos: la tabla de la que se elige el de cada cafe -->
     <!-- En movil sigue al final, despues del listado (order) -->
@@ -137,7 +144,8 @@
     <p v-if="error" class="muted" style="color: var(--danger)">No se pudieron cargar los cafés.</p>
     <p v-if="!loading && !coffees.length && !formOpen" class="muted">Todavía no hay cafés en grano.</p>
 
-    <div v-for="coffee in coffees" :key="coffee.id" class="card coffee-row" :class="{ unavailable: !coffee.available }">
+    <template v-for="coffee in coffees" :key="coffee.id">
+    <div class="card coffee-row" :class="{ unavailable: !coffee.available, editing: formOpen && form.id === coffee.id }">
       <img v-if="coffee.imageUrl" :src="resolveImageUrl(coffee.imageUrl) ?? undefined" alt="" class="thumb" />
       <div class="coffee-info">
         <strong>{{ coffee.name }}</strong>
@@ -149,8 +157,10 @@
           </span>
         </p>
       </div>
-      <button class="button secondary" type="button" :disabled="formOpen" @click="startEdit(coffee)">Editar</button>
+      <button class="button secondary" type="button" @click="startEdit(coffee)">Editar</button>
     </div>
+    <div :id="`coffee-form-slot-${coffee.id}`" class="coffee-slot" />
+    </template>
 
     </div>
   </section>
@@ -370,7 +380,6 @@ function formatPrice(priceCents: number) {
 .coffee-list .coffee-row:first-of-type { margin-top: 0; }
 @media (min-width: 1000px) and (orientation: landscape) { .coffee-admin .wide-aside .coffee-form { margin-bottom: 0; } }
 .intro { font-size: 14px; margin: 0 0 14px; }
-.header { margin-bottom: 14px; }
 
 .coffee-form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
 .coffee-form h3 { margin: 0; }
@@ -399,6 +408,8 @@ input[type="text"], input[type="url"], input[type="number"], select, textarea {
 
 .coffee-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
 .coffee-row.unavailable { opacity: 0.6; }
+.coffee-row.editing { border-color: var(--accent); opacity: 1; }
+.coffee-slot .coffee-form { margin: 10px 0 0; }
 .coffee-info { flex: 1; min-width: 0; }
 .coffee-info p { margin: 4px 0 0; }
 .thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
