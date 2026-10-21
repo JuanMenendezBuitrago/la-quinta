@@ -14,7 +14,12 @@
     </div>
 
     <form v-if="formOpen" class="card staff-form" @submit.prevent="submitForm">
-      <h3>{{ form.id ? "Editar cuenta" : "Nueva cuenta" }}</h3>
+      <div class="form-head">
+        <h3>{{ form.id ? "Editar cuenta" : "Nueva cuenta" }}</h3>
+        <button class="close-form" type="button" aria-label="Cerrar" title="Cerrar" :disabled="saving" @click="cancelForm">
+          <X :size="22" :stroke-width="2" aria-hidden="true" />
+        </button>
+      </div>
       <!-- Datos a la izquierda; estado de la cuenta y botones a la derecha (en movil, debajo) -->
       <div class="form-grid">
         <div class="form-main">
@@ -104,7 +109,7 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { Trash2, UserCog, Users } from "lucide-vue-next";
+import { Trash2, UserCog, Users, X } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { useStaffAuth } from "~/composables/useAuth";
 import UserAvatar from "~/components/UserAvatar.vue";
@@ -287,6 +292,25 @@ async function submitForm() {
 @media (prefers-reduced-motion: reduce) { .switch-track, .switch-thumb { transition: none; } }
 
 .staff-form { margin-bottom: 16px; display: flex; flex-direction: column; gap: 12px; }
+.form-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.form-head h3 { margin: 0; }
+.close-form {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: -8px -10px -8px 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.close-form:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); }
+.close-form:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.close-form:disabled { opacity: 0.45; cursor: not-allowed; }
 .form-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start; }
 .form-main, .form-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 @media (max-width: 700px) { .form-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; } }

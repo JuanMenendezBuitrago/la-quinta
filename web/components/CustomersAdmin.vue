@@ -63,6 +63,10 @@
 
       <template v-if="detail">
         <header class="detail-header">
+          <!-- Pantalla ancha: cerrar la ficha (el listado sigue al lado); en movil se vuelve con el chevron -->
+          <button class="close-detail" type="button" aria-label="Cerrar ficha" title="Cerrar ficha" @click="closeDetail">
+            <X :size="22" :stroke-width="2" aria-hidden="true" />
+          </button>
           <h2 class="detail-name">
             <button class="back-chevron" type="button" aria-label="Volver a clientes" title="Volver a clientes" @click="closeDetail">
               <ChevronLeft :size="28" :stroke-width="2" aria-hidden="true" />
@@ -158,7 +162,7 @@
 
 <script setup lang="ts">
 import MobileTabs from "~/components/MobileTabs.vue";
-import { ChevronLeft, SearchX, ShoppingBag, Stamp, UserSearch, Users } from "lucide-vue-next";
+import { ChevronLeft, SearchX, ShoppingBag, Stamp, UserSearch, Users, X } from "lucide-vue-next";
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import UserAvatar from "~/components/UserAvatar.vue";
@@ -405,6 +409,25 @@ async function adjust() {
 }
 .back-chevron:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .back-chevron:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.detail-header { position: relative; }
+.close-detail {
+  display: none;
+  position: absolute;
+  top: 0;
+  right: -6px;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.close-detail:hover { background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); }
+.close-detail:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .detail-placeholder { display: none; }
 .customer-row.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
 @media (min-width: 1000px) and (orientation: landscape) {
@@ -412,9 +435,10 @@ async function adjust() {
   .detail-placeholder { display: flex; }
   .back-narrow { display: none; }
   .back-wide { display: inline; }
-  /* En pantalla ancha la ficha se cierra con "Cerrar ficha" */
-  .back.has-detail { display: inline-flex; }
+  /* En pantalla ancha la ficha se cierra con la X de arriba a la derecha */
   .back-chevron { display: none; }
+  .close-detail { display: inline-flex; }
+  .detail-header { padding-right: 40px; }
 }
 .list-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .list-header h2 { margin: 0; }
