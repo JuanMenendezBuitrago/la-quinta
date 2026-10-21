@@ -1,5 +1,5 @@
 import { GraphQLContext, requireStaff } from "../../graphql/context";
-import { SiteSettings } from "./model";
+import { DEFAULT_PACKAGING_FEE_CENTS, SiteSettings } from "./model";
 import { OpeningHoursDoc, scheduleLines, validateOpeningHours } from "./openingHours";
 
 // upsert sin filtro: si nadie ha guardado nunca la configuracion, crea el documento con
@@ -19,6 +19,14 @@ export async function staffOnlyOrders(): Promise<boolean> {
   return !!(await loadSettings()).staffOnlyOrders;
 }
 
+/** Recargo por empaque vigente. Lo usa "orders" al crear un pedido para llevar. */
+export async function packagingFeeCents(): Promise<number> {
+  return (await loadSettings()).packagingFeeCents ?? DEFAULT_PACKAGING_FEE_CENTS;
+}
+
+// Tope de cordura para el recargo (como los importes del cierre de caja).
+const MAX_PACKAGING_FEE_CENTS = 100_000;
+
 export const settingsResolvers = {
   Query: {
     siteSettings: () => loadSettings(),
@@ -28,6 +36,7 @@ export const settingsResolvers = {
     schedule: (doc: any) => scheduleLines(doc.openingHours),
     // Documentos guardados antes de existir el campo: sin valor equivale a desactivado.
     staffOnlyOrders: (doc: any) => !!doc.staffOnlyOrders,
+    packagingFeeCents: (doc: any) => doc.packagingFeeCents ?? DEFAULT_PACKAGING_FEE_CENTS,
   },
   Mutation: {
     updateSiteSettings: async (_: unknown, args: { input: Record<string, unknown> }, ctx: GraphQLContext) => {
@@ -36,10 +45,14 @@ export const settingsResolvers = {
         const problem = validateOpeningHours(args.input.openingHours as OpeningHoursDoc[]);
         if (problem) throw new Error(problem);
       }
+      const fee = args.input.packagingFeeCents;
+      if (fee != null && (!Number.isInteger(fee) || (fee as number) < 0 || (fee as number) > MAX_PACKAGING_FEE_CENTS)) {
+        throw new Error("Recargo por empaque no valido");
+      }
       const update: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(args.input)) {
         // null en un booleano no significa "borrar": se ignora como si no viniera.
-        if (key === "staffOnlyOrders" && value === null) continue;
+        if ((key === "staffOnlyOrders" || key === "packagingFeeCents") && value === null) continue;
         if (value !== undefined) update[key] = value;
       }
       return SiteSettings.findOneAndUpdate({}, update, {

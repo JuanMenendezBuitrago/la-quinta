@@ -66,7 +66,10 @@ export const ordersTypeDefs = /* GraphQL */ `
     table: String
     note: String
     items: [OrderLine!]!
+    """Productos + empaque."""
     totalCents: Int!
+    """Recargo por empaque de este pedido (el vigente al crearlo; 0 en mesa o barra)."""
+    packagingCents: Int!
     pickupSlot: String!
     status: OrderStatus!
     """Todos los cambios de estado en orden. Los pedidos anteriores solo tienen creacion, entrega y cancelacion."""

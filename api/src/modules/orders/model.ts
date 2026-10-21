@@ -86,7 +86,9 @@ export interface OrderDoc {
   note?: string;
   createdByStaffId?: Types.ObjectId;
   items: OrderLineDoc[];
+  // Productos + recargo por empaque (packagingCents, solo en pedidos para llevar).
   totalCents: number;
+  packagingCents?: number;
   pickupSlot: Date;
   status: OrderStatus;
   // Todos los cambios de estado en orden, empezando por el NUEVO de la creacion.
@@ -145,6 +147,7 @@ const orderSchema = new Schema<OrderDoc>({
   createdByStaffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
   items: { type: [orderLineSchema], required: true, validate: (v: unknown[]) => v.length > 0 },
   totalCents: { type: Number, required: true, min: 0 },
+  packagingCents: { type: Number, default: 0, min: 0 },
   pickupSlot: { type: Date, required: true },
   status: {
     type: String,

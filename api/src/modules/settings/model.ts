@@ -10,6 +10,8 @@ const openingHoursSchema = new Schema<OpeningHoursDoc>(
   { _id: false }
 );
 
+export const DEFAULT_PACKAGING_FEE_CENTS = 1000;
+
 export interface SiteSettingsDoc {
   address?: string;
   addressMapUrl?: string;
@@ -28,6 +30,8 @@ export interface SiteSettingsDoc {
   privacyEmail?: string;
   // Solo el personal crea pedidos: los clientes ven la carta y sus pedidos, pero no pueden pedir.
   staffOnlyOrders: boolean;
+  // Recargo fijo por pedido para llevar (personal "Para llevar" y web de recogida), en pesos. 0 = sin recargo.
+  packagingFeeCents: number;
 }
 
 // Documento unico (singleton): siempre se lee/escribe con un findOneAndUpdate sin filtro,
@@ -50,6 +54,7 @@ const siteSettingsSchema = new Schema<SiteSettingsDoc>({
   taxId: { type: String, trim: true },
   privacyEmail: { type: String, trim: true, lowercase: true },
   staffOnlyOrders: { type: Boolean, default: false },
+  packagingFeeCents: { type: Number, default: DEFAULT_PACKAGING_FEE_CENTS, min: 0 },
 });
 
 export const SiteSettings = model<SiteSettingsDoc>("SiteSettings", siteSettingsSchema);

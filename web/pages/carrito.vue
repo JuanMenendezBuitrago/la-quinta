@@ -49,9 +49,13 @@
           <span class="line-subtotal price">{{ formatPrice(line.priceCents * line.quantity) }}</span>
         </div>
 
+        <div v-if="packagingCents" class="packaging-row muted">
+          <span>Empaque (para llevar)</span>
+          <span class="price">{{ formatPrice(packagingCents) }}</span>
+        </div>
         <div class="total-row">
           <span>Total</span>
-          <span class="total-amount price">{{ formatPrice(totalCents) }}</span>
+          <span class="total-amount price">{{ formatPrice(totalCents + packagingCents) }}</span>
         </div>
       </div>
 
@@ -149,7 +153,7 @@ import { MENU_QUERY, missingModifiers, type MenuCategory } from "~/composables/u
 import LineOptionsPicker from "~/components/LineOptionsPicker.vue";
 import { useAuth } from "~/composables/useAuth";
 import { useLightbox } from "~/composables/useLightbox";
-import { SITE_SETTINGS_QUERY, useCustomerOrdering, type SiteSettings } from "~/composables/useSiteSettings";
+import { SITE_SETTINGS_QUERY, useCustomerOrdering, usePackagingFee, type SiteSettings } from "~/composables/useSiteSettings";
 import { firstPickupSlot, pickupOutsideHoursReason } from "~/composables/useStoreTime";
 import { BAR_TABLE, TABLES, tableLabel, useCustomerTable } from "~/composables/useTables";
 import ImageLightbox from "~/components/ImageLightbox.vue";
@@ -205,6 +209,9 @@ watch(
 // En el local (con ?mesa=... ya viene elegida) o para recoger. Solo al recoger cuenta la hora.
 const table = useCustomerTable();
 const atTable = ref(!!table.value);
+// Recogida = para llevar: la API suma el recargo por empaque al crear el pedido. En mesa, no.
+const packagingFee = usePackagingFee();
+const packagingCents = computed(() => (atTable.value ? 0 : packagingFee.value));
 const submitLabel = computed(() => {
   if (!atTable.value) return "Confirmar pedido · pago en tienda";
   if (!table.value) return "Elige tu mesa";
@@ -321,6 +328,7 @@ async function submitOrder() {
 .qty-btn:hover { border-color: var(--accent); color: var(--accent); }
 .qty-value { min-width: 16px; text-align: center; font-variant-numeric: tabular-nums; }
 
+.packaging-row { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 15px; }
 .total-row {
   display: flex;
   align-items: center;

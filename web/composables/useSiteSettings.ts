@@ -26,6 +26,7 @@ export const SITE_SETTINGS_QUERY = gql`
       taxId
       privacyEmail
       staffOnlyOrders
+      packagingFeeCents
     }
   }
 `;
@@ -54,6 +55,7 @@ export const UPDATE_SITE_SETTINGS = gql`
       taxId
       privacyEmail
       staffOnlyOrders
+      packagingFeeCents
     }
   }
 `;
@@ -88,6 +90,8 @@ export interface SiteSettings {
   privacyEmail: string | null;
   /** Solo el personal crea pedidos: el cliente ve la carta y sus pedidos, pero no puede pedir. */
   staffOnlyOrders: boolean;
+  /** Recargo por empaque de cada pedido para llevar (pesos). 0 = sin recargo. */
+  packagingFeeCents: number;
 }
 
 /**
@@ -98,4 +102,13 @@ export interface SiteSettings {
 export function useCustomerOrdering() {
   const { result } = useQuery<{ siteSettings: SiteSettings }>(SITE_SETTINGS_QUERY);
   return computed(() => result.value?.siteSettings.staffOnlyOrders === false);
+}
+
+/**
+ * Recargo por empaque vigente, para mostrarlo antes de pedir (el que cuenta lo pone la API al
+ * crear el pedido). Misma consulta, desde la cache de Apollo.
+ */
+export function usePackagingFee() {
+  const { result } = useQuery<{ siteSettings: SiteSettings }>(SITE_SETTINGS_QUERY);
+  return computed(() => result.value?.siteSettings.packagingFeeCents ?? 0);
 }

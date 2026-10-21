@@ -69,7 +69,8 @@
             @change="setOptions(line.key, $event)"
           />
         </li>
-        <li class="ticket-total"><span>Total</span><span>{{ formatPrice(totalCents) }}</span></li>
+        <li v-if="packagingCents" class="ticket-packaging muted"><span>Empaque (para llevar)</span><span>{{ formatPrice(packagingCents) }}</span></li>
+        <li class="ticket-total"><span>Total</span><span>{{ formatPrice(totalCents + packagingCents) }}</span></li>
       </ul>
 
       <div class="field">
@@ -116,7 +117,7 @@
 
     <!-- Resumen fijo: con la lista larga, el ticket queda lejos (en el diseño ancho no hace falta) -->
     <div v-if="cartCount" class="sticky-bar">
-      <span>{{ cartCount }} {{ cartCount === 1 ? "producto" : "productos" }} · {{ formatPrice(totalCents) }}</span>
+      <span>{{ cartCount }} {{ cartCount === 1 ? "producto" : "productos" }} · {{ formatPrice(totalCents + packagingCents) }}</span>
       <button class="button" type="button" @click="ticketEl?.scrollIntoView({ behavior: 'smooth', block: 'start' })">Ver ticket</button>
     </div>
   </section>
@@ -128,6 +129,7 @@ import { orderLinesInput, useCart } from "~/composables/useCart";
 import { MENU_QUERY, defaultCartOptions, missingModifiers, type MenuCategory, type MenuItem } from "~/composables/useMenu";
 import LineOptionsPicker from "~/components/LineOptionsPicker.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
+import { usePackagingFee } from "~/composables/useSiteSettings";
 import { type CustomerMatch } from "~/composables/useStaffOrders";
 import { BAR_TABLE, TABLES } from "~/composables/useTables";
 
@@ -190,6 +192,9 @@ const BAR = BAR_TABLE;
 const PLACES = [...TABLES, { id: "LLEVAR", label: "Para llevar" }];
 // Sin valor por defecto: obliga a elegir, para que ningun pedido acabe en la mesa equivocada.
 const place = ref("");
+// Lo que mostrara el pedido al crearlo (lo calcula la API): solo en "Para llevar".
+const packagingFee = usePackagingFee();
+const packagingCents = computed(() => (place.value === "LLEVAR" ? packagingFee.value : 0));
 const customer = ref<CustomerMatch | null>(null);
 const note = ref("");
 const ticketEl = ref<HTMLElement | null>(null);

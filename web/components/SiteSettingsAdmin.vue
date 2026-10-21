@@ -20,6 +20,12 @@
       </div>
 
       <label class="field">
+        <span class="muted">Recargo por empaque (COP)</span>
+        <input v-model.number="form.packagingFeeCents" type="number" min="0" max="100000" step="1" inputmode="numeric" required />
+        <span class="muted">Se suma una vez a cada pedido para llevar: «Para llevar» en el local y recogida desde la web. En mesa o barra, no. 0 = sin recargo.</span>
+      </label>
+
+      <label class="field">
         <span class="muted">Dirección</span>
         <textarea v-model="form.address" rows="2" placeholder="Calle 00 # 00-00&#10;Barrio, Ciudad"></textarea>
       </label>
@@ -142,6 +148,7 @@ function emptyForm() {
     taxId: "",
     privacyEmail: "",
     staffOnlyOrders: false,
+    packagingFeeCents: 0 as number | "",
   };
 }
 
@@ -166,6 +173,7 @@ watch(
       taxId: val.taxId ?? "",
       privacyEmail: val.privacyEmail ?? "",
       staffOnlyOrders: val.staffOnlyOrders,
+      packagingFeeCents: val.packagingFeeCents,
     });
   },
   { immediate: true }
@@ -199,6 +207,7 @@ async function submit() {
         taxId: form.taxId.trim() || null,
         privacyEmail: form.privacyEmail.trim() || null,
         staffOnlyOrders: form.staffOnlyOrders,
+        packagingFeeCents: Math.round(Number(form.packagingFeeCents) || 0),
       },
     });
     await refetch();
@@ -245,7 +254,7 @@ onBeforeUnmount(() => {
 
 .form-actions { margin-top: 4px; }
 
-textarea, input[type="text"], input[type="url"], input[type="tel"], input[type="email"], input[type="time"] {
+textarea, input[type="text"], input[type="url"], input[type="tel"], input[type="email"], input[type="time"], input[type="number"] {
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;

@@ -33,6 +33,7 @@ const ORDER_FIELDS = `
   note
   status
   totalCents
+  packagingCents
   pickupSlot
   updatedAt
   paidAt

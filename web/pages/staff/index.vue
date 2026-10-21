@@ -130,6 +130,7 @@
                 <strong class="muted">Sin cliente</strong>
               </span>
               <OrderItems :items="order.items" list />
+              <p v-if="order.packagingCents" class="muted packaging-note">+ Empaque para llevar ({{ formatPrice(order.packagingCents) }})</p>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
               <p v-if="order.paidAt" class="paid-badge">Cobrado · {{ paymentLabel(order.paymentMethod) }}</p>
             </div>
@@ -481,6 +482,7 @@ watchEffect(() => {
 .order-customer--stacked { flex-direction: column; justify-content: center; gap: 4px; text-align: center; }
 /* Productos del pedido en la cola: mas grandes que el texto secundario (14px), se leen de lejos */
 .order-card .order-items { margin: 10px 0 12px; font-size: 16px; line-height: 1.4; }
+.packaging-note { margin: -6px 0 10px; font-size: 14px; }
 .order-head-right { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .handled-by { display: inline-flex; }
 .sr-only {

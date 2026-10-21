@@ -38,6 +38,7 @@ export interface OrderClosedPayload {
   orderId: string;
   customerId: string | null; // null: pedido del personal sin cliente registrado
   totalCents: number;
+  packagingCents?: number;
   // Instantanea del pedido para los modulos que necesitan registrarlo (p. ej. "sheets")
   // sin tener que importar los modelos de "orders" o "users".
   code: string;

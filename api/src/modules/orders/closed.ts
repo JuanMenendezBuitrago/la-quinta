@@ -10,7 +10,7 @@ import type { OrderDoc } from "./model";
 export async function buildClosedPayload<S extends OrderClosedPayload["status"]>(
   order: Pick<
     OrderDoc,
-    "_id" | "code" | "customerId" | "items" | "totalCents" | "pickupSlot" | "source" | "serviceType" | "table" | "paidAt" | "paymentMethod"
+    "_id" | "code" | "customerId" | "items" | "totalCents" | "packagingCents" | "pickupSlot" | "source" | "serviceType" | "table" | "paidAt" | "paymentMethod"
   >,
   status: S,
   closedAt: Date | null
@@ -23,6 +23,7 @@ export async function buildClosedPayload<S extends OrderClosedPayload["status"]>
     orderId: order._id.toString(),
     customerId: order.customerId?.toString() ?? null,
     totalCents: order.totalCents,
+    packagingCents: order.packagingCents ?? 0,
     code: order.code,
     customerName: customer?.name ?? "",
     customerCode: customer?.customerCode ?? "",

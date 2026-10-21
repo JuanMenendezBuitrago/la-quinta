@@ -47,6 +47,9 @@ export const settingsTypeDefs = /* GraphQL */ `
     anadir productos ni pedir (createOrder lo rechaza).
     """
     staffOnlyOrders: Boolean!
+    """Recargo por empaque (pesos) que se suma una vez a cada pedido para llevar: los "Para llevar"
+    del personal y los de recogida de la web (no los de mesa o barra). 0 = sin recargo."""
+    packagingFeeCents: Int!
   }
 
   input SiteSettingsInput {
@@ -63,6 +66,7 @@ export const settingsTypeDefs = /* GraphQL */ `
     taxId: String
     privacyEmail: String
     staffOnlyOrders: Boolean
+    packagingFeeCents: Int
   }
 
   extend type Query {

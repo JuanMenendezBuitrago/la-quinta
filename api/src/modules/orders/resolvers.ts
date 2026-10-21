@@ -8,7 +8,7 @@ import { StaffUser, User } from "../users/model";
 import { EVENTS } from "../../config/pubsub";
 import { internalEvents, INTERNAL_EVENTS } from "../../config/events";
 import { buildClosedPayload } from "./closed";
-import { getOpeningHours, staffOnlyOrders } from "../settings/resolvers";
+import { getOpeningHours, packagingFeeCents, staffOnlyOrders } from "../settings/resolvers";
 import { pickupOutsideHoursReason } from "../settings/openingHours";
 
 const ACTIVE_STATUSES: OrderStatus[] = ["NUEVO", "EN_PREPARACION", "LISTO"];
@@ -59,6 +59,7 @@ export const ordersResolvers = {
     createdAt: (doc: any) => new Date(doc.createdAt).toISOString(),
     updatedAt: (doc: any) => new Date(doc.updatedAt).toISOString(),
     deliveredAt: (doc: any) => iso(doc.deliveredAt),
+    packagingCents: (doc: any) => doc.packagingCents ?? 0,
     // Una sola consulta por pedido para el nombre y el avatar del personal que hizo cada cambio.
     statusHistory: async (doc: any) => {
       const history: any[] = doc.statusHistory ?? [];
@@ -122,13 +123,16 @@ export const ordersResolvers = {
       }
 
       const { lines, totalCents } = await buildOrderLines(args.items);
+      // Recogida en tienda = para llevar: lleva el recargo por empaque. En mesa, no.
+      const packagingCents = table ? 0 : await packagingFeeCents();
       const order = await createWithUniqueCode({
         customerId: customerId as any,
         source: "WEB",
         // En mesa se cobra aparte, como los pedidos de mesa que toma el personal (requiresPayment).
         ...(table ? { serviceType: "MESA" as const, table } : {}),
         items: lines,
-        totalCents,
+        totalCents: totalCents + packagingCents,
+        packagingCents,
         pickupSlot,
         status: "NUEVO",
       });
@@ -157,6 +161,7 @@ export const ordersResolvers = {
       if (input.customerId && !(await activeCustomerExists(input.customerId))) throw new Error("Cliente no encontrado");
 
       const { lines, totalCents } = await buildOrderLines(input.items);
+      const packagingCents = input.serviceType === "LLEVAR" ? await packagingFeeCents() : 0;
       // Lo toma el personal en el local: la recogida es ahora y no se valida contra el horario.
       const order = await createWithUniqueCode({
         customerId: (input.customerId || null) as any,
@@ -166,7 +171,8 @@ export const ordersResolvers = {
         note: input.note?.trim() || undefined,
         createdByStaffId: staff.id as any,
         items: lines,
-        totalCents,
+        totalCents: totalCents + packagingCents,
+        packagingCents,
         pickupSlot: new Date(),
         status: "NUEVO",
       });
