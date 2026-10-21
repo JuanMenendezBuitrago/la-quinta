@@ -5,7 +5,7 @@
       <NuxtLink :to="inStaff && staff ? '/staff' : '/'" class="brand" aria-label="La Quinta">
         <!-- En movil, el logotipo compacto "La 5ta"; en el resto, el horizontal "laquintaesencia" -->
         <img src="/logo-laquintaesencia.png" alt="La Quinta" class="brand-logo brand-logo--wide" width="694" height="76" />
-        <img src="/logo.png" alt="La Quinta" class="brand-logo brand-logo--compact" width="268" height="115" />
+        <img src="/logo-5ta.svg" alt="La Quinta" class="brand-logo brand-logo--compact" width="245" height="102" />
       </NuxtLink>
       <div class="topbar-end">
       <!-- En el panel de personal, su propio menu: carrito y "mi cuenta" son cosas del cliente -->
