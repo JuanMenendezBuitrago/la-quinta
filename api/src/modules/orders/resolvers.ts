@@ -1,4 +1,5 @@
 import { withFilter } from "graphql-subscriptions";
+import { Types } from "mongoose";
 import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
 import { ALLOWED_FROM, CUSTOMER_TABLES, isTakeaway, Order, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
 import { tryComplete } from "./complete";
@@ -42,13 +43,36 @@ export const ordersResolvers = {
       requireStaff(ctx, ["barra", "gestion"]);
       return Order.find(OPEN_ORDER).sort({ createdAt: 1 }).exec();
     },
-    orderHistory: async (_: unknown, args: { limit?: number }, ctx: GraphQLContext) => {
+    orderHistory: async (
+      _: unknown,
+      args: { limit?: number; from?: string | null; to?: string | null; staffId?: string | null; customerId?: string | null },
+      ctx: GraphQLContext
+    ) => {
       requireStaff(ctx, ["barra", "gestion"]);
       // Cerrados o cancelados: lo servido sin cobrar sigue en la cola, no aqui.
-      return Order.find({ $or: [{ status: "CANCELADO" }, { status: "ENTREGADO", completedAt: { $exists: true } }] })
-        .sort({ updatedAt: -1 })
-        .limit(args.limit ?? 50)
-        .exec();
+      const filter: Record<string, unknown> = {
+        $or: [{ status: "CANCELADO" }, { status: "ENTREGADO", completedAt: { $exists: true } }],
+      };
+      const date = (value: string, label: string) => {
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) throw new Error(`Fecha ${label} no valida`);
+        return d;
+      };
+      if (args.from || args.to) {
+        filter.updatedAt = {
+          ...(args.from ? { $gte: date(args.from, "desde") } : {}),
+          ...(args.to ? { $lt: date(args.to, "hasta") } : {}),
+        };
+      }
+      const id = (value: string) => {
+        if (!Types.ObjectId.isValid(value)) throw new Error("Identificador no valido");
+        return new Types.ObjectId(value);
+      };
+      // Quien lo tomo o le cambio el estado en algun momento (el alta del personal tambien queda ahi).
+      if (args.staffId) filter["statusHistory.staffId"] = id(args.staffId);
+      if (args.customerId) filter.customerId = id(args.customerId);
+      const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
+      return Order.find(filter).sort({ updatedAt: -1 }).limit(limit).exec();
     },
   },
   Order: {

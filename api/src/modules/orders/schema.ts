@@ -111,8 +111,12 @@ export const ordersTypeDefs = /* GraphQL */ `
     myOrders: [Order!]!
     """Cola del panel de personal: pedidos activos y los de mesa servidos sin cobrar."""
     orderQueue: [Order!]!
-    """Pedidos cerrados (entregados y, si son de mesa, cobrados) o cancelados, mas recientes primero."""
-    orderHistory(limit: Int): [Order!]!
+    """
+    Pedidos cerrados (entregados y, si son de mesa, cobrados) o cancelados, mas recientes primero.
+    Filtros opcionales: cerrados entre from y to (instantes ISO), alguien del personal que lo tomo
+    o le cambio el estado, y cliente.
+    """
+    orderHistory(limit: Int, from: String, to: String, staffId: ID, customerId: ID): [Order!]!
   }
 
   extend type Mutation {

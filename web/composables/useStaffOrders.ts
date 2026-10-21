@@ -57,7 +57,19 @@ const ORDER_FIELDS = `
 
 const QUEUE_QUERY = gql`query OrderQueue { orderQueue { ${ORDER_FIELDS} } }`;
 const QUEUE_SUBSCRIPTION = gql`subscription OrderQueueUpdated { orderQueueUpdated { ${ORDER_FIELDS} } }`;
-const HISTORY_QUERY = gql`query OrderHistory($limit: Int) { orderHistory(limit: $limit) { ${ORDER_FIELDS} } }`;
+const HISTORY_QUERY = gql`
+  query OrderHistory($limit: Int, $from: String, $to: String, $staffId: ID, $customerId: ID) {
+    orderHistory(limit: $limit, from: $from, to: $to, staffId: $staffId, customerId: $customerId) { ${ORDER_FIELDS} }
+  }
+`;
+
+/** Filtros del historial (ver HistoryFilters.vue): instantes ISO y ids, null = sin filtrar. */
+export interface HistoryFilter {
+  from: string | null;
+  to: string | null;
+  staffId: string | null;
+  customerId: string | null;
+}
 
 const SET_STATUS = gql`
   mutation SetOrderStatus($id: ID!, $status: OrderStatus!, $paymentMethod: PaymentMethod) {
@@ -208,21 +220,31 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
   const historyOrders = ref<any[]>([]);
   const historyLoading = ref(false);
   const historyLoaded = ref(false);
+  let historyFilter: HistoryFilter | null = null;
+  let historyRequest = 0;
 
-  async function loadHistory() {
-    if (historyLoaded.value || historyLoading.value) return;
+  /** Sin argumento, solo la primera vez (al abrir la pestaña); con filtro, vuelve a cargar. */
+  async function loadHistory(filter?: HistoryFilter) {
+    if (filter) historyFilter = Object.values(filter).some(Boolean) ? filter : null;
+    // Al volver a la pestaña los filtros empiezan vacios: si la lista estaba filtrada, se recarga entera.
+    else if (historyFilter) historyFilter = null;
+    else if (historyLoaded.value || historyLoading.value) return;
+    // Si se cambia un filtro con otra carga en curso, gana la ultima.
+    const request = ++historyRequest;
     historyLoading.value = true;
     try {
       const { defaultClient } = useNuxtApp().$apollo;
       const { data } = await defaultClient.query({
         query: HISTORY_QUERY,
-        variables: { limit: 50 },
+        // Con filtros se busca algo concreto: se traen mas.
+        variables: { limit: historyFilter ? 200 : 50, ...historyFilter },
         fetchPolicy: "network-only",
       });
+      if (request !== historyRequest) return;
       historyOrders.value = data?.orderHistory ? [...data.orderHistory] : [];
       historyLoaded.value = true;
     } finally {
-      historyLoading.value = false;
+      if (request === historyRequest) historyLoading.value = false;
     }
   }
 

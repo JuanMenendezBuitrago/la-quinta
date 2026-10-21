@@ -224,9 +224,16 @@
       </section>
 
       <!-- Historial -->
-      <section v-else-if="activeTab === 'historial'" class="history-list">
+      <!-- Pantallas anchas apaisadas: pedidos a la izquierda; filtros a la derecha, fijos al hacer scroll -->
+      <section v-else-if="activeTab === 'historial'" class="wide-layout">
+        <aside class="wide-aside wide-aside--sticky">
+          <HistoryFilters @change="onHistoryFilter" />
+        </aside>
+        <div class="wide-main history-list">
         <p v-if="historyLoading" class="muted">Cargando historial…</p>
-        <p v-else-if="!historyOrders.length" class="muted">Todavía no hay pedidos entregados ni cancelados.</p>
+        <p v-else-if="!historyOrders.length" class="muted">
+          {{ historyFiltered ? "Ningún pedido coincide con los filtros." : "Todavía no hay pedidos entregados ni cancelados." }}
+        </p>
         <div v-for="order in historyOrders" :key="order.id" class="card history-row">
           <div class="order-info">
             <span class="order-code">{{ order.code }}</span>
@@ -243,6 +250,7 @@
             </p>
           </div>
           <span class="status-badge" :class="`status-${order.status}`">{{ statusLabel(order.status) }}</span>
+        </div>
         </div>
       </section>
 
@@ -302,7 +310,7 @@
 <script setup lang="ts">
 import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, Inbox, Trash2, UserPlus } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
-import { PAYMENT_LABELS, useStaffOrders, type CustomerMatch, type PaymentMethod } from "~/composables/useStaffOrders";
+import { PAYMENT_LABELS, useStaffOrders, type CustomerMatch, type HistoryFilter, type PaymentMethod } from "~/composables/useStaffOrders";
 import { primeAudio } from "~/composables/useOrderChime";
 import MenuAdmin from "~/components/MenuAdmin.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
@@ -318,6 +326,7 @@ import StaffOrderTaker from "~/components/StaffOrderTaker.vue";
 import HeroAdmin from "~/components/HeroAdmin.vue";
 import CustomerLookup from "~/components/CustomerLookup.vue";
 import OrderItems from "~/components/OrderItems.vue";
+import HistoryFilters from "~/components/HistoryFilters.vue";
 import InventoryAdmin from "~/components/InventoryAdmin.vue";
 import { formatQty, useInventoryAlerts } from "~/composables/useInventory";
 import { goToSection, STAFF_SECTIONS, useStaffBadges, useStaffSection } from "~/composables/useStaffSections";
@@ -385,6 +394,12 @@ function queueHeading(status: string, count: number) {
   return `${count} ${count === 1 ? words[0] : words[1]}`;
 }
 
+const historyFiltered = ref(false);
+function onHistoryFilter(filter: HistoryFilter) {
+  historyFiltered.value = Object.values(filter).some(Boolean);
+  loadHistory(filter);
+}
+
 /** Ultimo miembro del personal que cambio el estado del pedido (o lo tomo), si lo hay. */
 function handledBy(order: any): { staffName: string; staffAvatar?: string | null } | null {
   const history: any[] = order.statusHistory ?? [];
@@ -423,7 +438,7 @@ async function doCancel(order: any) {
 const activeTab = useStaffSection();
 // Secciones con diseño ancho de dos columnas en pantallas apaisadas (.wide-layout en assets/main.css):
 // su titulo se alinea con las columnas.
-const WIDE_SECTIONS: string[] = ["caja", "tomar", "opiniones", "personal", "portada", "cafe", "novedades", "clientes", "carta", "pie"];
+const WIDE_SECTIONS: string[] = ["caja", "tomar", "opiniones", "personal", "portada", "cafe", "novedades", "clientes", "carta", "pie", "historial"];
 const sectionLabel = computed(() => STAFF_SECTIONS.find((s) => s.id === activeTab.value)?.label ?? "");
 const selectTab = goToSection;
 
@@ -672,7 +687,7 @@ watchEffect(() => {
 .assign-icon:disabled { opacity: 0.45; cursor: not-allowed; }
 .danger-solid { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
 
-.history-list { display: flex; flex-direction: column; gap: 10px; }
+.history-list { gap: 10px; }
 /* Estado (entregado/cancelado) en la esquina superior derecha, alineado con el codigo */
 .history-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 
