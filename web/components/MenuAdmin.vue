@@ -1,7 +1,23 @@
 <template>
   <!-- Pantallas anchas apaisadas: productos a la izquierda; categorias y personalizaciones a la derecha.
        En movil, categorias y personalizaciones primero (como antes) y despues los productos. -->
-  <section class="menu-admin wide-layout">
+  <section class="menu-admin wide-layout" :data-tab="mobileTab">
+    <!-- Movil y vertical: pestañas arriba, se ve una parte cada vez (en pantalla ancha, todo a la vez) -->
+    <nav class="menu-tabs" role="tablist" aria-label="Partes de la carta">
+      <button
+        v-for="t in MOBILE_TABS"
+        :key="t.id"
+        type="button"
+        role="tab"
+        class="menu-tab"
+        :class="{ active: mobileTab === t.id }"
+        :aria-selected="mobileTab === t.id"
+        @click="selectTab(t.id)"
+      >
+        {{ t.label }}
+        <span class="tab-count">{{ t.count() }}</span>
+      </button>
+    </nav>
     <aside class="wide-aside">
     <section class="categories-admin">
       <div class="categories-header">
@@ -560,7 +576,22 @@ function toggleModifier(group: ModifierGroupAdmin, checked: boolean) {
 
 const form = reactive(emptyForm());
 
+// --- Pestañas en movil ---
+type MobileTab = "productos" | "categorias" | "personalizaciones";
+const MOBILE_TABS: { id: MobileTab; label: string; count: () => number }[] = [
+  { id: "productos", label: "Productos", count: () => categories.value.reduce((n, c) => n + c.items.length, 0) },
+  { id: "categorias", label: "Categorías", count: () => categories.value.length },
+  { id: "personalizaciones", label: "Personalizaciones", count: () => groups.value.length },
+];
+const mobileTab = ref<MobileTab>("productos");
+function selectTab(id: MobileTab) {
+  mobileTab.value = id;
+  window.scrollTo({ top: 0 });
+}
+
 function startCreate(categoryId?: string) {
+  // "+ Nuevo producto" esta en la cabecera: se puede pulsar desde otra pestaña
+  mobileTab.value = "productos";
   Object.assign(form, emptyForm());
   form.categoryId = categoryId ?? categories.value[0]?.id ?? "";
   formError.value = "";
@@ -648,6 +679,62 @@ function formatPrice(priceCents: number) {
 </script>
 
 <style scoped>
+/* Pestañas: solo en movil y vertical, fijas bajo la barra superior */
+.menu-tabs {
+  position: sticky;
+  top: 77px;
+  z-index: 5;
+  display: flex;
+  gap: 4px;
+  margin: -6px 0 0;
+  padding: 2px 0 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.menu-tab {
+  /* Numero debajo del nombre: asi caben las tres pestañas en 360 px sin cortar "Personalizaciones" */
+  flex: 1 0 auto;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 6px 7px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.menu-tab.active { color: var(--accent-strong); border-bottom-color: var(--accent-strong); }
+.menu-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tab-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.menu-tab.active .tab-count { background: var(--accent-strong); color: var(--bg); }
+@media (max-width: 999px), (orientation: portrait) {
+  .menu-admin[data-tab="productos"] .wide-aside,
+  .menu-admin[data-tab="categorias"] .groups-admin,
+  .menu-admin[data-tab="categorias"] .wide-main,
+  .menu-admin[data-tab="personalizaciones"] .categories-admin,
+  .menu-admin[data-tab="personalizaciones"] .wide-main { display: none; }
+  /* La parte visible empieza arriba, sin el margen ni la raya que la separaban de la siguiente */
+  .menu-admin .categories-admin, .menu-admin .groups-admin { margin-top: 0; border-bottom: none; }
+}
+@media (min-width: 1000px) and (orientation: landscape) { .menu-tabs { display: none; } }
+
 .menu-admin { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
 .menu-admin .wide-main, .menu-admin .wide-aside { gap: 0; }
 @media (min-width: 1000px) and (orientation: landscape) {
