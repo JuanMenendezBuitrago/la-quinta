@@ -330,8 +330,9 @@ function statusLabel(status: string) {
   padding: 26px 20px;
 }
 .stamps-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 260px; }
-.stamp { width: 22px; height: 22px; border-radius: 50%; border: 1.4px solid var(--accent); background: transparent; }
-.stamp.filled { background: var(--accent); }
+/* Cada sello es un querubin (claro u oscuro segun el tema, ver --stamp-img); los pendientes, tenues. */
+.stamp { width: 24px; height: 34px; background: var(--stamp-img) center / contain no-repeat; opacity: 0.22; }
+.stamp.filled { opacity: 1; }
 .stamps-label { color: var(--text-muted); font-size: 13px; margin: 0; }
 
 .order-row {

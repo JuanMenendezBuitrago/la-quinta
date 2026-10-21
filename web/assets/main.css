@@ -73,6 +73,7 @@
   /* Pie: marron con texto crema (en oscuro, cafe oscuro) */
   --footer-bg: var(--color4);
   --footer-text: var(--surface);
+  --stamp-img: url("/sellos/querubin-claro.svg");
   color-scheme: light;
 }
 
@@ -100,6 +101,7 @@
     --color5: #cdb85e;
     --footer-bg: #2e241b;
     --footer-text: #f3ead0;
+    --stamp-img: url("/sellos/querubin-oscuro.svg");
     color-scheme: dark;
   }
 }
@@ -120,6 +122,7 @@
   --color5: #cdb85e;
   --footer-bg: #2e241b;
   --footer-text: #f3ead0;
+  --stamp-img: url("/sellos/querubin-oscuro.svg");
   color-scheme: dark;
 }
 
