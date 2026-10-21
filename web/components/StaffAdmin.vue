@@ -9,7 +9,9 @@
       </Teleport>
     </ClientOnly>
     <!-- Solo en pantallas anchas: la columna del formulario no queda vacia -->
-    <p v-if="!formOpen" class="muted form-placeholder">Pulsa «Editar» en una cuenta o crea una nueva.</p>
+    <div v-if="!formOpen" class="form-placeholder">
+      <EmptyState :icon="UserCog" title="Elige una cuenta para editarla">O crea una nueva con «+ Nueva cuenta».</EmptyState>
+    </div>
 
     <form v-if="formOpen" class="card staff-form" @submit.prevent="submitForm">
       <h3>{{ form.id ? "Editar cuenta" : "Nueva cuenta" }}</h3>
@@ -95,13 +97,14 @@
       </div>
       <button class="button secondary" type="button" @click="startEdit(user)">Editar</button>
     </div>
-    <p v-if="!loading && !staffUsers.length" class="muted">No hay cuentas de personal todavía.</p>
+    <EmptyState v-if="!loading && !staffUsers.length" :icon="Users" title="No hay cuentas de personal todavía" />
     </aside>
   </section>
 </template>
 
 <script setup lang="ts">
-import { Trash2 } from "lucide-vue-next";
+import EmptyState from "~/components/EmptyState.vue";
+import { Trash2, UserCog, Users } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { useStaffAuth } from "~/composables/useAuth";
 import UserAvatar from "~/components/UserAvatar.vue";
@@ -235,7 +238,7 @@ async function submitForm() {
 
 <style scoped>
 .staff-main { gap: 0; }
-.form-placeholder { display: none; margin: 0; }
+.form-placeholder { display: none; }
 @media (min-width: 1000px) and (orientation: landscape) { .form-placeholder { display: block; } }
 .staff-list { gap: 0; }
 .staff-list .staff-row:first-of-type { margin-top: 0; }

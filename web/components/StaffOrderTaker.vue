@@ -24,7 +24,7 @@
 
     <p v-if="loading && !menu.length" class="muted">Cargando la carta…</p>
     <p v-if="error" class="muted" style="color: var(--danger)">No se pudo cargar la carta.</p>
-    <p v-if="menu.length && !visibleItems.length" class="muted">Ningún producto coincide con la búsqueda.</p>
+    <EmptyState v-if="menu.length && !visibleItems.length" :icon="SearchX" title="Ningún producto coincide con la búsqueda" />
 
     <!-- Cuadricula: un toque en la tarjeta suma una unidad; "−" resta -->
     <ul class="product-grid">
@@ -129,6 +129,8 @@
 </template>
 
 <script setup lang="ts">
+import { SearchX } from "lucide-vue-next";
+import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import { orderLinesInput, useCart } from "~/composables/useCart";
 import { MENU_QUERY, defaultCartOptions, missingModifiers, type MenuCategory, type MenuItem } from "~/composables/useMenu";

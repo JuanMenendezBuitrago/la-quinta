@@ -17,7 +17,7 @@
            fijo al hacer scroll (y el boton de confirmar dentro de la columna, no en la barra inferior) -->
       <div class="wide-layout cart-layout">
       <div class="wide-main">
-      <p v-if="lines.length === 0" class="muted">Todavía no has añadido nada de la carta.</p>
+      <EmptyState v-if="lines.length === 0" :icon="ShoppingBag" title="Tu pedido está vacío">Todavía no has añadido nada. <NuxtLink to="/">Ver la carta</NuxtLink></EmptyState>
 
       <div v-else class="order-lines">
         <div v-for="line in lines" :key="line.key" class="order-line">
@@ -146,7 +146,8 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronLeft, Clock } from "lucide-vue-next";
+import EmptyState from "~/components/EmptyState.vue";
+import { ChevronLeft, Clock, ShoppingBag } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { orderLinesInput, useCart } from "~/composables/useCart";
 import { MENU_QUERY, missingModifiers, type MenuCategory } from "~/composables/useMenu";

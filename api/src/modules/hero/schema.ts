@@ -14,6 +14,8 @@ export const heroTypeDefs = /* GraphQL */ `
     tone: HeroTone!
     linkUrl: String
     linkLabel: String
+    """Foto de fondo: ruta /uploads/... o https://. Null: fondo de color (tone)."""
+    imageUrl: String
     """Primer dia en que se muestra (YYYY-MM-DD, calendario de la tienda). Null: sin limite."""
     startDate: String
     """Ultimo dia en que se muestra (incluido). Null: sin limite."""
@@ -30,6 +32,7 @@ export const heroTypeDefs = /* GraphQL */ `
     """https://... o una ruta de la web que empiece por / (p. ej. /cuenta)."""
     linkUrl: String
     linkLabel: String
+    imageUrl: String
     startDate: String
     endDate: String
     active: Boolean!

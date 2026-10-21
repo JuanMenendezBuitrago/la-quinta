@@ -17,7 +17,7 @@
 
     <p v-if="!supplies.length && !loading" class="muted">Primero da de alta los insumos en «Stock».</p>
     <p v-if="loading && !categories.length" class="muted">Cargando la carta…</p>
-    <p v-else-if="categories.length && !groups.length" class="muted">Ningún producto coincide.</p>
+    <EmptyState v-else-if="categories.length && !groups.length" :icon="SearchX" title="Ningún producto coincide" />
 
     <section v-for="group in groups" :key="group.id" class="group">
       <h3>{{ group.name }}</h3>
@@ -79,7 +79,8 @@
 </template>
 
 <script setup lang="ts">
-import { Trash2 } from "lucide-vue-next";
+import EmptyState from "~/components/EmptyState.vue";
+import { SearchX, Trash2 } from "lucide-vue-next";
 import {
   formatQty,
   RECIPE_MENU_QUERY,

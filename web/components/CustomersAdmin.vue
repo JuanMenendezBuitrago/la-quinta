@@ -16,9 +16,10 @@
 
       <p v-if="listLoading && !customers.length" class="muted">Cargando clientes…</p>
       <p v-if="listError" class="muted" style="color: var(--danger)">{{ listError }}</p>
-      <p v-if="!listLoading && !listError && !customers.length" class="muted">
-        {{ search.trim() ? "Ningún cliente coincide con la búsqueda." : "Todavía no hay clientes registrados." }}
-      </p>
+      <template v-if="!listLoading && !listError && !customers.length">
+        <EmptyState v-if="search.trim()" :icon="SearchX" title="Ningún cliente coincide con la búsqueda" />
+        <EmptyState v-else :icon="Users" title="Todavía no hay clientes registrados" />
+      </template>
 
       <button v-for="c in customers" :key="c.id" type="button" class="card row customer-row" :class="{ selected: c.id === selectedId }" @click="openDetail(c.id)">
         <UserAvatar :avatar="c.avatar" :name="c.name" :size="36" />
@@ -113,7 +114,7 @@
 
         <section class="detail-section">
           <h3>Pedidos</h3>
-          <p v-if="!detail.orders.length" class="muted">Todavía no ha hecho ningún pedido.</p>
+          <EmptyState v-if="!detail.orders.length" compact :icon="ShoppingBag" title="Todavía no ha hecho ningún pedido" />
           <div v-for="order in detail.orders" :key="order.id" class="card row">
             <div class="row-info">
               <span class="code">{{ order.code }}</span>
@@ -126,7 +127,7 @@
 
         <section class="detail-section">
           <h3>Historial de sellos</h3>
-          <p v-if="!detail.stamps.length" class="muted">Sin movimientos.</p>
+          <EmptyState v-if="!detail.stamps.length" compact :icon="Stamp" title="Sin movimientos de sellos" />
           <div v-for="m in detail.stamps" :key="m.id" class="card row">
             <div class="row-info">
               <strong>{{ REASON_LABELS[m.reason] ?? m.reason }}</strong>
@@ -143,12 +144,14 @@
     </div>
     <!-- Solo en pantallas anchas: la columna de la ficha no queda vacia -->
     <div v-else class="wide-main detail-placeholder">
-      <p class="muted">Elige un cliente del listado para ver su ficha.</p>
+      <EmptyState :icon="UserSearch" title="Elige un cliente del listado">Aquí verás su ficha: sellos, pedidos y movimientos.</EmptyState>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { SearchX, ShoppingBag, Stamp, UserSearch, Users } from "lucide-vue-next";
+import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import UserAvatar from "~/components/UserAvatar.vue";
 

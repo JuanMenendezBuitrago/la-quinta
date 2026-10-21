@@ -142,7 +142,7 @@
     <div class="wide-main coffee-list">
     <p v-if="loading && !coffees.length" class="muted">Cargando…</p>
     <p v-if="error" class="muted" style="color: var(--danger)">No se pudieron cargar los cafés.</p>
-    <p v-if="!loading && !coffees.length && !formOpen" class="muted">Todavía no hay cafés en grano.</p>
+    <EmptyState v-if="!loading && !coffees.length && !formOpen" :icon="Coffee" title="Todavía no hay cafés en grano">Crea el primero con «+ Nuevo café».</EmptyState>
 
     <template v-for="coffee in coffees" :key="coffee.id">
     <div class="card coffee-row" :class="{ unavailable: !coffee.available, editing: formOpen && form.id === coffee.id }">
@@ -167,7 +167,8 @@
 </template>
 
 <script setup lang="ts">
-import { Trash2 } from "lucide-vue-next";
+import EmptyState from "~/components/EmptyState.vue";
+import { Coffee, Trash2 } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { ROAST_LABELS } from "~/composables/useMenu";
 

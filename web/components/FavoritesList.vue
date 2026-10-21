@@ -1,8 +1,8 @@
 <template>
   <div class="favorites">
-    <p v-if="!favorites.length" class="muted">
-      Todavía no tienes favoritos. Márcalos con el corazón en la <NuxtLink to="/">carta</NuxtLink>.
-    </p>
+    <EmptyState v-if="!favorites.length" :icon="Heart" title="Todavía no tienes favoritos">
+      Márcalos con el corazón en la <NuxtLink to="/">carta</NuxtLink>.
+    </EmptyState>
     <ul v-else class="favorite-list">
       <li v-for="item in favorites" :key="item.id" class="favorite-row">
         <img
@@ -42,6 +42,7 @@
 </template>
 
 <script setup lang="ts">
+import EmptyState from "~/components/EmptyState.vue";
 import { Heart } from "lucide-vue-next";
 import { useCart } from "~/composables/useCart";
 import { useFavorites } from "~/composables/useFavorites";

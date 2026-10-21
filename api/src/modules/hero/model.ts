@@ -10,6 +10,8 @@ export interface HeroSlideDoc {
   tone: HeroTone; // uno de los colores del diseño (ver HeroSlideCard.vue)
   linkUrl?: string;
   linkLabel?: string;
+  // Foto de fondo (subida a /uploads o https://). Sin ella, el fondo es el color de `tone`.
+  imageUrl?: string;
   // Dias de vigencia en el calendario de la tienda ("YYYY-MM-DD", ambos incluidos). Sin ellos,
   // la diapositiva se muestra siempre que este activa.
   startDate?: string;
@@ -29,6 +31,7 @@ const heroSlideSchema = new Schema<HeroSlideDoc>({
   tone: { type: String, enum: ["teal", "brown", "olive"], default: "teal" },
   linkUrl: { type: String, trim: true, maxlength: 500 },
   linkLabel: { type: String, trim: true, maxlength: 30 },
+  imageUrl: { type: String, trim: true, maxlength: 500 },
   startDate: { type: String, match: DATE_PATTERN },
   endDate: { type: String, match: DATE_PATTERN },
   active: { type: Boolean, default: true },

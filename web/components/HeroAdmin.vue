@@ -2,9 +2,12 @@
   <!-- Pantallas anchas apaisadas: diapositivas a la izquierda; alta y edicion (con vista previa) a la derecha -->
   <section class="hero-admin wide-layout">
     <aside class="wide-aside wide-aside--sticky">
-    <div class="hero-admin-header">
-      <button class="button" type="button" :disabled="formOpen" @click="startCreate">+ Nueva diapositiva</button>
-    </div>
+    <!-- En la cabecera de la seccion, a la derecha (solo en cliente: Teleport fuera de #teleports no se renderiza en SSR) -->
+    <ClientOnly>
+      <Teleport to="#staff-hero-actions">
+        <button class="button" type="button" :disabled="formOpen" @click="startCreate">+ Nueva diapositiva</button>
+      </Teleport>
+    </ClientOnly>
     <p class="muted intro">
       Ofertas, eventos y novedades que se muestran arriba de la carta. Solo se ven las activas y
       dentro de sus fechas; con fechas, una oferta aparece y desaparece sola.
@@ -41,6 +44,23 @@
         <textarea v-model="form.text" rows="2" maxlength="160"></textarea>
       </label>
 
+      <div class="field">
+        <span class="muted">Imagen de fondo (opcional; sin ella, el fondo es el color elegido)</span>
+        <div class="image-row">
+          <label class="button secondary upload" :class="{ disabled: uploading }">
+            <ImageUp :size="16" :stroke-width="1.8" aria-hidden="true" />
+            {{ uploading ? "Subiendo…" : form.imageUrl ? "Cambiar imagen" : "Subir imagen" }}
+            <input type="file" accept="image/png,image/jpeg,image/webp" :disabled="uploading" @change="handleImageUpload" />
+          </label>
+          <button v-if="form.imageUrl" class="button secondary delete" type="button" @click="form.imageUrl = ''">
+            <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
+            Quitar
+          </button>
+        </div>
+        <span v-if="uploadError" class="muted" style="color: var(--danger)">{{ uploadError }}</span>
+        <span class="muted hint">Mejor apaisada (p. ej. 1600×600). Abajo se oscurece para que el texto se lea.</span>
+      </div>
+
       <div class="grid-2">
         <label class="field">
           <span class="muted">Enlace (opcional)</span>
@@ -70,7 +90,7 @@
 
       <p v-if="formError" class="muted" style="color: var(--danger)">{{ formError }}</p>
       <div class="form-actions">
-        <button class="button" type="submit" :disabled="saving">{{ saving ? "Guardando…" : "Guardar" }}</button>
+        <button class="button" type="submit" :disabled="saving || uploading">{{ saving ? "Guardando…" : "Guardar" }}</button>
         <button class="button secondary cancel" type="button" :disabled="saving" @click="closeForm"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
       </div>
     </form>
@@ -80,9 +100,9 @@
     <div class="wide-main slide-list">
     <p v-if="loading && !slides.length" class="muted">Cargando…</p>
     <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
-    <p v-if="!loading && !loadError && !slides.length" class="muted">
-      No hay diapositivas: la portada de la carta no muestra el carrusel.
-    </p>
+    <EmptyState v-if="!loading && !loadError && !slides.length" :icon="Images" title="No hay diapositivas">
+      Mientras no haya ninguna, la portada de la carta no muestra el carrusel.
+    </EmptyState>
     <div v-for="(slide, i) in slides" :key="slide.id" class="card slide-row">
       <HeroSlideCard :slide="slide" class="mini" />
       <div class="slide-meta">
@@ -108,7 +128,9 @@
 </template>
 
 <script setup lang="ts">
-import { Trash2 } from "lucide-vue-next";
+import EmptyState from "~/components/EmptyState.vue";
+import { ImageUp, Images, Trash2 } from "lucide-vue-next";
+import { useImageUpload } from "~/composables/useImageUpload";
 import {
   ALL_HERO_SLIDES_QUERY,
   CREATE_HERO_SLIDE,
@@ -165,6 +187,7 @@ function emptyForm() {
     tone: "teal" as HeroTone,
     linkUrl: "",
     linkLabel: "",
+    imageUrl: "",
     startDate: "",
     endDate: "",
     active: true,
@@ -182,7 +205,15 @@ const previewSlide = computed(() => ({
   tone: form.tone,
   linkUrl: form.linkUrl.trim() || null,
   linkLabel: form.linkLabel.trim() || null,
+  imageUrl: form.imageUrl || null,
 }));
+
+// Misma subida que las fotos de la carta (/uploads, solo gestion).
+const { uploading, uploadError, uploadFromInput } = useImageUpload();
+async function handleImageUpload(event: Event) {
+  const url = await uploadFromInput(event);
+  if (url) form.imageUrl = url;
+}
 
 function startCreate() {
   Object.assign(form, emptyForm());
@@ -198,6 +229,7 @@ function startEdit(slide: HeroSlide) {
     tone: slide.tone,
     linkUrl: slide.linkUrl ?? "",
     linkLabel: slide.linkLabel ?? "",
+    imageUrl: slide.imageUrl ?? "",
     startDate: slide.startDate ?? "",
     endDate: slide.endDate ?? "",
     active: slide.active,
@@ -220,6 +252,7 @@ async function submit() {
     tone: form.tone,
     linkUrl: form.linkUrl.trim() || null,
     linkLabel: form.linkLabel.trim() || null,
+    imageUrl: form.imageUrl || null,
     startDate: form.startDate || null,
     endDate: form.endDate || null,
     active: form.active,
@@ -269,15 +302,19 @@ function remove(id: string) {
 </script>
 
 <style scoped>
+.image-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.upload { position: relative; }
+.upload.disabled { opacity: 0.45; cursor: not-allowed; }
+.upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.upload:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { font-size: 12.5px; }
 .hero-admin { max-width: 640px; }
 @media (min-width: 1000px) and (orientation: landscape) { .hero-admin { max-width: none; } }
 .hero-admin .wide-aside { gap: 12px; }
 .hero-admin .slide-form { margin-bottom: 0; }
 .slide-list { gap: 0; }
 .slide-list .slide-row:first-of-type { margin-top: 0; }
-.hero-admin-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.hero-admin-header h2 { margin: 0; }
-.intro { margin: 8px 0 16px; font-size: 14px; }
+.intro { margin: 0 0 16px; font-size: 14px; }
 
 .slide-form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
 .slide-form h3 { margin: 0; }

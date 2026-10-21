@@ -9,6 +9,7 @@ interface HeroSlideInput {
   tone: HeroTone;
   linkUrl?: string | null;
   linkLabel?: string | null;
+  imageUrl?: string | null;
   startDate?: string | null;
   endDate?: string | null;
   active: boolean;
@@ -49,6 +50,13 @@ function clean(input: HeroSlideInput) {
   const linkLabel = input.linkLabel?.trim() || undefined;
   if (linkUrl && !linkLabel) throw new Error("Indica el texto del enlace (p. ej. Reservar plaza)");
 
+  // Va a un background-image de la portada publica: solo subidas propias o https, sin comillas ni
+  // parentesis que pudieran romper el url(...).
+  const imageUrl = input.imageUrl?.trim() || undefined;
+  if (imageUrl && !/^\/uploads\/[\w.-]+$/.test(imageUrl) && !/^https:\/\/[^\s"'()\\]+$/i.test(imageUrl)) {
+    throw new Error("La imagen debe ser una subida o un enlace https://");
+  }
+
   const startDate = input.startDate?.trim() || undefined;
   const endDate = input.endDate?.trim() || undefined;
   if (startDate && !isValidDate(startDate)) throw new Error("La fecha de inicio no es valida");
@@ -62,6 +70,7 @@ function clean(input: HeroSlideInput) {
     tone: input.tone,
     linkUrl,
     linkLabel: linkUrl ? linkLabel : undefined,
+    imageUrl,
     startDate,
     endDate,
     active: input.active,

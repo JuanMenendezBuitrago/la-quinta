@@ -11,7 +11,7 @@
     </p>
 
     <p v-if="loading && !active.length" class="muted">Cargando insumos…</p>
-    <p v-else-if="!active.length" class="muted">No hay insumos activos que contar.</p>
+    <EmptyState v-else-if="!active.length" :icon="ClipboardCheck" title="No hay insumos activos que contar" />
 
     <template v-if="!reviewing">
       <section v-for="group in groups" :key="group.title" class="group">
@@ -66,6 +66,8 @@
 </template>
 
 <script setup lang="ts">
+import { ClipboardCheck } from "lucide-vue-next";
+import EmptyState from "~/components/EmptyState.vue";
 import { formatDelta, formatQty, RECORD_COUNT, SUPPLIES_QUERY, type Supply } from "~/composables/useInventory";
 import QtyInput from "~/components/QtyInput.vue";
 

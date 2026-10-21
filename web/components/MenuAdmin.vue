@@ -84,7 +84,7 @@
         </div>
       </form>
 
-      <p v-if="!groups.length && !groupFormOpen" class="muted">Todavía no hay personalizaciones.</p>
+      <EmptyState v-if="!groups.length && !groupFormOpen" compact :icon="SlidersHorizontal" title="Todavía no hay personalizaciones" />
       <!-- Botones debajo de la descripcion (no a la derecha): las opciones necesitan todo el ancho -->
       <div v-for="group in groups" :key="group.id" class="card category-row group-row">
         <div class="item-info">
@@ -240,14 +240,15 @@
       </div>
       <div :id="`item-form-slot-${item.id}`" />
       </template>
-      <p v-if="!category.items.length" class="muted">Sin productos en esta categoría.</p>
+      <EmptyState v-if="!category.items.length" compact :icon="PackageOpen" title="Sin productos en esta categoría" />
     </section>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { Trash2 } from "lucide-vue-next";
+import EmptyState from "~/components/EmptyState.vue";
+import { PackageOpen, SlidersHorizontal, Trash2 } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 
 interface ModifierOptionAdmin {

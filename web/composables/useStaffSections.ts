@@ -51,9 +51,8 @@ export function goToSection(id: StaffSectionId) {
 }
 
 /**
- * Contadores que la pagina del panel publica para los menus (pedidos en cola, insumos bajo minimo
- * y, para la barra de acceso rapido, los pedidos por cobrar).
+ * Contadores que la pagina del panel publica para los menus (pedidos en cola, insumos bajo minimo).
  */
 export function useStaffBadges() {
-  return useState<Partial<Record<StaffSectionId | "porCobrar", number>>>("lq-staff-badges", () => ({}));
+  return useState<Partial<Record<StaffSectionId, number>>>("lq-staff-badges", () => ({}));
 }

@@ -60,7 +60,7 @@
 
     <aside class="wide-aside campaigns">
     <h2 class="history-title">Envíos</h2>
-    <p v-if="!overview?.campaigns.length" class="muted">Todavía no se ha enviado ninguno.</p>
+    <EmptyState v-if="!overview?.campaigns.length" compact :icon="Mail" title="Todavía no se ha enviado ninguno" />
     <article v-for="c in overview?.campaigns ?? []" :key="c.id" class="card campaign">
       <div class="campaign-head">
         <strong>{{ c.subject }}</strong>
@@ -76,6 +76,7 @@
 </template>
 
 <script setup lang="ts">
+import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import { Mail, Send } from "lucide-vue-next";
 

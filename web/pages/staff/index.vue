@@ -233,9 +233,8 @@
         </aside>
         <div class="wide-main history-list">
         <p v-if="historyLoading" class="muted">Cargando historial…</p>
-        <p v-else-if="!historyOrders.length" class="muted">
-          {{ historyFiltered ? "Ningún pedido coincide con los filtros." : "Todavía no hay pedidos entregados ni cancelados." }}
-        </p>
+        <EmptyState v-else-if="!historyOrders.length && historyFiltered" :icon="SearchX" title="Ningún pedido coincide con los filtros" />
+        <EmptyState v-else-if="!historyOrders.length" :icon="History" title="Todavía no hay pedidos entregados ni cancelados" />
         <div v-for="order in historyOrders" :key="order.id" class="card history-row">
           <div class="order-info">
             <span class="order-code">{{ order.code }}</span>
@@ -310,7 +309,8 @@
 </template>
 
 <script setup lang="ts">
-import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, Inbox, Trash2, UserPlus } from "lucide-vue-next";
+import EmptyState from "~/components/EmptyState.vue";
+import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, SearchX, Trash2, UserPlus } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import { PAYMENT_LABELS, useStaffOrders, type CustomerMatch, type HistoryFilter, type PaymentMethod } from "~/composables/useStaffOrders";
 import { primeAudio } from "~/composables/useOrderChime";
@@ -459,7 +459,6 @@ watchEffect(() => {
   badges.value = {
     cola: groupedQueue.value.reduce((sum: number, g: { orders: unknown[] }) => sum + g.orders.length, 0),
     inventario: lowCount.value,
-    porCobrar: groupedQueue.value.find((g: { status: string }) => g.status === "POR_COBRAR")?.orders.length ?? 0,
   };
 });
 </script>

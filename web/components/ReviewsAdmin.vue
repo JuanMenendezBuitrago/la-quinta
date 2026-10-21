@@ -45,9 +45,11 @@
 
     <div class="wide-main">
     <p v-if="loadError" class="muted error" role="alert">{{ loadError }}</p>
-    <p v-else-if="!loading && !items.length" class="muted">
-      {{ rating ? `No hay opiniones de ${rating} ${rating === 1 ? "estrella" : "estrellas"}.` : "Todavía no hay opiniones." }}
-    </p>
+    <EmptyState
+      v-else-if="!loading && !items.length"
+      :icon="MessageSquare"
+      :title="rating ? `No hay opiniones de ${rating} ${rating === 1 ? 'estrella' : 'estrellas'}` : 'Todavía no hay opiniones'"
+    />
 
     <article v-for="r in items" :key="r.id" class="card review">
       <header class="review-head">
@@ -72,6 +74,8 @@
 </template>
 
 <script setup lang="ts">
+import { MessageSquare } from "lucide-vue-next";
+import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import StarRating from "~/components/StarRating.vue";
 import UserAvatar from "~/components/UserAvatar.vue";

@@ -21,10 +21,10 @@
     </form>
 
     <p v-if="loading && !supplies.length" class="muted">Cargando inventario…</p>
-    <p v-else-if="!supplies.length" class="muted">
-      Todavía no hay insumos.{{ isGestion ? " Crea el primero con «Nuevo insumo»." : " Gestión debe darlos de alta." }}
-    </p>
-    <p v-else-if="!groups.length" class="muted">Ningún insumo coincide con la búsqueda.</p>
+    <EmptyState v-else-if="!supplies.length" :icon="Package" title="Todavía no hay insumos">
+      {{ isGestion ? "Crea el primero con «Nuevo insumo»." : "Gestión debe darlos de alta." }}
+    </EmptyState>
+    <EmptyState v-else-if="!groups.length" :icon="SearchX" title="Ningún insumo coincide con la búsqueda" />
 
     <section v-for="group in groups" :key="group.title" class="group">
       <h3 :class="{ 'low-title': group.low }">{{ group.title }} ({{ group.items.length }})</h3>
@@ -84,7 +84,7 @@
           <!-- Historial -->
           <div v-else-if="openId === supply.id && mode === 'historial'" class="panel">
             <p v-if="movementsLoading && !movements.length" class="muted">Cargando movimientos…</p>
-            <p v-else-if="!movements.length" class="muted">Sin movimientos todavía.</p>
+            <EmptyState v-else-if="!movements.length" compact :icon="History" title="Sin movimientos todavía" />
             <ul class="movements">
               <li v-for="m in movements" :key="m.id">
                 <span class="mv-delta" :class="{ neg: m.delta < 0 }">{{ formatDelta(m.delta, supply.unit) }}</span>
@@ -108,7 +108,8 @@
 </template>
 
 <script setup lang="ts">
-import { Trash2 } from "lucide-vue-next";
+import EmptyState from "~/components/EmptyState.vue";
+import { History, Package, SearchX, Trash2 } from "lucide-vue-next";
 import {
   ADJUST_STOCK,
   CREATE_SUPPLY,

@@ -10,13 +10,15 @@ export interface HeroSlide {
   tone: HeroTone;
   linkUrl: string | null;
   linkLabel: string | null;
+  /** Foto de fondo (/uploads/... o https://). Null: fondo del color `tone`. */
+  imageUrl: string | null;
   startDate: string | null;
   endDate: string | null;
   active: boolean;
   position: number;
 }
 
-const SLIDE_FIELDS = `id tag title text tone linkUrl linkLabel startDate endDate active position`;
+const SLIDE_FIELDS = `id tag title text tone linkUrl linkLabel imageUrl startDate endDate active position`;
 
 /** Publica: las que se ven hoy en la portada. */
 export const HERO_SLIDES_QUERY = gql`

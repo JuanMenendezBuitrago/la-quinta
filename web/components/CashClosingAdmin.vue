@@ -40,7 +40,7 @@
         </button>
       </div>
       <ExpenseForm v-if="adding" @saved="onExpenseSaved" @cancel="adding = false" />
-      <p v-if="!pending.length && !adding" class="muted">Sin gastos registrados en este periodo.</p>
+      <EmptyState v-if="!pending.length && !adding" compact :icon="Receipt" title="Sin gastos registrados en este periodo" />
       <ul v-if="pending.length" class="expense-list">
         <li v-for="e in pending" :key="e.id" class="expense">
           <ExpenseForm v-if="editingId === e.id" :existing="e" @saved="onExpenseSaved" @cancel="editingId = ''" />
@@ -155,7 +155,7 @@
     <!-- Historial de cierres -->
     <div class="cash-history">
     <h2 class="history-title">Cierres anteriores</h2>
-    <p v-if="!closings.length" class="muted">Todavía no hay ningún cierre.</p>
+    <EmptyState v-if="!closings.length" :icon="Archive" title="Todavía no hay ningún cierre">Aparecerán aquí cada vez que se cierre la caja.</EmptyState>
     <article v-for="c in closings" :key="c.id" class="card closing">
       <header class="closing-head">
         <strong>{{ formatDateTime(c.periodEnd) }}</strong>
@@ -218,8 +218,9 @@
 </template>
 
 <script setup lang="ts">
+import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
-import { Banknote, Check, CircleHelp, CreditCard, ImageIcon, Lock, Pencil, Plus, Receipt, Smartphone, Trash2 } from "lucide-vue-next";
+import { Archive, Banknote, Check, CircleHelp, CreditCard, ImageIcon, Lock, Pencil, Plus, Receipt, Smartphone, Trash2 } from "lucide-vue-next";
 import { useStoreTime } from "~/composables/useStoreTime";
 import { useStaffAuth } from "~/composables/useAuth";
 import { useLightbox } from "~/composables/useLightbox";

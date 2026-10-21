@@ -24,7 +24,7 @@
 
 <script setup lang="ts">
 import type { Component } from "vue";
-import { ClipboardList, History, Package, SquarePen, Wallet } from "lucide-vue-next";
+import { Calculator, ClipboardList, History, Package, SquarePen } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import { goToSection, sectionsFor, useStaffBadges, useStaffSection, type StaffSectionId } from "~/composables/useStaffSections";
 
@@ -50,22 +50,13 @@ async function goToSectionTop(id: StaffSectionId) {
   window.scrollTo({ top: 0 });
 }
 
-// "Por cobrar" no es una seccion: es la ultima columna de la cola, que en movil queda al fondo.
-async function goToAwaitingPayment() {
-  await goToSection("cola");
-  await nextTick();
-  document.getElementById("cola-POR_COBRAR")?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
 const actions = computed<QuickAction[]>(() => {
   const visible = new Set<StaffSectionId>(sectionsFor(staff.value?.role).map((s) => s.id));
   const sectionAction = (id: StaffSectionId, label: string, icon: Component, extra: Partial<QuickAction> = {}) =>
     visible.has(id) ? [{ id, label, icon, go: () => goToSectionTop(id), current: section.value === id, ...extra }] : [];
   return [
     ...sectionAction("cola", "Cola", ClipboardList, { badge: badges.value.cola }),
-    ...(visible.has("cola")
-      ? [{ id: "por-cobrar", label: "Por cobrar", icon: Wallet, go: goToAwaitingPayment, badge: badges.value.porCobrar }]
-      : []),
+    ...sectionAction("caja", "Cierre de caja", Calculator),
     ...sectionAction("tomar", "Tomar", SquarePen, { primary: true }),
     ...sectionAction("historial", "Historial", History),
     ...sectionAction("inventario", "Inventario", Package, { badge: badges.value.inventario, danger: true }),
@@ -89,7 +80,8 @@ const actions = computed<QuickAction[]>(() => {
     /* En tablet las 5 acciones no se estiran a todo el ancho: quedan centradas */
     grid-template-columns: repeat(5, minmax(0, 120px));
     justify-content: center;
-    align-items: end;
+    /* Arriba: si una etiqueta ocupa dos lineas, los iconos siguen alineados */
+    align-items: start;
     padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
     background: var(--surface);
     border-top: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
@@ -114,7 +106,8 @@ const actions = computed<QuickAction[]>(() => {
 }
 .quick.current { color: var(--accent-strong); font-weight: 700; }
 .quick-icon { position: relative; display: inline-flex; }
-.quick-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* Puede pasar a dos lineas ("Cierre de caja" en movil) en vez de cortarse con "…" */
+.quick-label { max-width: 100%; line-height: 1.15; text-align: center; }
 
 /* Tomar pedido: la accion mas repetida, destacada en el centro */
 .quick.primary .quick-icon {

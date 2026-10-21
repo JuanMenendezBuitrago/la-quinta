@@ -34,7 +34,7 @@
 
           <section style="order: 5" class="orders-section">
             <p class="eyebrow">Pedidos recientes</p>
-            <p v-if="!orders?.length" class="muted">Todavía no has hecho ningún pedido.</p>
+            <EmptyState v-if="!orders?.length" :icon="ShoppingBag" title="Todavía no has hecho ningún pedido"><NuxtLink to="/">Ver la carta</NuxtLink></EmptyState>
             <div v-for="order in orders" :key="order.id" class="order-row">
               <div v-if="orderImages(order).length" class="order-thumbs">
                 <img
@@ -139,6 +139,7 @@
 </template>
 
 <script setup lang="ts">
+import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import { useAuth } from "~/composables/useAuth";
 import { useLightbox } from "~/composables/useLightbox";
@@ -148,7 +149,7 @@ import AvatarPicker from "~/components/AvatarPicker.vue";
 import FavoritesList from "~/components/FavoritesList.vue";
 import ReviewForm, { type MyReview } from "~/components/ReviewForm.vue";
 import StarRating from "~/components/StarRating.vue";
-import { Star } from "lucide-vue-next";
+import { ShoppingBag, Star } from "lucide-vue-next";
 import { useImageUrl } from "~/composables/useImageUrl";
 import { tableLabel } from "~/composables/useTables";
 
