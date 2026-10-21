@@ -26,9 +26,9 @@
         </div>
       </form>
 
-      <div class="card category-row" v-for="(category, i) in categories" :key="category.id">
+      <div class="card category-row category-item" v-for="(category, i) in categories" :key="category.id">
         <template v-if="editingCategoryId === category.id">
-          <input v-model="categoryNameDraft" type="text" maxlength="80" style="flex: 1" />
+          <input v-model="categoryNameDraft" class="category-name-input" type="text" maxlength="80" />
           <button class="button secondary" type="button" @click="saveCategoryName(category)">Guardar</button>
           <button class="button secondary cancel" type="button" @click="editingCategoryId = ''"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
         </template>
@@ -654,8 +654,18 @@ function formatPrice(priceCents: number) {
   .menu-admin .categories-admin { margin-top: 0; }
 }
 
-.categories-admin { margin-top: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
-.categories-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.categories-admin { margin-top: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); container-type: inline-size; }
+.category-name-input { flex: 1; min-width: 0; }
+/* Columna estrecha (movil): el nombre arriba y los botones debajo, a todo el ancho; en fila, ▲ ▼ y
+   "Editar nombre" (~280 px) no caben junto al nombre y desbordan la tarjeta. */
+@container (max-width: 460px) {
+  .category-item { flex-wrap: wrap; }
+  .category-item .category-name { flex: 1 1 100%; }
+  .category-item .category-actions { flex: 1 1 100%; display: grid; grid-template-columns: auto auto 1fr; }
+  .category-item .category-name-input { flex: 1 1 100%; }
+  .category-item > .button { flex: 1 1 0; }
+}
+.categories-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 10px; }
 .category-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
 .category-name { font-weight: 600; }
 .category-actions { display: flex; gap: 6px; flex-shrink: 0; }
@@ -677,8 +687,15 @@ function formatPrice(priceCents: number) {
 .item-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
 .item-row.unavailable { opacity: 0.55; }
 .item-row.editing { border-color: var(--accent); opacity: 1; }
-.item-info { flex: 1; }
+.item-info { flex: 1; min-width: 0; }
 .item-actions { display: flex; gap: 8px; flex-shrink: 0; }
+/* Columna estrecha (movil): los botones de cada producto bajan a su propia fila, a mitades */
+.menu-admin .wide-main { container-type: inline-size; }
+@container (max-width: 520px) {
+  .item-row { flex-wrap: wrap; }
+  .item-actions { flex: 1 1 100%; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; align-items: center; }
+  .item-actions > .muted { grid-column: 1 / -1; }
+}
 .thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
 
 .item-form { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
