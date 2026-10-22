@@ -48,11 +48,9 @@
             <template v-if="supply.active">
               <button type="button" class="button secondary small" @click="toggle(supply, 'entrada')">Entrada</button>
               <button type="button" class="button secondary small" @click="toggle(supply, 'merma')">Merma</button>
+              <button type="button" class="button secondary small" @click="toggle(supply, 'ajuste')">Ajuste</button>
             </template>
-            <template v-if="isGestion">
-              <button v-if="supply.active" type="button" class="button secondary small" @click="toggle(supply, 'ajuste')">Ajuste</button>
-              <button type="button" class="button secondary small" @click="toggle(supply, 'editar')">Editar</button>
-            </template>
+            <button v-if="isGestion" type="button" class="button secondary small" @click="toggle(supply, 'editar')">Editar</button>
           </div>
 
           <!-- Entrada / merma / ajuste -->

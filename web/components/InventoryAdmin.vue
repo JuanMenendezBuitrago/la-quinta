@@ -28,8 +28,8 @@ import InventoryStock from "~/components/InventoryStock.vue";
 import InventoryCount from "~/components/InventoryCount.vue";
 import InventoryRecipes from "~/components/InventoryRecipes.vue";
 
-// Barra registra lo que pasa en el dia a dia (entradas, mermas, conteos); Gestion ademas da de
-// alta los insumos, define las recetas y hace ajustes. La API aplica lo mismo en cada mutacion.
+// Barra registra lo que pasa en el dia a dia (entradas, mermas, ajustes, conteos); Gestion ademas
+// da de alta los insumos y define las recetas. La API aplica lo mismo en cada mutacion.
 const { staff } = useStaffAuth();
 const isGestion = computed(() => staff.value?.role === "gestion");
 

@@ -104,7 +104,7 @@ export const inventoryTypeDefs = /* GraphQL */ `
     setSupplyActive(id: ID!, active: Boolean!): Supply!
     """Solo si no tiene movimientos ni esta en ninguna receta (para errores al crearlo)."""
     deleteSupply(id: ID!): Boolean!
-    """Gestion: correccion manual del saldo, con motivo."""
+    """Personal (barra y gestion): correccion manual del saldo, con motivo."""
     adjustStock(supplyId: ID!, delta: Float!, note: String!): Supply!
     """Gestion: lines vacio borra la receta."""
     setRecipe(menuItemId: ID!, lines: [RecipeLineInput!]!): Recipe

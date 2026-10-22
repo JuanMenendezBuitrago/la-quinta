@@ -202,7 +202,7 @@ export const inventoryResolvers = {
       args: { supplyId: string; delta: number; note: string },
       ctx: GraphQLContext
     ) => {
-      const staff = requireStaff(ctx, ["gestion"]);
+      const staff = requireStaff(ctx, [...ANY_STAFF]);
       await findSupply(args.supplyId);
       if (!Number.isFinite(args.delta) || roundQty(args.delta) === 0 || Math.abs(args.delta) > MAX_QTY) {
         throw new Error("El ajuste no es valido");
