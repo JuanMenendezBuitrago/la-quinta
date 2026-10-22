@@ -14,8 +14,18 @@
     <EmptyState v-else-if="!active.length" :icon="ClipboardCheck" title="No hay insumos activos que contar" />
 
     <template v-if="!reviewing">
-      <section v-for="group in groups" :key="group.title" class="group">
-        <h3>{{ group.title }}</h3>
+      <!-- Mismo acordeon que Recetas: cada categoria empieza plegada -->
+      <CollapsibleGroup
+        v-for="group in groups"
+        :key="group.title"
+        :title="group.title"
+        :open="openGroups.has(group.title)"
+        @update:open="toggleGroup(group.title)"
+      >
+        <template #meta>
+          {{ group.items.length }}
+          <span v-if="group.countedCount" class="group-counted">· {{ group.countedCount }} {{ group.countedCount === 1 ? "contado" : "contados" }}</span>
+        </template>
         <ul class="count-list">
           <li v-for="supply in group.items" :key="supply.id" class="count-row">
             <div class="count-info">
@@ -25,7 +35,7 @@
             <QtyInput v-model="counted[supply.id]" :unit="supply.unit" placeholder="Contado" :aria-label="`Contado de ${supply.name}`" />
           </li>
         </ul>
-      </section>
+      </CollapsibleGroup>
     </template>
 
     <!-- Revision antes de guardar -->
@@ -70,6 +80,7 @@ import { ClipboardCheck } from "lucide-vue-next";
 import EmptyState from "~/components/EmptyState.vue";
 import { formatDelta, formatQty, RECORD_COUNT, SUPPLIES_QUERY, type Supply } from "~/composables/useInventory";
 import QtyInput from "~/components/QtyInput.vue";
+import CollapsibleGroup from "~/components/CollapsibleGroup.vue";
 
 const { result, loading } = useQuery<{ supplies: Supply[] }>(SUPPLIES_QUERY, null, () => ({
   fetchPolicy: "cache-and-network",
@@ -82,8 +93,20 @@ const groups = computed(() => {
     const key = s.category || "Sin categoría";
     byCategory.set(key, [...(byCategory.get(key) ?? []), s]);
   }
-  return [...byCategory.entries()].map(([title, items]) => ({ title, items }));
+  return [...byCategory.entries()].map(([title, items]) => ({
+    title,
+    items,
+    countedCount: items.filter((s) => counted.value[s.id] !== null && counted.value[s.id] !== undefined).length,
+  }));
 });
+
+// Categorias desplegadas (por defecto, ninguna).
+const openGroups = ref(new Set<string>());
+function toggleGroup(title: string) {
+  const next = new Set(openGroups.value);
+  if (!next.delete(title)) next.add(title);
+  openGroups.value = next;
+}
 
 const counted = ref<Record<string, number | null>>({});
 const reviewing = ref(false);
@@ -135,8 +158,7 @@ async function save() {
 .count-view { padding-bottom: 72px; }
 .intro { font-size: 14px; margin: 0 0 14px; }
 .saved { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; border-color: var(--accent); }
-.group { margin-bottom: 18px; }
-.group h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin: 0 0 6px; }
+.group-counted { color: var(--accent-strong); }
 .count-list { list-style: none; padding: 0; margin: 0; }
 .count-row {
   display: grid;

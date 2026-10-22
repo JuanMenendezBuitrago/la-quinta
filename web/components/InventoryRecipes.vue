@@ -19,35 +19,32 @@
 
     <p v-if="!supplies.length && !loading" class="muted">Primero da de alta los insumos en «Stock».</p>
     <p v-if="loading && !categories.length" class="muted">Cargando la carta…</p>
+    <EmptyState v-else-if="categories.length && onlyMissing && !missingCount" :icon="ClipboardCheck" title="No hay ningún producto sin receta" />
     <EmptyState v-else-if="categories.length && !groups.length" :icon="SearchX" title="Ningún producto coincide" />
 
-    <section v-for="group in groups" :key="group.id" class="group">
-      <!-- Cada grupo empieza plegado; el titulo entero (con el chevron a la derecha) lo abre y cierra -->
-      <h3 class="group-title">
-        <button
-          type="button"
-          class="group-toggle"
-          :aria-expanded="isOpen(group.id)"
-          :aria-controls="`recipes-${group.id}`"
-          @click="toggleGroup(group.id)"
-        >
-          <span class="group-name">{{ group.name }}</span>
-          <span class="group-meta">
-            {{ group.items.length }}
-            <span v-if="group.missing" class="group-missing">· {{ group.missing }} sin receta</span>
-          </span>
-          <ChevronDown class="group-chevron" :size="20" :stroke-width="2" aria-hidden="true" />
-        </button>
-      </h3>
-      <ul v-show="isOpen(group.id)" :id="`recipes-${group.id}`" class="product-list">
+    <!-- Cada grupo empieza plegado -->
+    <CollapsibleGroup
+      v-for="group in groups"
+      :key="group.id"
+      :title="group.name"
+      :open="isOpen(group.id)"
+      @update:open="toggleGroup(group.id)"
+    >
+      <template #meta>
+        {{ group.items.length }}
+        <span v-if="group.missing" class="group-missing">· {{ group.missing }} sin receta</span>
+      </template>
+      <ul class="product-list">
         <li v-for="item in group.items" :key="item.id" class="product-row" :class="{ editing: editingId === item.id }">
-          <!-- Toda la fila abre el editor (crear o editar la receta); mientras se edita, no hace nada -->
+          <!-- Toda la fila abre el editor (crear o editar la receta); con el editor abierto, lo cierra
+               sin guardar, igual que la X -->
           <button
             class="product-head"
             type="button"
-            :disabled="editingId === item.id"
-            :title="recipeFor(item.id) ? 'Editar receta' : 'Crear receta'"
-            @click="startEdit(item.id)"
+            :disabled="saving && editingId === item.id"
+            :aria-expanded="editingId === item.id"
+            :title="editingId === item.id ? 'Cerrar sin guardar' : recipeFor(item.id) ? 'Editar receta' : 'Crear receta'"
+            @click="editingId === item.id ? (editingId = '') : startEdit(item.id)"
           >
             <span class="product-info">
               <span class="product-name">
@@ -107,7 +104,7 @@
           </form>
         </li>
       </ul>
-    </section>
+    </CollapsibleGroup>
 
     <InventoryOptionSupplies :supplies="supplies" />
   </div>
@@ -115,7 +112,7 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { ChevronDown, ClipboardX, CupSoda, SearchX, X } from "lucide-vue-next";
+import { ClipboardCheck, ClipboardX, CupSoda, SearchX, X } from "lucide-vue-next";
 import {
   formatQty,
   RECIPE_MENU_QUERY,
@@ -126,6 +123,7 @@ import {
   type Supply,
 } from "~/composables/useInventory";
 import QtyInput from "~/components/QtyInput.vue";
+import CollapsibleGroup from "~/components/CollapsibleGroup.vue";
 import InventoryOptionSupplies from "~/components/InventoryOptionSupplies.vue";
 
 interface RecipeMenuCategory {
@@ -269,34 +267,7 @@ async function save(menuItemId: string, removeRecipe = false) {
   font-family: inherit;
 }
 
-.group { margin-bottom: 4px; }
-.group-title { margin: 0; }
-.group-toggle {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 2px;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  background: none;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  text-align: left;
-  cursor: pointer;
-}
-.group-toggle:hover { color: var(--text); }
-.group-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.group-name { min-width: 0; overflow-wrap: anywhere; }
-.group-meta { font-weight: 600; letter-spacing: 0; text-transform: none; white-space: nowrap; }
 .group-missing { color: var(--danger); }
-.group-chevron { flex-shrink: 0; margin-left: auto; transition: transform 0.2s ease; }
-.group-toggle[aria-expanded="true"] .group-chevron { transform: rotate(180deg); }
-@media (prefers-reduced-motion: reduce) { .group-chevron { transition: none; } }
 .product-list { list-style: none; padding: 0; margin: 0; }
 .product-row { position: relative; border-bottom: 1px solid var(--border); }
 .product-row.editing .product-head { padding-right: 52px; }
