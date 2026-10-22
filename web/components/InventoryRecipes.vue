@@ -2,7 +2,8 @@
   <div class="recipes-view">
     <p class="muted intro">
       La receta dice qué insumos gasta <strong>una unidad</strong> de cada producto. Al entregar un
-      pedido se descuentan solos. Marca «solo para llevar» en vasos, tapas y similares: se
+      pedido se descuentan solos. Marca «solo para llevar»
+      (<CupSoda class="inline-icon" :size="15" :stroke-width="1.8" aria-hidden="true" />) en vasos, tapas y similares: se
       descuentan en los pedidos web y en los «para llevar», no en los de mesa. Qué insumo es cada
       opción de leche se indica al final de la página.
     </p>
@@ -53,9 +54,10 @@
                 aria-label="Cantidad por unidad"
               />
               <span v-else />
-              <label class="takeaway">
-                <input v-model="line.onlyTakeaway" type="checkbox" />
-                Solo para llevar
+              <!-- Interruptor con icono: el checkbox sigue ahi (oculto) para teclado y lectores de pantalla -->
+              <label class="takeaway" title="Solo para llevar">
+                <input v-model="line.onlyTakeaway" type="checkbox" class="visually-hidden" aria-label="Solo para llevar" />
+                <CupSoda :size="20" :stroke-width="1.8" aria-hidden="true" />
               </label>
               <button class="remove" type="button" :aria-label="`Quitar ingrediente ${index + 1}`" @click="draft.splice(index, 1)">×</button>
             </div>
@@ -80,7 +82,7 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { SearchX, Trash2 } from "lucide-vue-next";
+import { CupSoda, SearchX, Trash2 } from "lucide-vue-next";
 import {
   formatQty,
   RECIPE_MENU_QUERY,
@@ -235,7 +237,7 @@ async function save(menuItemId: string, removeRecipe = false) {
   align-items: center;
 }
 @media (max-width: 560px) {
-  .line { grid-template-columns: minmax(0, 1fr) auto; }
+  .line { grid-template-columns: minmax(0, 1fr) auto auto; }
   .line select { grid-column: 1 / -1; }
 }
 .line select {
@@ -249,7 +251,23 @@ async function save(menuItemId: string, removeRecipe = false) {
   background: var(--bg);
   color: inherit;
 }
-.takeaway { display: flex; gap: 6px; align-items: center; font-size: 13.5px; white-space: nowrap; }
+.takeaway {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.takeaway:hover { color: var(--text); }
+.takeaway:has(input:checked) { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--bg); }
+.takeaway:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.inline-icon { vertical-align: -2px; }
 .remove {
   width: 36px;
   height: 36px;
