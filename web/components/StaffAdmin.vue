@@ -79,7 +79,7 @@
               {{ saving ? "Guardando…" : "Guardar" }}
             </button>
             <button class="button secondary cancel" type="button" :disabled="saving" @click="cancelForm">
-              <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
+              <X :size="16" :stroke-width="1.8" aria-hidden="true" />
               Cancelar
             </button>
           </div>
@@ -109,7 +109,7 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { Trash2, UserCog, Users, X } from "lucide-vue-next";
+import { UserCog, Users, X } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { useStaffAuth } from "~/composables/useAuth";
 import UserAvatar from "~/components/UserAvatar.vue";

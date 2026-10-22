@@ -162,7 +162,7 @@
                   No, mantener
                 </button>
                 <button class="button danger-solid" type="button" :disabled="busyOrderId === order.id" @click="doCancel(order)">
-                  <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
+                  <X :size="16" :stroke-width="1.8" aria-hidden="true" />
                   {{ busyOrderId === order.id ? "Cancelando…" : "Sí, cancelar" }}
                 </button>
               </div>
@@ -212,7 +212,7 @@
                 :disabled="busyOrderId === order.id"
                 @click="pendingCancelId = order.id"
               >
-                <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
+                <X :size="16" :stroke-width="1.8" aria-hidden="true" />
                 Cancelar
               </button>
             </div>
@@ -310,7 +310,7 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, SearchX, Trash2, UserPlus } from "lucide-vue-next";
+import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, SearchX, UserPlus, X } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import { PAYMENT_LABELS, useStaffOrders, type CustomerMatch, type HistoryFilter, type PaymentMethod } from "~/composables/useStaffOrders";
 import { primeAudio } from "~/composables/useOrderChime";

@@ -108,7 +108,7 @@
       <p v-if="formError" class="muted" style="color: var(--danger)">{{ formError }}</p>
       <div class="form-actions">
         <button class="button" type="submit" :disabled="saving || uploading">{{ saving ? "Guardando…" : "Guardar" }}</button>
-        <button class="button secondary cancel" type="button" :disabled="saving" @click="formOpen = false"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
+        <button class="button secondary cancel" type="button" :disabled="saving" @click="formOpen = false"><X :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
       </div>
     </form>
     </Teleport>
@@ -122,7 +122,7 @@
         <template v-if="editingProcessId === p.id">
           <input v-model="processDraft" type="text" maxlength="40" aria-label="Nombre del proceso" @keydown.enter.prevent="renameProcess(p.id)" />
           <button class="button secondary" type="button" :disabled="processBusy" @click="renameProcess(p.id)">Guardar</button>
-          <button class="button secondary cancel" type="button" @click="editingProcessId = ''"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
+          <button class="button secondary cancel" type="button" @click="editingProcessId = ''"><X :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
         </template>
         <template v-else>
           <span class="process-name">{{ p.name }}</span>
@@ -168,7 +168,7 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { Coffee, Trash2 } from "lucide-vue-next";
+import { Coffee, Trash2, X } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { ROAST_LABELS } from "~/composables/useMenu";
 

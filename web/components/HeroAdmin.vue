@@ -91,7 +91,7 @@
       <p v-if="formError" class="muted" style="color: var(--danger)">{{ formError }}</p>
       <div class="form-actions">
         <button class="button" type="submit" :disabled="saving || uploading">{{ saving ? "Guardando…" : "Guardar" }}</button>
-        <button class="button secondary cancel" type="button" :disabled="saving" @click="closeForm"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
+        <button class="button secondary cancel" type="button" :disabled="saving" @click="closeForm"><X :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
       </div>
     </form>
     </aside>
@@ -129,7 +129,7 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { ImageUp, Images, Trash2 } from "lucide-vue-next";
+import { Images, ImageUp, Trash2, X } from "lucide-vue-next";
 import { useImageUpload } from "~/composables/useImageUpload";
 import {
   ALL_HERO_SLIDES_QUERY,

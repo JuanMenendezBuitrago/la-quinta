@@ -71,7 +71,7 @@
         {{ saving ? "Guardando…" : existing ? "Guardar cambios" : "Añadir gasto" }}
       </button>
       <button class="button secondary cancel" type="button" :disabled="saving" @click="emit('cancel')">
-        <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
+        <X :size="16" :stroke-width="1.8" aria-hidden="true" />
         Cancelar
       </button>
     </div>
@@ -80,7 +80,7 @@
 
 <script setup lang="ts">
 import { gql } from "graphql-tag";
-import { Camera, Check, Trash2 } from "lucide-vue-next";
+import { Camera, Check, X } from "lucide-vue-next";
 import { useImageUrl } from "~/composables/useImageUrl";
 import { useStoreTime } from "~/composables/useStoreTime";
 import {

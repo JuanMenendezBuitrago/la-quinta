@@ -22,7 +22,7 @@
             {{ savingCategory ? "Guardando…" : "Guardar" }}
           </button>
           <button class="button secondary cancel" type="button" :disabled="savingCategory" @click="categoryFormOpen = false">
-            <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
+            <X :size="16" :stroke-width="1.8" aria-hidden="true" />
             Cancelar
           </button>
         </div>
@@ -32,7 +32,7 @@
         <template v-if="editingCategoryId === category.id">
           <input v-model="categoryNameDraft" class="category-name-input" type="text" maxlength="80" />
           <button class="button secondary" type="button" @click="saveCategoryName(category)">Guardar</button>
-          <button class="button secondary cancel" type="button" @click="editingCategoryId = ''"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
+          <button class="button secondary cancel" type="button" @click="editingCategoryId = ''"><X :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
         </template>
         <template v-else>
           <span class="category-name">{{ category.name }}</span>
@@ -82,7 +82,7 @@
         <p v-if="groupFormError" class="muted" style="color: var(--danger)">{{ groupFormError }}</p>
         <div class="form-actions">
           <button class="button" type="submit" :disabled="savingGroup">{{ savingGroup ? "Guardando…" : "Guardar" }}</button>
-          <button class="button secondary cancel" type="button" :disabled="savingGroup" @click="groupFormOpen = false"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
+          <button class="button secondary cancel" type="button" :disabled="savingGroup" @click="groupFormOpen = false"><X :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
         </div>
       </form>
 
@@ -204,7 +204,7 @@
           {{ saving ? "Guardando…" : "Guardar" }}
         </button>
         <button class="button secondary cancel" type="button" :disabled="saving" @click="cancelForm">
-          <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
+          <X :size="16" :stroke-width="1.8" aria-hidden="true" />
           Cancelar
         </button>
       </div>
@@ -251,7 +251,7 @@
 <script setup lang="ts">
 import MobileTabs from "~/components/MobileTabs.vue";
 import EmptyState from "~/components/EmptyState.vue";
-import { PackageOpen, SlidersHorizontal, Trash2 } from "lucide-vue-next";
+import { PackageOpen, SlidersHorizontal, Trash2, X } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 
 interface ModifierOptionAdmin {
