@@ -10,9 +10,10 @@
 
     <div class="toolbar">
       <input v-model="search" class="search" type="search" placeholder="Buscar producto" aria-label="Buscar producto" />
-      <label class="only-missing">
-        <input v-model="onlyMissing" type="checkbox" />
-        Sin receta ({{ missingCount }})
+      <label class="icon-toggle only-missing" :title="`Solo productos sin receta (${missingCount})`">
+        <input v-model="onlyMissing" type="checkbox" class="visually-hidden" :aria-label="`Solo productos sin receta (${missingCount})`" />
+        <ClipboardX :size="20" :stroke-width="1.8" aria-hidden="true" />
+        <span v-if="missingCount" class="toggle-count" aria-hidden="true">{{ missingCount }}</span>
       </label>
     </div>
 
@@ -55,7 +56,7 @@
               />
               <span v-else />
               <!-- Interruptor con icono: el checkbox sigue ahi (oculto) para teclado y lectores de pantalla -->
-              <label class="takeaway" title="Solo para llevar">
+              <label class="icon-toggle" title="Solo para llevar">
                 <input v-model="line.onlyTakeaway" type="checkbox" class="visually-hidden" aria-label="Solo para llevar" />
                 <CupSoda :size="20" :stroke-width="1.8" aria-hidden="true" />
               </label>
@@ -82,7 +83,7 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { CupSoda, SearchX, Trash2 } from "lucide-vue-next";
+import { ClipboardX, CupSoda, SearchX, Trash2 } from "lucide-vue-next";
 import {
   formatQty,
   RECIPE_MENU_QUERY,
@@ -216,7 +217,6 @@ async function save(menuItemId: string, removeRecipe = false) {
   font-size: 15px;
   font-family: inherit;
 }
-.only-missing { display: flex; gap: 6px; align-items: center; font-size: 14px; white-space: nowrap; }
 
 .group { margin-bottom: 18px; }
 .group h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin: 0 0 6px; }
@@ -251,7 +251,10 @@ async function save(menuItemId: string, removeRecipe = false) {
   background: var(--bg);
   color: inherit;
 }
-.takeaway {
+/* Interruptores con icono ("solo para llevar", "solo sin receta"): encendidos, en color de acento */
+.icon-toggle {
+  position: relative;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -263,9 +266,24 @@ async function save(menuItemId: string, removeRecipe = false) {
   cursor: pointer;
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
-.takeaway:hover { color: var(--text); }
-.takeaway:has(input:checked) { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--bg); }
-.takeaway:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.icon-toggle:hover { color: var(--text); }
+.icon-toggle:has(input:checked) { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--bg); }
+.icon-toggle:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.only-missing { width: 42px; height: 42px; }
+.toggle-count {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 20px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--on-danger);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .inline-icon { vertical-align: -2px; }
 .remove {
