@@ -145,7 +145,7 @@
                 <UserPlus :size="15" :stroke-width="1.8" aria-hidden="true" />
                 Asignar cliente
               </p>
-              <CustomerLookup icon-only @found="doAssign(order, $event)" />
+              <CustomerLookup @found="doAssign(order, $event)" />
               <button class="button secondary" type="button" @click="assigningId = ''">No asignar</button>
             </div>
 

@@ -25,7 +25,7 @@
           <strong>{{ customer.name }}</strong>
           <button class="link-button" type="button" @click="customer = null">Quitar</button>
         </div>
-        <CustomerLookup v-else icon-only @found="customer = $event" />
+        <CustomerLookup v-else @found="customer = $event" />
       </div>
     </div>
     <button v-if="active" class="link-button clear" type="button" @click="clear">Quitar filtros</button>

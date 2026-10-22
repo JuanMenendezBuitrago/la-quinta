@@ -7,9 +7,7 @@
       aria-label="Nombre, código o teléfono del cliente"
       autocomplete="off"
     />
-    <!-- iconOnly (la cola, donde hay poco ancho): lupa en vez del texto -->
     <button
-      v-if="iconOnly"
       class="button secondary icon-search"
       type="submit"
       :disabled="!query.trim() || searching"
@@ -17,9 +15,6 @@
       title="Buscar"
     >
       <Search :size="18" :stroke-width="1.8" aria-hidden="true" />
-    </button>
-    <button v-else class="button secondary" type="submit" :disabled="!query.trim() || searching">
-      {{ searching ? "Buscando…" : "Buscar" }}
     </button>
     <p v-if="message" class="muted lookup-message">{{ message }}</p>
     <!-- Varias coincidencias por nombre: se elige una -->
@@ -41,7 +36,6 @@ import { Search } from "lucide-vue-next";
 import type { CustomerMatch } from "~/composables/useStaffOrders";
 import UserAvatar from "~/components/UserAvatar.vue";
 
-withDefaults(defineProps<{ iconOnly?: boolean }>(), { iconOnly: false });
 const emit = defineEmits<{ (e: "found", customer: CustomerMatch): void }>();
 
 // Codigo, telefono o email exactos, o parte del nombre (ver searchCustomers en la API: como mucho
