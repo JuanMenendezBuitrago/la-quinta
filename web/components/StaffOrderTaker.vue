@@ -8,7 +8,30 @@
     </p>
 
     <!-- Carta: mismos datos que la carta publica, en formato compacto para teclear rapido -->
-    <input v-model="search" class="search" type="search" placeholder="Buscar producto" aria-label="Buscar producto" />
+    <!-- En movil el buscador va plegado: se abre con la lupa de la fila de categorias -->
+    <input
+      id="order-search"
+      ref="searchInput"
+      v-model="search"
+      class="search"
+      :class="{ 'search--open': searchOpen }"
+      type="search"
+      placeholder="Buscar producto"
+      aria-label="Buscar producto"
+    />
+    <div class="category-row">
+    <button
+      type="button"
+      class="search-toggle"
+      :class="{ active: searchOpen }"
+      :aria-expanded="searchOpen"
+      aria-controls="order-search"
+      :aria-label="searchOpen ? 'Ocultar búsqueda' : 'Buscar producto'"
+      :title="searchOpen ? 'Ocultar búsqueda' : 'Buscar producto'"
+      @click="toggleSearch"
+    >
+      <Search :size="18" :stroke-width="2" aria-hidden="true" />
+    </button>
     <nav v-if="!search.trim() && menu.length" class="chips" aria-label="Categorías">
       <button
         v-for="category in menu"
@@ -21,6 +44,7 @@
         {{ category.name }}
       </button>
     </nav>
+    </div>
 
     <p v-if="loading && !menu.length" class="muted">Cargando la carta…</p>
     <p v-if="error" class="muted" style="color: var(--danger)">No se pudo cargar la carta.</p>
@@ -129,7 +153,7 @@
 </template>
 
 <script setup lang="ts">
-import { Receipt, SearchX } from "lucide-vue-next";
+import { Receipt, Search, SearchX } from "lucide-vue-next";
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import { orderLinesInput, useCart } from "~/composables/useCart";
@@ -156,6 +180,19 @@ const menu = computed(() => result.value?.menu ?? []);
 const { lines, add, setQuantity, setOptions, clear, cartCount, totalCents } = useCart("staff-ticket-lines");
 
 const search = ref("");
+const searchOpen = ref(false);
+const searchInput = ref<HTMLInputElement | null>(null);
+
+// Al cerrar el buscador se borra lo escrito: si no, la carta seguiria filtrada sin que se vea por que.
+async function toggleSearch() {
+  searchOpen.value = !searchOpen.value;
+  if (searchOpen.value) {
+    await nextTick();
+    searchInput.value?.focus();
+  } else {
+    search.value = "";
+  }
+}
 // Calculada (no asignada al cargar): asi el servidor ya pinta la primera categoria marcada y la
 // hidratacion no deja la clase "active" desincronizada.
 const chosenCategoryId = ref<string | null>(null);
@@ -275,8 +312,31 @@ input {
 
 .sent-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; border-color: var(--accent); }
 
-.search { margin-bottom: 10px; }
-.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 6px; }
+.search { display: none; margin-bottom: 10px; }
+.search.search--open { display: block; }
+.category-row { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 6px; }
+.search-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.search-toggle.active { border-color: var(--accent); color: var(--accent); }
+.search-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; min-width: 0; }
+/* Pantalla ancha: buscador siempre visible, sin lupa */
+@media (min-width: 1000px) and (orientation: landscape) {
+  .search { display: block; }
+  .search-toggle { display: none; }
+}
 .chip {
   flex-shrink: 0;
   border: 1px solid var(--border);
@@ -424,6 +484,14 @@ input {
 }
 /* Diseño ancho: el ticket ya esta siempre a la vista (columna fija), sobra la barra "Ver ticket" */
 @media (min-width: 1000px) and (orientation: landscape) { .sticky-bar { display: none; } }
+/* Movil: dos columnas, tarjetas mas anchas para leer el nombre entero y acertar con el dedo */
+@media (max-width: 600px) {
+  .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tile-add { min-height: 84px; padding: 12px 12px 10px; }
+  .tile.selected .tile-add { padding: 11px 11px 9px; }
+  .tile-name { font-size: 15px; }
+  .tile-price { font-size: 13.5px; }
+}
 /* Diseño ancho: tarjetas de producto mas grandes, en tres columnas */
 @media (min-width: 1000px) and (orientation: landscape) {
   .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
