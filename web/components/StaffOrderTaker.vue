@@ -137,7 +137,7 @@
       <p v-if="submitError" class="muted" style="color: var(--danger)">{{ submitError }}</p>
       <div class="ticket-actions">
         <button class="button" type="button" :disabled="!canSubmit" @click="submit">
-          {{ submitting ? "Enviando…" : "Enviar a cola" }}
+          {{ submitting ? "Haciendo pedido…" : "Hacer pedido" }}
         </button>
         <button v-if="lines.length" class="button secondary" type="button" :disabled="submitting" @click="reset">Vaciar</button>
       </div>
