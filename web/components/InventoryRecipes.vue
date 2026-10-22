@@ -22,27 +22,64 @@
     <EmptyState v-else-if="categories.length && !groups.length" :icon="SearchX" title="Ningún producto coincide" />
 
     <section v-for="group in groups" :key="group.id" class="group">
-      <h3>{{ group.name }}</h3>
-      <ul class="product-list">
-        <li v-for="item in group.items" :key="item.id" class="product-row">
-          <div class="product-head">
-            <div class="product-info">
+      <!-- Cada grupo empieza plegado; el titulo entero (con el chevron a la derecha) lo abre y cierra -->
+      <h3 class="group-title">
+        <button
+          type="button"
+          class="group-toggle"
+          :aria-expanded="isOpen(group.id)"
+          :aria-controls="`recipes-${group.id}`"
+          @click="toggleGroup(group.id)"
+        >
+          <span class="group-name">{{ group.name }}</span>
+          <span class="group-meta">
+            {{ group.items.length }}
+            <span v-if="group.missing" class="group-missing">· {{ group.missing }} sin receta</span>
+          </span>
+          <ChevronDown class="group-chevron" :size="20" :stroke-width="2" aria-hidden="true" />
+        </button>
+      </h3>
+      <ul v-show="isOpen(group.id)" :id="`recipes-${group.id}`" class="product-list">
+        <li v-for="item in group.items" :key="item.id" class="product-row" :class="{ editing: editingId === item.id }">
+          <!-- Toda la fila abre el editor (crear o editar la receta); mientras se edita, no hace nada -->
+          <button
+            class="product-head"
+            type="button"
+            :disabled="editingId === item.id"
+            :title="recipeFor(item.id) ? 'Editar receta' : 'Crear receta'"
+            @click="startEdit(item.id)"
+          >
+            <span class="product-info">
               <span class="product-name">
                 {{ item.name }}
                 <span v-if="!item.available" class="muted">(no disponible)</span>
               </span>
               <span v-if="recipeFor(item.id)" class="muted summary">{{ summary(recipeFor(item.id)!) }}</span>
               <span v-else class="missing">Sin receta</span>
-            </div>
-            <button v-if="editingId !== item.id" class="button secondary small" type="button" @click="startEdit(item.id)">
-              {{ recipeFor(item.id) ? "Editar" : "Crear receta" }}
-            </button>
-          </div>
+            </span>
+          </button>
+          <!-- Cerrar el editor sin guardar -->
+          <button
+            v-if="editingId === item.id"
+            class="close-editor"
+            type="button"
+            aria-label="Cerrar sin guardar"
+            title="Cerrar sin guardar"
+            :disabled="saving"
+            @click="editingId = ''"
+          >
+            <X :size="22" :stroke-width="2" aria-hidden="true" />
+          </button>
 
           <!-- Editor -->
           <form v-if="editingId === item.id" class="editor" @submit.prevent="save(item.id)">
             <p v-if="!draft.length" class="muted">Sin ingredientes. Añade el primero.</p>
             <div v-for="(line, index) in draft" :key="line.key" class="line">
+              <!-- "Solo para llevar", a la izquierda del insumo. Interruptor con icono: el checkbox sigue ahi (oculto) para teclado y lectores de pantalla -->
+              <label class="icon-toggle" title="Solo para llevar">
+                <input v-model="line.onlyTakeaway" type="checkbox" class="visually-hidden" aria-label="Solo para llevar" />
+                <CupSoda :size="20" :stroke-width="1.8" aria-hidden="true" />
+              </label>
               <select v-model="line.supplyId" aria-label="Insumo">
                 <option value="" disabled>Insumo…</option>
                 <option v-for="s in selectableSupplies(line.supplyId)" :key="s.id" :value="s.id">{{ s.name }}</option>
@@ -52,14 +89,10 @@
                 :key="line.supplyId"
                 v-model="line.qty"
                 :unit="supplyById(line.supplyId)!.unit"
+                class="line-qty"
                 aria-label="Cantidad por unidad"
               />
-              <span v-else />
-              <!-- Interruptor con icono: el checkbox sigue ahi (oculto) para teclado y lectores de pantalla -->
-              <label class="icon-toggle" title="Solo para llevar">
-                <input v-model="line.onlyTakeaway" type="checkbox" class="visually-hidden" aria-label="Solo para llevar" />
-                <CupSoda :size="20" :stroke-width="1.8" aria-hidden="true" />
-              </label>
+              <span v-else class="line-qty" />
               <button class="remove" type="button" :aria-label="`Quitar ingrediente ${index + 1}`" @click="draft.splice(index, 1)">×</button>
             </div>
             <button class="button secondary small add-line" type="button" @click="addLine">+ Ingrediente</button>
@@ -67,7 +100,6 @@
             <p v-if="error" class="error">{{ error }}</p>
             <div class="actions">
               <button class="button" type="submit" :disabled="saving || !canSave">{{ saving ? "Guardando…" : "Guardar" }}</button>
-              <button class="button secondary cancel" type="button" :disabled="saving" @click="editingId = ''"><Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
               <button v-if="recipeFor(item.id)" class="button secondary danger push" type="button" :disabled="saving" @click="save(item.id, true)">
                 Quitar receta
               </button>
@@ -83,7 +115,7 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { ClipboardX, CupSoda, SearchX, Trash2 } from "lucide-vue-next";
+import { ChevronDown, ClipboardX, CupSoda, SearchX, X } from "lucide-vue-next";
 import {
   formatQty,
   RECIPE_MENU_QUERY,
@@ -147,8 +179,27 @@ const groups = computed(() => {
         (i) => (!q || normalize(i.name).includes(q)) && (!onlyMissing.value || !recipeFor(i.id))
       ),
     }))
-    .filter((c) => c.items.length);
+    .filter((c) => c.items.length)
+    .map((c) => ({ ...c, missing: c.items.filter((i) => !recipeFor(i.id)).length }));
 });
+
+// Grupos desplegados (por defecto, ninguno).
+const openGroups = ref(new Set<string>());
+function isOpen(id: string) {
+  return openGroups.value.has(id);
+}
+function toggleGroup(id: string) {
+  const next = new Set(openGroups.value);
+  if (!next.delete(id)) next.add(id);
+  openGroups.value = next;
+}
+// Al buscar o filtrar "sin receta" se despliegan los grupos con resultados: si no, no se verian.
+watch(
+  () => [search.value.trim(), onlyMissing.value] as const,
+  ([q, missing]) => {
+    if (q || missing) openGroups.value = new Set([...openGroups.value, ...groups.value.map((g) => g.id)]);
+  }
+);
 
 // --- Editor (una receta a la vez) ---
 interface DraftLine {
@@ -218,11 +269,75 @@ async function save(menuItemId: string, removeRecipe = false) {
   font-family: inherit;
 }
 
-.group { margin-bottom: 18px; }
-.group h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin: 0 0 6px; }
+.group { margin-bottom: 4px; }
+.group-title { margin: 0; }
+.group-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 2px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  cursor: pointer;
+}
+.group-toggle:hover { color: var(--text); }
+.group-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.group-name { min-width: 0; overflow-wrap: anywhere; }
+.group-meta { font-weight: 600; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+.group-missing { color: var(--danger); }
+.group-chevron { flex-shrink: 0; margin-left: auto; transition: transform 0.2s ease; }
+.group-toggle[aria-expanded="true"] .group-chevron { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .group-chevron { transition: none; } }
 .product-list { list-style: none; padding: 0; margin: 0; }
-.product-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
-.product-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.product-row { position: relative; border-bottom: 1px solid var(--border); }
+.product-row.editing .product-head { padding-right: 52px; }
+.close-editor {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.close-editor:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); }
+.close-editor:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.close-editor:disabled { opacity: 0.45; cursor: not-allowed; }
+.product-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.product-head:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.product-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.product-head:disabled { cursor: default; }
+.product-row .editor { padding: 0 8px 12px; }
 .product-info { display: flex; flex-direction: column; min-width: 0; }
 .product-name { font-weight: 600; overflow-wrap: anywhere; }
 .summary { font-size: 13.5px; overflow-wrap: anywhere; }
@@ -232,13 +347,15 @@ async function save(menuItemId: string, removeRecipe = false) {
 .editor { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
 .line {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
 }
+/* Movil: vaso + insumo en una fila; cantidad y quitar debajo */
 @media (max-width: 560px) {
-  .line { grid-template-columns: minmax(0, 1fr) auto auto; }
-  .line select { grid-column: 1 / -1; }
+  .line { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .line select { grid-column: 2 / -1; }
+  .line .line-qty { grid-column: 1 / 3; }
 }
 .line select {
   width: 100%;
