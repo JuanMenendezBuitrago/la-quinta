@@ -270,7 +270,7 @@
         <CoffeeAdmin />
       </section>
 
-      <!-- Clientes (solo gestion) -->
+      <!-- Clientes (barra y gestion) -->
       <section v-else-if="activeTab === 'clientes'">
         <CustomersAdmin />
       </section>

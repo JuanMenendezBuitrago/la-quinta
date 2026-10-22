@@ -43,7 +43,7 @@ export const loyaltyResolvers = {
     },
 
     redeemCustomerReward: async (_: unknown, args: { customerId: string }, ctx: GraphQLContext) => {
-      const staff = requireStaff(ctx, ["gestion"]);
+      const staff = requireStaff(ctx, ["barra", "gestion"]);
       await requireActiveCustomer(args.customerId);
       const status = await loadStatus(args.customerId);
       if (!status.rewardAvailable) throw new Error("El cliente todavia no tiene sellos suficientes para canjear");
@@ -63,7 +63,7 @@ export const loyaltyResolvers = {
       args: { customerId: string; stamps: number; note: string },
       ctx: GraphQLContext
     ) => {
-      const staff = requireStaff(ctx, ["gestion"]);
+      const staff = requireStaff(ctx, ["barra", "gestion"]);
       const note = args.note.trim();
       if (!Number.isInteger(args.stamps) || args.stamps === 0) throw new Error("Indica cuantos sellos sumar o restar");
       if (Math.abs(args.stamps) > 100) throw new Error("Un ajuste no puede pasar de 100 sellos");

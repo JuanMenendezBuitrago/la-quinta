@@ -21,9 +21,9 @@ export const loyaltyTypeDefs = /* GraphQL */ `
   extend type Mutation {
     """Canjea la recompensa si el cliente tiene sellos suficientes."""
     redeemLoyaltyReward: LoyaltyStatus!
-    """Gestion: canjea la recompensa de un cliente en el mostrador."""
+    """Personal (barra y gestion): canjea la recompensa de un cliente en el mostrador."""
     redeemCustomerReward(customerId: ID!): LoyaltyStatus!
-    """Gestion: suma (positivo) o resta (negativo) sellos a un cliente. El motivo es obligatorio."""
+    """Personal (barra y gestion): suma (positivo) o resta (negativo) sellos a un cliente. El motivo es obligatorio."""
     adjustCustomerStamps(customerId: ID!, stamps: Int!, note: String!): LoyaltyStatus!
   }
 `;

@@ -15,7 +15,7 @@ export const STAFF_SECTIONS = [
   { id: "inventario", label: "Inventario", group: "local", roles: ["barra", "gestion"] },
   { id: "caja", label: "Cierre de caja", group: "local", roles: ["barra", "gestion"] },
   // Solo gestion: muestra datos personales (la politica de privacidad limita el acceso a quien lo necesita).
-  { id: "clientes", label: "Clientes", group: "local", roles: ["gestion"] },
+  { id: "clientes", label: "Clientes", group: "local", roles: ["barra", "gestion"] },
   { id: "personal", label: "Personal", group: "local", roles: ["gestion"] },
   // Opiniones de los clientes (con su nombre: datos personales, solo gestion).
   { id: "opiniones", label: "Opiniones", group: "local", roles: ["gestion"] },

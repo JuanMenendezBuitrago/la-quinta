@@ -1,5 +1,5 @@
 export const customersTypeDefs = /* GraphQL */ `
-  """Cliente con sus cifras, para el panel de gestion."""
+  """Cliente con sus cifras, para el panel del personal."""
   type CustomerSummary {
     id: ID!
     name: String!
@@ -47,10 +47,10 @@ export const customersTypeDefs = /* GraphQL */ `
   }
 
   extend type Query {
-    """Gestion: clientes registrados (sin las cuentas eliminadas), mas recientes primero.
+    """Personal (barra y gestion): clientes registrados (sin las cuentas eliminadas), mas recientes primero.
     search busca en nombre, email, telefono y codigo de cliente."""
     customers(search: String, limit: Int, offset: Int): CustomerPage!
-    """Gestion: ficha completa de un cliente."""
+    """Personal (barra y gestion): ficha completa de un cliente."""
     customerDetail(id: ID!): CustomerDetail!
   }
 `;

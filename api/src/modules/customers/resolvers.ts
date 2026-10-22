@@ -68,7 +68,7 @@ function summary(user: UserDoc, stats: Awaited<ReturnType<typeof statsFor>>) {
 }
 
 /**
- * Vista de clientes para Gestion. Solo lectura: como "privacy", reune datos de varios modulos
+ * Vista de clientes para el personal (barra y gestion). Solo lectura: como "privacy", reune datos de varios modulos
  * (usuarios, pedidos, fidelizacion); las acciones sobre sellos viven en "loyalty".
  */
 export const customersResolvers = {
@@ -78,7 +78,7 @@ export const customersResolvers = {
       args: { search?: string; limit?: number; offset?: number },
       ctx: GraphQLContext
     ) => {
-      requireStaff(ctx, ["gestion"]);
+      requireStaff(ctx, ["barra", "gestion"]);
       const filter: Record<string, unknown> = { deletedAt: { $exists: false } };
       const search = args.search?.trim();
       if (search) {
@@ -97,7 +97,7 @@ export const customersResolvers = {
     },
 
     customerDetail: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["gestion"]);
+      requireStaff(ctx, ["barra", "gestion"]);
       if (!Types.ObjectId.isValid(args.id)) throw new Error("Cliente no encontrado");
       const user = await User.findOne({ _id: args.id, deletedAt: { $exists: false } }).lean<UserDoc>();
       if (!user) throw new Error("Cliente no encontrado");

@@ -39,7 +39,7 @@ import UserAvatar from "~/components/UserAvatar.vue";
 const emit = defineEmits<{ (e: "found", customer: CustomerMatch): void }>();
 
 // Codigo, telefono o email exactos, o parte del nombre (ver searchCustomers en la API: como mucho
-// 8 por nombre; el listado completo de clientes sigue siendo solo de gestion).
+// 8 por nombre; el listado completo esta en la seccion Clientes).
 const SEARCH = gql`
   query SearchCustomers($query: String!) {
     searchCustomers(query: $query) {
