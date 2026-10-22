@@ -9,13 +9,16 @@
       class="quick"
       :class="{ current: action.current, primary: action.primary }"
       :aria-current="action.current ? 'page' : undefined"
+      :aria-label="action.primary ? action.label : undefined"
+      :title="action.primary ? action.label : undefined"
       @click="action.go()"
     >
       <span class="quick-icon">
-        <component :is="action.icon" :size="action.primary ? 24 : 20" :stroke-width="1.8" />
+        <component :is="action.icon" :size="action.primary ? 30 : 20" :stroke-width="1.8" />
         <span v-if="action.badge" class="badge" :class="{ danger: action.danger }">{{ action.badge }}</span>
       </span>
-      <span class="quick-label">{{ action.label }}</span>
+      <!-- La accion central va solo con icono (su nombre, en aria-label) -->
+      <span v-if="!action.primary" class="quick-label">{{ action.label }}</span>
     </button>
   </nav>
   <!-- Hueco al final de la pagina para que la barra fija no tape el pie ni la ultima tarjeta -->
@@ -57,7 +60,7 @@ const actions = computed<QuickAction[]>(() => {
   return [
     ...sectionAction("cola", "Cola", ClipboardList, { badge: badges.value.cola }),
     ...sectionAction("caja", "Cierre de caja", Calculator),
-    ...sectionAction("tomar", "Tomar", SquarePen, { primary: true }),
+    ...sectionAction("tomar", "Tomar pedido", SquarePen, { primary: true }),
     ...sectionAction("historial", "Historial", History),
     ...sectionAction("inventario", "Inventario", Package, { badge: badges.value.inventario, danger: true }),
   ];
@@ -111,8 +114,8 @@ const actions = computed<QuickAction[]>(() => {
 
 /* Tomar pedido: la accion mas repetida, destacada en el centro */
 .quick.primary .quick-icon {
-  padding: 10px;
-  margin-top: -18px;
+  padding: 13px;
+  margin-top: -26px;
   border-radius: 999px;
   background: var(--accent-strong);
   color: var(--bg);
