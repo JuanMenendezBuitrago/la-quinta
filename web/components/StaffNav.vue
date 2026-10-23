@@ -76,12 +76,6 @@
           <li class="who muted">
             {{ person?.name }}<template v-if="staff?.actingAs"> · con {{ staff.name }}</template> · {{ roleLabel }}
           </li>
-          <li v-if="staff?.shared">
-            <button type="button" class="entry" @click="changePerson">
-              <UserRoundCog class="entry-icon" :size="16" :stroke-width="1.8" />
-              <span class="entry-label">Cambiar de persona</span>
-            </button>
-          </li>
           <!-- En la compartida, cada cual cambia su avatar desde su propia cuenta (o gestion en Personal) -->
           <li v-if="!staff?.shared">
             <button type="button" class="entry" @click="openAvatarDialog">
@@ -129,7 +123,6 @@ import {
   Package,
   Settings,
   SquarePen,
-  UserRoundCog,
   Users,
 } from "lucide-vue-next";
 import type { Component } from "vue";
@@ -172,7 +165,7 @@ const ENTRY_ICONS: Record<Entry["id"], Component> = {
   "ver-carta": ExternalLink,
 };
 
-const { staff, logout, choosingPerson } = useStaffAuth();
+const { staff, logout } = useStaffAuth();
 // Quien aparece en la cabecera: en una cuenta compartida, la persona elegida.
 const person = computed(() => staff.value?.actingAs ?? staff.value);
 const section = useStaffSection();
@@ -241,11 +234,6 @@ function openAvatarDialog() {
 function select(entry: Entry) {
   open.value = null;
   if (!entry.external) goToSection(entry.id as StaffSectionId);
-}
-function changePerson() {
-  open.value = null;
-  choosingPerson.value = true;
-  window.scrollTo({ top: 0 });
 }
 async function doLogout() {
   open.value = null;

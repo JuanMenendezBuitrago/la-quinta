@@ -172,6 +172,17 @@ export function useAuth() {
   return { customer, requestCode, verifyCode, logout };
 }
 
+/** Quien puede usar una cuenta compartida (selector de la cabecera y pantalla "¿Quién eres?"). */
+export const ACTING_STAFF_OPTIONS = gql`
+  query ActingStaffOptions {
+    actingStaffOptions {
+      id
+      name
+      avatar
+    }
+  }
+`;
+
 const SET_ACTING_STAFF = gql`
   mutation SetActingStaff($staffId: ID!) {
     setActingStaff(staffId: $staffId) {
@@ -203,8 +214,6 @@ export function useStaffAuth() {
   const { mutate: staffLogin } = useMutation(STAFF_LOGIN);
   const { mutate: staffLoginById } = useMutation(STAFF_LOGIN_BY_ID);
   const { mutate: setActing } = useMutation(SET_ACTING_STAFF);
-  // "Cambiar de persona": vuelve a mostrar el selector aunque ya haya alguien elegido.
-  const choosingPerson = useState("lq-staff-choosing", () => false);
 
   async function startSession(payload: { token: string; staff: any } | undefined) {
     if (!payload) throw new Error("Credenciales invalidas");
@@ -229,16 +238,16 @@ export function useStaffAuth() {
     const result = await setActing({ staffId: person.id });
     const token = result?.data?.setActingStaff.token;
     if (!token) throw new Error("No se pudo cambiar de persona");
-    await onLogin(token);
+    // Sin vaciar la cache de Apollo: los datos no cambian (solo a nombre de quien queda lo
+    // siguiente), asi el cambio es instantaneo y no se recarga la pantalla.
+    await onLogin(token, undefined, true);
     if (staff.value) staff.value = { ...staff.value, actingAs: person };
-    choosingPerson.value = false;
   }
 
   async function logout() {
     await onLogout();
     staff.value = null;
-    choosingPerson.value = false;
   }
 
-  return { staff, login, loginById, logout, setActingStaff, choosingPerson };
+  return { staff, login, loginById, logout, setActingStaff };
 }

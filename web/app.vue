@@ -8,6 +8,8 @@
         <img src="/logo-5ta.svg" alt="La Quinta" class="brand-logo brand-logo--compact" width="245" height="102" />
       </NuxtLink>
       <div class="topbar-end">
+      <!-- Cuenta compartida: quien la usa, a un toque (en vez de hacer login cada vez) -->
+      <StaffActingSwitcher v-if="inStaff && staff?.shared && staff.actingAs" />
       <!-- En el panel de personal, su propio menu: carrito y "mi cuenta" son cosas del cliente -->
       <StaffNav v-if="inStaff && staff" />
       <nav v-else-if="inStaff">
@@ -49,6 +51,7 @@ import { restoreSession, useAuth, useStaffAuth } from "~/composables/useAuth";
 import { TABLES, useCustomerTable } from "~/composables/useTables";
 import { useCustomerOrdering } from "~/composables/useSiteSettings";
 import StaffNav from "~/components/StaffNav.vue";
+import StaffActingSwitcher from "~/components/StaffActingSwitcher.vue";
 import StaffQuickBar from "~/components/StaffQuickBar.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
 import ThemeToggle from "~/components/ThemeToggle.vue";
@@ -90,7 +93,7 @@ await useAsyncData("session", async () => {
 <style scoped>
 .app-shell { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
 .app-body { flex: 1 0 auto; }
-.topbar-end { display: flex; align-items: center; gap: 14px; }
+.topbar-end { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .topbar {
   position: sticky;
   top: 0;

@@ -7,8 +7,8 @@
       <StaffLogin />
     </template>
 
-    <!-- Cuenta compartida: antes de nada, quien la esta usando (y al pulsar "Cambiar de persona") -->
-    <template v-else-if="staff.shared && (!staff.actingAs || choosingPerson)">
+    <!-- Cuenta compartida: antes de nada, quien la esta usando (luego se cambia desde la cabecera) -->
+    <template v-else-if="staff.shared && !staff.actingAs">
       <header class="account-hero login-hero">
         <h1>¿Quién eres?</h1>
       </header>
@@ -342,7 +342,7 @@ import InventoryAdmin from "~/components/InventoryAdmin.vue";
 import { formatQty, useInventoryAlerts } from "~/composables/useInventory";
 import { goToSection, STAFF_SECTIONS, useStaffBadges, useStaffSection } from "~/composables/useStaffSections";
 
-const { staff, choosingPerson } = useStaffAuth();
+const { staff } = useStaffAuth();
 // Si la sesion ya estaba abierta (se restaura sola con la cookie, sin pasar por doLogin()),
 // el audio nunca se desbloquea y el aviso sonoro queda mudo en silencio. Con esto, el primer
 // toque/clic en cualquier parte del panel sirve tambien para desbloquearlo.
