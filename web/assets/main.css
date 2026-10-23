@@ -128,6 +128,10 @@
 
 * { box-sizing: border-box; }
 
+/* Hueco de la barra de scroll siempre reservado: si no, al pasar de una pagina (o una ficha) corta
+   a una larga aparece la barra y todo el contenido cambia de ancho y se desplaza. */
+html { scrollbar-gutter: stable; }
+
 body {
   margin: 0;
   background: var(--bg);
