@@ -27,9 +27,8 @@
 
 <script setup lang="ts">
 import type { Component } from "vue";
-import { Calculator, ClipboardList, History, Package, SquarePen } from "lucide-vue-next";
-import { useStaffAuth } from "~/composables/useAuth";
-import { goToSection, sectionsFor, useStaffBadges, useStaffSection, type StaffSectionId } from "~/composables/useStaffSections";
+import { Calculator, ClipboardList, History, Package, SquarePen, Users } from "lucide-vue-next";
+import { goToSection, useStaffBadges, useStaffSection, useVisibleSections, type StaffSectionId } from "~/composables/useStaffSections";
 
 interface QuickAction {
   id: string;
@@ -42,7 +41,7 @@ interface QuickAction {
   danger?: boolean;
 }
 
-const { staff } = useStaffAuth();
+const visibleSections = useVisibleSections();
 const section = useStaffSection();
 const badges = useStaffBadges();
 
@@ -54,11 +53,15 @@ async function goToSectionTop(id: StaffSectionId) {
 }
 
 const actions = computed<QuickAction[]>(() => {
-  const visible = new Set<StaffSectionId>(sectionsFor(staff.value?.role).map((s) => s.id));
+  const visible = new Set<StaffSectionId>(visibleSections.value.map((s) => s.id));
   const sectionAction = (id: StaffSectionId, label: string, icon: Component, extra: Partial<QuickAction> = {}) =>
     visible.has(id) ? [{ id, label, icon, go: () => goToSectionTop(id), current: section.value === id, ...extra }] : [];
   return [
-    ...sectionAction("cola", "Cola", ClipboardList, { badge: badges.value.cola }),
+    // Sin cola (se pide y se cobra en caja a la vez), su hueco es para Clientes: asi "Tomar
+    // pedido" sigue en el centro.
+    ...(visible.has("cola")
+      ? sectionAction("cola", "Cola", ClipboardList, { badge: badges.value.cola })
+      : sectionAction("clientes", "Clientes", Users)),
     ...sectionAction("caja", "Cierre de caja", Calculator),
     ...sectionAction("tomar", "Tomar pedido", SquarePen, { primary: true }),
     ...sectionAction("historial", "Historial", History),

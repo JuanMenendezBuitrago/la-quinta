@@ -1,7 +1,7 @@
 import { withFilter } from "graphql-subscriptions";
 import { Types } from "mongoose";
 import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
-import { ALLOWED_FROM, CUSTOMER_TABLES, isTakeaway, Order, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
+import { ALLOWED_FROM, AWAITING_PAYMENT, CUSTOMER_TABLES, OPEN_ORDER, isTakeaway, Order, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
 import { tryComplete } from "./complete";
 import { buildOrderLines, createWithUniqueCode, type OrderLineRequest } from "./create";
 import { MenuItem } from "../menu/model";
@@ -9,19 +9,9 @@ import { StaffUser, User } from "../users/model";
 import { EVENTS } from "../../config/pubsub";
 import { internalEvents, INTERNAL_EVENTS } from "../../config/events";
 import { buildClosedPayload } from "./closed";
-import { getOpeningHours, packagingFeeCents, staffOnlyOrders } from "../settings/resolvers";
+import { getOpeningHours, orderQueueEnabled, packagingFeeCents, staffOnlyOrders } from "../settings/resolvers";
 import { pickupOutsideHoursReason } from "../settings/openingHours";
 
-const ACTIVE_STATUSES: OrderStatus[] = ["NUEVO", "EN_PREPARACION", "LISTO"];
-// De mesa o barra, ya servido pero sin cobrar: sigue en la cola, en "Por cobrar".
-const AWAITING_PAYMENT = {
-  status: "ENTREGADO",
-  serviceType: "MESA",
-  paidAt: { $exists: false },
-  completedAt: { $exists: false },
-};
-// Aun no cerrado: se le puede asignar cliente (los sellos se suman al cerrar).
-const OPEN_ORDER = { $or: [{ status: { $in: ACTIVE_STATUSES } }, AWAITING_PAYMENT] };
 
 function iso(value: unknown) {
   return value ? new Date(value as string).toISOString() : null;
@@ -135,7 +125,8 @@ export const ordersResolvers = {
       ctx: GraphQLContext
     ) => {
       const customerId = requireCustomer(ctx);
-      if (await staffOnlyOrders()) {
+      // Sin cola nadie veria el pedido para prepararlo: tampoco se acepta desde la web.
+      if ((await staffOnlyOrders()) || !(await orderQueueEnabled())) {
         throw new Error("Ahora mismo los pedidos se hacen con el personal del local, no desde la web");
       }
       if (args.items.length === 0) throw new Error("El pedido no puede estar vacio");
@@ -204,6 +195,9 @@ export const ordersResolvers = {
       // Guardar y pagar: se sirvio sin pasar por la cola y se cobra ahora.
       const paidNow = !!input.paymentMethod;
       if (paidNow && !PAYMENT_METHODS.includes(input.paymentMethod!)) throw new Error("Metodo de pago no valido");
+      if (!paidNow && !(await orderQueueEnabled())) {
+        throw new Error("La cola de pedidos esta desactivada: usa \"Guardar y pagar\"");
+      }
 
       const { lines, totalCents } = await buildOrderLines(input.items);
       // Mesa o barra con "para llevar" marcado: se empaqueta igual que un pedido para llevar.
@@ -248,8 +242,8 @@ export const ordersResolvers = {
       requireStaff(ctx, ["barra", "gestion"]);
       if (!(await activeCustomerExists(args.customerId))) throw new Error("Cliente no encontrado");
 
-      // Solo pedidos sin cerrar y sin cliente: asi los sellos van a su cuenta al cerrarlo, y no se
-      // puede "robar" un pedido que ya es de otro cliente.
+      // Solo pedidos sin cerrar (OPEN_ORDER) y sin cliente: asi los sellos van a su cuenta al
+      // cerrarlo, y no se puede "robar" un pedido que ya es de otro cliente.
       const order = await Order.findOneAndUpdate(
         { _id: args.orderId, customerId: null, ...OPEN_ORDER },
         { customerId: args.customerId, updatedAt: new Date() },

@@ -127,11 +127,11 @@ import UserAvatar from "~/components/UserAvatar.vue";
 import AvatarPicker from "~/components/AvatarPicker.vue";
 import {
   goToSection,
-  sectionsFor,
   STAFF_GROUPS,
   STAFF_SECTIONS,
   useStaffBadges,
   useStaffSection,
+  useVisibleSections,
   type StaffSectionId,
 } from "~/composables/useStaffSections";
 
@@ -163,6 +163,7 @@ const ENTRY_ICONS: Record<Entry["id"], Component> = {
 
 const { staff, logout } = useStaffAuth();
 const section = useStaffSection();
+const visibleSections = useVisibleSections();
 const badges = useStaffBadges();
 
 const roleLabel = computed(() => (staff.value?.role === "gestion" ? "Gestión" : "Barra"));
@@ -173,7 +174,7 @@ function badgeFor(id: StaffSectionId) {
 }
 
 const groups = computed(() => {
-  const visible = sectionsFor(staff.value?.role);
+  const visible = visibleSections.value;
   return STAFF_GROUPS.map((g) => {
     const entries: Entry[] = visible
       .filter((s) => s.group === g.id)

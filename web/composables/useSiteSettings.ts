@@ -26,6 +26,7 @@ export const SITE_SETTINGS_QUERY = gql`
       taxId
       privacyEmail
       staffOnlyOrders
+      orderQueueEnabled
       packagingFeeCents
     }
   }
@@ -55,6 +56,7 @@ export const UPDATE_SITE_SETTINGS = gql`
       taxId
       privacyEmail
       staffOnlyOrders
+      orderQueueEnabled
       packagingFeeCents
     }
   }
@@ -90,6 +92,8 @@ export interface SiteSettings {
   privacyEmail: string | null;
   /** Solo el personal crea pedidos: el cliente ve la carta y sus pedidos, pero no puede pedir. */
   staffOnlyOrders: boolean;
+  /** Cola de pedidos. Desactivada: solo "Guardar y pagar" y sin pedidos desde la web. */
+  orderQueueEnabled: boolean;
   /** Recargo por empaque de cada pedido para llevar (pesos). 0 = sin recargo. */
   packagingFeeCents: number;
 }
@@ -101,7 +105,19 @@ export interface SiteSettings {
  */
 export function useCustomerOrdering() {
   const { result } = useQuery<{ siteSettings: SiteSettings }>(SITE_SETTINGS_QUERY);
-  return computed(() => result.value?.siteSettings.staffOnlyOrders === false);
+  // Sin cola, nadie veria el pedido para prepararlo: la API tambien lo rechaza.
+  return computed(
+    () => result.value?.siteSettings.staffOnlyOrders === false && result.value.siteSettings.orderQueueEnabled !== false
+  );
+}
+
+/**
+ * Si la cola de pedidos esta activa (la seccion "Cola" y el boton "Hacer pedido"). Mientras no se
+ * sabe, se da por activa: es lo normal y asi no parpadea el menu.
+ */
+export function useOrderQueueEnabled() {
+  const { result } = useQuery<{ siteSettings: SiteSettings }>(SITE_SETTINGS_QUERY);
+  return computed(() => result.value?.siteSettings.orderQueueEnabled !== false);
 }
 
 /**

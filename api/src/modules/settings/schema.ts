@@ -47,6 +47,11 @@ export const settingsTypeDefs = /* GraphQL */ `
     anadir productos ni pedir (createOrder lo rechaza).
     """
     staffOnlyOrders: Boolean!
+    """
+    Cola de pedidos. Desactivada: el personal solo registra pedidos ya servidos y cobrados
+    ("Guardar y pagar") y los clientes no pueden pedir desde la web.
+    """
+    orderQueueEnabled: Boolean!
     """Recargo por empaque (pesos) que se suma una vez a cada pedido para llevar: los "Para llevar"
     del personal y los de recogida de la web (no los de mesa o barra). 0 = sin recargo."""
     packagingFeeCents: Int!
@@ -66,6 +71,8 @@ export const settingsTypeDefs = /* GraphQL */ `
     taxId: String
     privacyEmail: String
     staffOnlyOrders: Boolean
+    """No se puede desactivar con pedidos abiertos en la cola."""
+    orderQueueEnabled: Boolean
     packagingFeeCents: Int
   }
 

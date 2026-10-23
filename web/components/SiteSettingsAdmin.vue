@@ -17,6 +17,11 @@
           <span>Solo el personal puede crear pedidos</span>
         </label>
         <span class="muted">Los clientes seguirán viendo la carta y sus pedidos, pero no podrán añadir productos ni pedir desde la web.</span>
+        <label class="day-toggle">
+          <input v-model="form.orderQueueEnabled" type="checkbox" />
+          <span>Cola de pedidos activa</span>
+        </label>
+        <span class="muted">Desactivada, los pedidos se hacen y se pagan en caja en el mismo momento: desaparecen la sección «Cola» y el botón «Hacer pedido» (solo queda «Guardar y pagar»), y los clientes no pueden pedir desde la web. Para desactivarla, la cola tiene que estar vacía.</span>
       </div>
 
       <label class="field">
@@ -150,6 +155,7 @@ function emptyForm() {
     taxId: "",
     privacyEmail: "",
     staffOnlyOrders: false,
+    orderQueueEnabled: true,
     packagingFeeCents: 0 as number | "",
   };
 }
@@ -175,6 +181,7 @@ watch(
       taxId: val.taxId ?? "",
       privacyEmail: val.privacyEmail ?? "",
       staffOnlyOrders: val.staffOnlyOrders,
+      orderQueueEnabled: val.orderQueueEnabled,
       packagingFeeCents: val.packagingFeeCents,
     });
   },
@@ -209,6 +216,7 @@ async function submit() {
         taxId: form.taxId.trim() || null,
         privacyEmail: form.privacyEmail.trim() || null,
         staffOnlyOrders: form.staffOnlyOrders,
+        orderQueueEnabled: form.orderQueueEnabled,
         packagingFeeCents: Math.round(Number(form.packagingFeeCents) || 0),
       },
     });

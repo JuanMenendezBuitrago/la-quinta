@@ -174,7 +174,8 @@
           <Banknote :size="16" :stroke-width="1.8" aria-hidden="true" />
           Guardar y pagar
         </button>
-        <button class="button secondary" type="button" :disabled="!canSubmit" @click="submit()">
+        <!-- Sin cola nadie lo prepararia: solo se registran pedidos ya servidos y cobrados -->
+        <button v-if="queueEnabled" class="button secondary" type="button" :disabled="!canSubmit" @click="submit()">
           {{ submitting ? "Haciendo pedido…" : "Hacer pedido" }}
         </button>
         <button v-if="lines.length" class="button secondary" type="button" :disabled="submitting" @click="reset">Vaciar</button>
@@ -198,7 +199,7 @@ import { orderLinesInput, useCart } from "~/composables/useCart";
 import { MENU_QUERY, defaultCartOptions, missingModifiers, type MenuCategory, type MenuItem } from "~/composables/useMenu";
 import LineOptionsPicker from "~/components/LineOptionsPicker.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
-import { usePackagingFee } from "~/composables/useSiteSettings";
+import { useOrderQueueEnabled, usePackagingFee } from "~/composables/useSiteSettings";
 import { PAYMENT_LABELS, type CustomerMatch, type PaymentMethod } from "~/composables/useStaffOrders";
 import { BAR_TABLE, TABLES } from "~/composables/useTables";
 
@@ -292,6 +293,7 @@ const PLACES = [...TABLES, { id: "LLEVAR", label: "Para llevar" }];
 const place = ref("");
 // Lo que mostrara el pedido al crearlo (lo calcula la API): solo en "Para llevar".
 const packagingFee = usePackagingFee();
+const queueEnabled = useOrderQueueEnabled();
 const takeaway = ref(false);
 const isTakeaway = computed(() => place.value === "LLEVAR" || (!!place.value && takeaway.value));
 const packagingCents = computed(() => (isTakeaway.value ? packagingFee.value : 0));

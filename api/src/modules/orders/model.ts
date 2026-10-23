@@ -249,6 +249,17 @@ export async function backfillStatusHistory() {
 }
 
 /** Va empaquetado: lo marcado al crearlo o, en pedidos anteriores, "para llevar" o web sin mesa. */
+const ACTIVE_STATUSES: OrderStatus[] = ["NUEVO", "EN_PREPARACION", "LISTO"];
+// De mesa o barra, ya servido pero sin cobrar: sigue en la cola, en "Por cobrar".
+export const AWAITING_PAYMENT = {
+  status: "ENTREGADO",
+  serviceType: "MESA",
+  paidAt: { $exists: false },
+  completedAt: { $exists: false },
+};
+/** Lo que esta en la cola: activo o servido en mesa sin cobrar. */
+export const OPEN_ORDER = { $or: [{ status: { $in: ACTIVE_STATUSES } }, AWAITING_PAYMENT] };
+
 export function isTakeaway(order: Pick<OrderDoc, "takeaway" | "serviceType">) {
   return order.takeaway ?? (order.serviceType ? order.serviceType === "LLEVAR" : true);
 }

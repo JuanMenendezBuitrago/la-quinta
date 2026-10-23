@@ -1,3 +1,5 @@
+import { useOrderQueueEnabled } from "~/composables/useSiteSettings";
+
 type StaffRole = "barra" | "gestion";
 
 // Secciones del panel de personal y como se agrupan en el menu superior. La seccion activa va
@@ -35,14 +37,24 @@ export function sectionsFor(role: string | undefined) {
   return STAFF_SECTIONS.filter((s) => (s.roles as readonly string[]).includes(role ?? ""));
 }
 
-/** Seccion activa segun la URL; si no existe o el rol no la ve, la cola. */
+/** Secciones que ve el personal con sesion: las de su rol, sin "Cola" si esta desactivada. */
+export function useVisibleSections() {
+  const queueEnabled = useOrderQueueEnabled();
+  return computed(() => {
+    const role = useState<{ role: string } | null>("lq-staff").value?.role;
+    return sectionsFor(role).filter((s) => queueEnabled.value || s.id !== "cola");
+  });
+}
+
+/** Seccion activa segun la URL; si no existe o no se ve, la cola (o, sin cola, tomar pedido). */
 export function useStaffSection() {
   const route = useRoute();
+  const visible = useVisibleSections();
   return computed<StaffSectionId>(() => {
-    const role = useState<{ role: string } | null>("lq-staff").value?.role;
     const requested = route.query.s;
-    const match = sectionsFor(role).find((s) => s.id === requested);
-    return match?.id ?? "cola";
+    const match = visible.value.find((s) => s.id === requested);
+    if (match) return match.id;
+    return visible.value.some((s) => s.id === "cola") ? "cola" : "tomar";
   });
 }
 

@@ -1,5 +1,6 @@
 import { GraphQLContext, requireStaff } from "../../graphql/context";
 import { DEFAULT_PACKAGING_FEE_CENTS, SiteSettings } from "./model";
+import { OPEN_ORDER, Order } from "../orders/model";
 import { OpeningHoursDoc, scheduleLines, validateOpeningHours } from "./openingHours";
 
 // upsert sin filtro: si nadie ha guardado nunca la configuracion, crea el documento con
@@ -19,6 +20,11 @@ export async function staffOnlyOrders(): Promise<boolean> {
   return !!(await loadSettings()).staffOnlyOrders;
 }
 
+/** Si la cola de pedidos esta activa. Lo usa "orders" al crear pedidos. */
+export async function orderQueueEnabled(): Promise<boolean> {
+  return (await loadSettings()).orderQueueEnabled !== false;
+}
+
 /** Recargo por empaque vigente. Lo usa "orders" al crear un pedido para llevar. */
 export async function packagingFeeCents(): Promise<number> {
   return (await loadSettings()).packagingFeeCents ?? DEFAULT_PACKAGING_FEE_CENTS;
@@ -36,6 +42,7 @@ export const settingsResolvers = {
     schedule: (doc: any) => scheduleLines(doc.openingHours),
     // Documentos guardados antes de existir el campo: sin valor equivale a desactivado.
     staffOnlyOrders: (doc: any) => !!doc.staffOnlyOrders,
+    orderQueueEnabled: (doc: any) => doc.orderQueueEnabled !== false,
     packagingFeeCents: (doc: any) => doc.packagingFeeCents ?? DEFAULT_PACKAGING_FEE_CENTS,
   },
   Mutation: {
@@ -49,10 +56,21 @@ export const settingsResolvers = {
       if (fee != null && (!Number.isInteger(fee) || (fee as number) < 0 || (fee as number) > MAX_PACKAGING_FEE_CENTS)) {
         throw new Error("Recargo por empaque no valido");
       }
+      // Apagar la cola con pedidos dentro los dejaria escondidos, sin forma de entregarlos ni cobrarlos.
+      if (args.input.orderQueueEnabled === false) {
+        const open = await Order.countDocuments(OPEN_ORDER);
+        if (open) {
+          throw new Error(
+            open === 1
+              ? "Queda 1 pedido en la cola: entrégalo y cóbralo, o cancélalo, antes de desactivarla"
+              : `Quedan ${open} pedidos en la cola: entrégalos y cóbralos, o cancélalos, antes de desactivarla`
+          );
+        }
+      }
       const update: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(args.input)) {
         // null en un booleano no significa "borrar": se ignora como si no viniera.
-        if ((key === "staffOnlyOrders" || key === "packagingFeeCents") && value === null) continue;
+        if ((key === "staffOnlyOrders" || key === "orderQueueEnabled" || key === "packagingFeeCents") && value === null) continue;
         if (value !== undefined) update[key] = value;
       }
       return SiteSettings.findOneAndUpdate({}, update, {
