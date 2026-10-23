@@ -45,6 +45,9 @@
       <p v-if="loginError" class="muted error" role="alert">{{ loginError }}</p>
       <button v-if="options.length" type="button" class="link-button" @click="backToList">Volver a la lista</button>
     </form>
+
+    <!-- Por si un cliente llega aqui (p. ej. desde el enlace del pie): su acceso es otro -->
+    <p class="customer-link muted">¿Eres cliente? <NuxtLink to="/cuenta">Entra en tu cuenta</NuxtLink></p>
   </div>
 </template>
 
@@ -176,6 +179,8 @@ function submitEmail() {
   text-underline-offset: 2px;
   cursor: pointer;
 }
+.customer-link { margin: 28px 0 0; font-size: 14px; }
+.customer-link a { color: var(--accent); text-underline-offset: 2px; }
 .sr-only {
   position: absolute;
   width: 1px;
