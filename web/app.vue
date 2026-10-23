@@ -93,7 +93,9 @@ await useAsyncData("session", async () => {
 <style scoped>
 .app-shell { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
 .app-body { flex: 1 0 auto; }
-.topbar-end { display: flex; align-items: center; gap: 14px; min-width: 0; }
+/* A la derecha y sin saltar de linea: si no cabe (p. ej. los avatares de la cuenta compartida en
+   movil), se encoge el selector de personas, que se desplaza en horizontal */
+.topbar-end { display: flex; align-items: center; gap: 14px; min-width: 0; margin-left: auto; }
 .topbar {
   position: sticky;
   top: 0;
@@ -107,7 +109,7 @@ await useAsyncData("session", async () => {
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 10px;
 }
 .brand {
@@ -119,6 +121,7 @@ await useAsyncData("session", async () => {
   text-decoration: none;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 /* Logotipo por altura: el horizontal (694x76) en escritorio y tablet, el compacto (268x115) en movil */
 .brand-logo {
