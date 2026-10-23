@@ -36,7 +36,8 @@
     <div class="app-body">
       <NuxtPage />
     </div>
-    <SiteFooter />
+    <!-- El pie (direccion, horarios, redes) es para el cliente: no en el panel de personal -->
+    <SiteFooter v-if="!inStaff" />
     <StaffQuickBar v-if="inStaff && staff" />
   </div>
 </template>
