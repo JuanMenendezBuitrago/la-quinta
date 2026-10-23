@@ -1,7 +1,7 @@
 <template>
   <div class="login-inline">
     <template v-if="step === 'identifier'">
-      <input v-model="identifier" type="text" placeholder="Email o teléfono" />
+      <input v-model="identifier" type="email" inputmode="email" autocomplete="email" placeholder="Email" />
       <button class="button" style="margin-top: 8px" :disabled="!identifier || sending" @click="sendCode">
         {{ sending ? "Enviando…" : "Enviar código" }}
       </button>
@@ -39,15 +39,15 @@
       <label v-if="requirements.askPrivacyConsent" class="consent">
         <input v-model="acceptPrivacy" type="checkbox" />
         <span>
-          Autorizo a La Quinta a tratar mis datos (nombre, email o teléfono y pedidos) para gestionar
+          Autorizo a La Quinta a tratar mis datos (nombre, email y pedidos) para gestionar
           mis pedidos y mis sellos, según la
           <!-- En pestaña nueva: el carrito vive en memoria y se perderia al navegar. -->
           <a href="/privacidad" target="_blank" rel="noopener">política de tratamiento de datos</a>.
         </span>
       </label>
-      <!-- Alta con email: novedades opcionales, desmarcadas (la autorizacion tiene que ser expresa).
+      <!-- Alta: novedades opcionales, desmarcadas (la autorizacion tiene que ser expresa).
            Se puede cambiar despues en Mi cuenta. -->
-      <label v-if="requirements.askName && isEmail" class="consent">
+      <label v-if="requirements.askName" class="consent">
         <input v-model="subscribeNewsletter" type="checkbox" />
         <span>
           Quiero recibir por email novedades de La Quinta: ofertas, eventos y nuevos cafés
@@ -90,7 +90,6 @@ const subscribeNewsletter = ref(false);
 const canVerify = computed(
   () => code.value.length === CODE_LENGTH && !verifying.value && (!requirements.value.askPrivacyConsent || acceptPrivacy.value)
 );
-const isEmail = computed(() => identifier.value.includes("@"));
 
 async function sendCode() {
   sending.value = true;
@@ -171,7 +170,7 @@ async function verify() {
       code.value,
       name.value || undefined,
       acceptPrivacy.value || undefined,
-      (requirements.value.askName && isEmail.value && subscribeNewsletter.value) || undefined
+      (requirements.value.askName && subscribeNewsletter.value) || undefined
     );
     emit("logged-in");
   } catch (err: any) {

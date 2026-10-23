@@ -25,7 +25,7 @@
     <section>
       <h2>2. Qué datos tratamos</h2>
       <ul>
-        <li>Tu nombre y el email o teléfono con el que inicias sesión.</li>
+        <li>Tu nombre y el email con el que inicias sesión.</li>
         <li>Tu código de cliente.</li>
         <li>Tus pedidos: productos, importes, fechas, hora de recogida y estado.</li>
         <li>Tus sellos de fidelización y los canjes.</li>

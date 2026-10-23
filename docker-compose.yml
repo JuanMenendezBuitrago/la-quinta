@@ -30,7 +30,6 @@ services:
       JWT_SECRET: ${JWT_SECRET:-cambia-esto-por-un-secreto-largo-y-aleatorio}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30d}
       OTP_TTL_SECONDS: ${OTP_TTL_SECONDS:-300}
-      OTP_CHANNEL: ${OTP_CHANNEL:-email}
       SMTP_URL: ${SMTP_URL:-}
       SMTP_FROM: ${SMTP_FROM:-}
       PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-http://localhost:3000}

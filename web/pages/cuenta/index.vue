@@ -8,7 +8,7 @@
       <p v-if="accountDeleted" class="card deleted-notice" role="status">
         Tu cuenta se ha eliminado. Hemos borrado tu nombre, email y teléfono.
       </p>
-      <p class="muted">Inicia sesión con tu email o teléfono para ver tus sellos y tus pedidos.</p>
+      <p class="muted">Inicia sesión con tu email para ver tus sellos y tus pedidos.</p>
       <LoginInline @logged-in="onLoggedIn" />
     </template>
 

@@ -44,45 +44,48 @@ export function verifyToken(token: string): AuthTokenPayload | null {
   }
 }
 
-function otpKey(identifier: string) {
-  return `otp:${identifier.toLowerCase()}`;
+function otpKey(email: string) {
+  return `otp:${email}`;
 }
 
 function generateCustomerCode() {
   return `LQ-${randomInt(1000, 9999)}`;
 }
 
-/** Mismo criterio email/telefono usado para buscar o crear el cliente en verifyOtpAndIssueToken. */
-function customerLookupQuery(identifier: string) {
-  const isEmail = identifier.includes("@");
-  return isEmail ? { email: identifier.toLowerCase() } : { phone: identifier };
+// Lo justo para descartar lo que no puede recibir el codigo (un telefono, texto suelto...).
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Los clientes entran solo con email: es por donde llega el codigo (no hay envio por SMS). Mismo
+ * criterio para pedir el codigo, comprobarlo y buscar o crear la cuenta.
+ */
+function normalizeEmail(identifier: string) {
+  const email = identifier.trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) throw new Error("Introduce un email valido");
+  return email;
 }
 
 /** Cliente con ese identificador, si existe (para no volver a pedir nombre ni autorizacion). */
 export async function findExistingCustomer(identifier: string) {
-  return User.findOne(customerLookupQuery(identifier)).select("_id privacyConsent").lean();
+  return User.findOne({ email: normalizeEmail(identifier) }).select("_id privacyConsent").lean();
 }
 
 /**
- * Genera un codigo de un solo uso y lo guarda en Redis con caducidad.
- * Envio real solo para email (ver sendOtpEmail); SMS se deja como punto de extension.
+ * Genera un codigo de un solo uso, lo guarda en Redis con caducidad y lo envia por email.
  * En desarrollo el codigo tambien se imprime en consola, para poder probar el flujo
  * aunque SMTP_URL no este configurada todavia.
  */
 export async function requestOtp(identifier: string): Promise<void> {
+  const email = normalizeEmail(identifier);
   const code = String(randomInt(100000, 999999));
-  await redisClient.set(otpKey(identifier), code, "EX", env.otpTtlSeconds);
+  await redisClient.set(otpKey(email), code, "EX", env.otpTtlSeconds);
 
   if (env.nodeEnv !== "production") {
     // eslint-disable-next-line no-console
-    console.log(`[otp] codigo para ${identifier}: ${code} (valido ${env.otpTtlSeconds}s)`);
+    console.log(`[otp] codigo para ${email}: ${code} (valido ${env.otpTtlSeconds}s)`);
   }
 
-  const isEmail = identifier.includes("@");
-  if (env.otpChannel === "email" && isEmail) {
-    await sendOtpEmail(identifier, code);
-  }
-  // TODO: integrar SMS cuando env.otpChannel === "sms"
+  await sendOtpEmail(email, code);
 }
 
 export async function verifyOtpAndIssueToken(
@@ -92,30 +95,30 @@ export async function verifyOtpAndIssueToken(
   acceptPrivacyPolicy = false,
   subscribeNewsletter = false
 ): Promise<{ token: string; user: InstanceType<typeof User> }> {
-  const stored = await redisClient.get(otpKey(identifier));
+  const email = normalizeEmail(identifier);
+  const stored = await redisClient.get(otpKey(email));
   if (!stored || stored !== code) {
     throw new Error("Codigo invalido o caducado");
   }
 
-  const query = customerLookupQuery(identifier);
-  let user = await User.findOne(query);
+  let user = await User.findOne({ email });
 
   // Sin autorizacion expresa no se crea la cuenta (ni se deja entrar a quien la tiene de una
   // version anterior de la politica). El codigo no se consume, para poder reintentar.
   if (!(user && hasCurrentConsent(user)) && !acceptPrivacyPolicy) {
     throw new Error("Para continuar tienes que aceptar la politica de tratamiento de datos");
   }
-  await redisClient.del(otpKey(identifier));
+  await redisClient.del(otpKey(email));
 
   const consent = { acceptedAt: new Date(), policyVersion: PRIVACY_POLICY_VERSION };
   if (!user) {
     user = await User.create({
-      ...query,
+      email,
       name: name?.trim() || "Cliente La Quinta",
       customerCode: generateCustomerCode(),
       privacyConsent: consent,
-      // Novedades: casilla aparte y desmarcada en el alta; solo si la marca y la cuenta tiene email.
-      ...(subscribeNewsletter && "email" in query ? { newsletterConsent: { acceptedAt: consent.acceptedAt } } : {}),
+      // Novedades: casilla aparte y desmarcada en el alta; solo si la marca.
+      ...(subscribeNewsletter ? { newsletterConsent: { acceptedAt: consent.acceptedAt } } : {}),
     });
   } else if (!hasCurrentConsent(user)) {
     user.privacyConsent = consent;

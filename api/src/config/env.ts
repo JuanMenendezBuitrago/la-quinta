@@ -16,7 +16,6 @@ export const env = {
   jwtSecret: required("JWT_SECRET", "dev-secret-cambiame"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "30d",
   otpTtlSeconds: Number(process.env.OTP_TTL_SECONDS ?? 300),
-  otpChannel: (process.env.OTP_CHANNEL ?? "email") as "email" | "sms",
   // Cadena de conexion SMTP completa, p. ej. "smtps://usuario%40gmail.com:contraseña@smtp.gmail.com:465".
   // Si no esta definida, el codigo se imprime en los logs (modo desarrollo) en vez de enviarse.
   smtpUrl: process.env.SMTP_URL || null,

@@ -75,12 +75,12 @@ export const usersTypeDefs = /* GraphQL */ `
     staffLoginOptions: [StaffLoginOption!]!
     """Listado de personal del local (requiere rol gestion)."""
     staffUsers: [Staff!]!
-    """Que datos pedir en el login a ese email/telefono (nombre, autorizacion de datos)."""
+    """Que datos pedir en el login a ese email (nombre, autorizacion de datos)."""
     loginRequirements(identifier: String!): LoginRequirements!
   }
 
   extend type Mutation {
-    """Paso 1 del login: envia un codigo de un solo uso a email o telefono."""
+    """Paso 1 del login: envia un codigo de un solo uso al email (identifier; solo se acepta email)."""
     requestOtp(identifier: String!): Boolean!
     """Paso 2 del login: valida el codigo y devuelve un token de sesion. acceptPrivacyPolicy es
     obligatorio (true) si loginRequirements pidio la autorizacion. subscribeNewsletter (opcional)
