@@ -263,8 +263,9 @@ input:focus, select:focus, textarea:focus {
   }
   .wide-main { grid-area: main; }
   .wide-aside { grid-area: aside; }
-  /* Columna lateral que acompaña al hacer scroll (ticket, filtros...) */
-  .wide-aside--sticky { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; }
+  /* Columna lateral que acompaña al hacer scroll (ticket, filtros...), sin meterse bajo la barra
+     inferior del personal */
+  .wide-aside--sticky { position: sticky; top: 84px; max-height: calc(100vh - 100px - var(--quickbar-height, 0px)); overflow-y: auto; }
   /* Cabecera de la pagina con el mismo ancho que las columnas */
   .wide-head {
     --wide-width: min(1160px, calc(100vw - 40px));

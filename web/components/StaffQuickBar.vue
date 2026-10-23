@@ -1,6 +1,6 @@
 <template>
-  <!-- Acceso rapido del personal en movil y tablet: lo que mas se usa durante el turno. El resto
-       de secciones sigue en el menu (StaffNav). -->
+  <!-- Acceso rapido del personal, en todas las pantallas: lo que mas se usa durante el turno. El
+       resto de secciones sigue en el menu (StaffNav). -->
   <nav class="quickbar" aria-label="Acceso rápido">
     <button
       v-for="action in actions"
@@ -67,31 +67,30 @@ const actions = computed<QuickAction[]>(() => {
 });
 </script>
 
-<style scoped>
-.quickbar,
-.quickbar-spacer { display: none; }
+<style>
+/* Alto de la barra: las otras barras fijas del panel (p. ej. "Ver ticket") se colocan encima */
+body:has(.quickbar) { --quickbar-height: calc(64px + env(safe-area-inset-bottom)); }
+</style>
 
-/* Movil y tablet (hasta 1024 px, p. ej. un iPad en horizontal); en escritorio basta el menu superior */
-@media (max-width: 1024px) {
-  .quickbar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 80; /* por debajo de la cabecera (85), que contiene el panel lateral del menu */
-    display: grid;
-    /* En tablet las 5 acciones no se estiran a todo el ancho: quedan centradas */
-    grid-template-columns: repeat(5, minmax(0, 120px));
-    justify-content: center;
-    /* Arriba: si una etiqueta ocupa dos lineas, los iconos siguen alineados */
-    align-items: start;
-    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
-    background: var(--surface);
-    border-top: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
-  }
-  .quickbar-spacer { display: block; height: calc(72px + env(safe-area-inset-bottom)); }
+<style scoped>
+.quickbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 80; /* por debajo de la cabecera (85), que contiene el panel lateral del menu */
+  display: grid;
+  /* En tablet y escritorio las 5 acciones no se estiran a todo el ancho: quedan centradas */
+  grid-template-columns: repeat(5, minmax(0, 120px));
+  justify-content: center;
+  /* Arriba: si una etiqueta ocupa dos lineas, los iconos siguen alineados */
+  align-items: start;
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
 }
+.quickbar-spacer { height: calc(72px + env(safe-area-inset-bottom)); }
 
 .quick {
   display: flex;

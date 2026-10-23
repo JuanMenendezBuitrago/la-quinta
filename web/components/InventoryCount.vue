@@ -191,7 +191,8 @@ async function save() {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  /* Encima de la barra inferior del personal */
+  bottom: var(--quickbar-height, 0px);
   display: flex;
   align-items: center;
   justify-content: space-between;
