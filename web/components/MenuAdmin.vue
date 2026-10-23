@@ -211,8 +211,17 @@
     </form>
     </Teleport>
 
-    <section v-for="category in categories" :key="category.id" class="category">
-      <h3>{{ category.name }}</h3>
+    <!-- Una categoria por grupo plegable, como en Recetas y Conteo; empiezan plegadas. El formulario
+         de edicion vive dentro (v-show): plegar el grupo no pierde lo escrito. -->
+    <CollapsibleGroup
+      v-for="category in categories"
+      :key="category.id"
+      class="category"
+      :title="category.name"
+      :open="isOpen(category.id)"
+      @update:open="toggleCategory(category.id)"
+    >
+      <template #meta>{{ category.items.length }}</template>
       <template v-for="item in category.items" :key="item.id">
       <div class="card item-row" :class="{ unavailable: !item.available, editing: formOpen && form.id === item.id }">
         <img v-if="item.imageUrl" :src="resolveImageUrl(item.imageUrl) ?? undefined" alt="" class="thumb" />
@@ -243,7 +252,7 @@
       <div :id="`item-form-slot-${item.id}`" />
       </template>
       <EmptyState v-if="!category.items.length" compact :icon="PackageOpen" title="Sin productos en esta categoría" />
-    </section>
+    </CollapsibleGroup>
     </div>
   </section>
 </template>
@@ -251,6 +260,7 @@
 <script setup lang="ts">
 import MobileTabs from "~/components/MobileTabs.vue";
 import EmptyState from "~/components/EmptyState.vue";
+import CollapsibleGroup from "~/components/CollapsibleGroup.vue";
 import { PackageOpen, SlidersHorizontal, Trash2, X } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 
@@ -572,6 +582,16 @@ const mobileTabs = computed(() => [
 ]);
 const mobileTab = ref<MobileTab>("productos");
 
+const openCategories = ref(new Set<string>());
+function isOpen(id: string) {
+  return openCategories.value.has(id);
+}
+function toggleCategory(id: string) {
+  const next = new Set(openCategories.value);
+  if (!next.delete(id)) next.add(id);
+  openCategories.value = next;
+}
+
 function startCreate(categoryId?: string) {
   // "+ Nuevo producto" esta en la cabecera: se puede pulsar desde otra pestaña
   mobileTab.value = "productos";
@@ -630,6 +650,8 @@ async function submitForm() {
     }
     await refetch();
     formOpen.value = false;
+    // Que se vea donde ha quedado (nuevo, o movido a otra categoria que estaba plegada)
+    openCategories.value = new Set([...openCategories.value, input.categoryId]);
   } catch (err: any) {
     formError.value = err?.message ?? "No se pudo guardar el producto";
   } finally {
@@ -707,7 +729,8 @@ function formatPrice(priceCents: number) {
 .modifier-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .modifier-row select { flex: 1; min-width: 180px; width: auto; }
 
-.category { margin-top: 24px; }
+/* Aire entre una categoria desplegada y la cabecera de la siguiente */
+.category { margin-bottom: 12px; }
 .item-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
 .item-row.unavailable { opacity: 0.55; }
 .item-row.editing { border-color: var(--accent); opacity: 1; }
