@@ -177,6 +177,7 @@ export const ordersResolvers = {
           customerId?: string | null;
           note?: string | null;
           takeaway?: boolean | null;
+          paymentMethod?: PaymentMethod | null;
         };
       },
       ctx: GraphQLContext
@@ -186,12 +187,16 @@ export const ordersResolvers = {
       const table = input.table?.trim() || undefined;
       if (input.serviceType === "MESA" && !table) throw new Error("Indica el numero de mesa");
       if (input.customerId && !(await activeCustomerExists(input.customerId))) throw new Error("Cliente no encontrado");
+      // Guardar y pagar: se sirvio sin pasar por la cola y se cobra ahora.
+      const paidNow = !!input.paymentMethod;
+      if (paidNow && !PAYMENT_METHODS.includes(input.paymentMethod!)) throw new Error("Metodo de pago no valido");
 
       const { lines, totalCents } = await buildOrderLines(input.items);
       // Mesa o barra con "para llevar" marcado: se empaqueta igual que un pedido para llevar.
       const takeaway = input.serviceType === "LLEVAR" || input.takeaway === true;
       const packagingCents = takeaway ? await packagingFeeCents() : 0;
       // Lo toma el personal en el local: la recogida es ahora y no se valida contra el horario.
+      const now = new Date();
       const order = await createWithUniqueCode({
         customerId: (input.customerId || null) as any,
         source: "STAFF",
@@ -203,11 +208,21 @@ export const ordersResolvers = {
         totalCents: totalCents + packagingCents,
         packagingCents,
         takeaway,
-        pickupSlot: new Date(),
-        status: "NUEVO",
+        pickupSlot: now,
+        // Guardar y pagar: creado, entregado, cobrado y cerrado en el mismo instante.
+        createdAt: now,
+        status: paidNow ? "ENTREGADO" : "NUEVO",
+        ...(paidNow
+          ? { deliveredAt: now, paidAt: now, paymentMethod: input.paymentMethod!, paidByStaffId: staff.id as any }
+          : {}),
       });
 
       await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
+      // Como al entregarlo desde la cola: sale la mercancia y, ya cobrado, se cierra (sellos y hoja).
+      if (paidNow) {
+        internalEvents.emit(INTERNAL_EVENTS.ORDER_DELIVERED, await buildClosedPayload(order, "ENTREGADO", now));
+        await tryComplete(order._id.toString(), now);
+      }
       return order;
     },
 

@@ -8,7 +8,8 @@ import { Order } from "./model";
  * personas, dos peticiones), solo una lo consigue y ORDER_COMPLETED sale una unica vez: los
  * sellos no se suman dos veces ni la fila se escribe dos veces en la hoja.
  */
-export async function tryComplete(orderId: string) {
+// at: el instante del cierre (por defecto, ahora).
+export async function tryComplete(orderId: string, at = new Date()) {
   const order = await Order.findOneAndUpdate(
     {
       _id: orderId,
@@ -16,7 +17,7 @@ export async function tryComplete(orderId: string) {
       completedAt: { $exists: false },
       $or: [{ serviceType: { $ne: "MESA" } }, { paidAt: { $exists: true } }],
     },
-    { $set: { completedAt: new Date() } },
+    { $set: { completedAt: at } },
     { new: true }
   );
   if (!order) return null;

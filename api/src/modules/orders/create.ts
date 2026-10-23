@@ -1,7 +1,9 @@
 import { MenuItem, MenuItemDoc, ModifierGroup, ModifierGroupDoc } from "../menu/model";
-import { generateOrderCode, isDuplicateCodeError, Order, OrderDoc, OrderLineOptionDoc } from "./model";
+import { generateOrderCode, isDuplicateCodeError, Order, OrderDoc, OrderLineOptionDoc, OrderStatus, OrderStatusChangeDoc } from "./model";
 
 const MAX_CODE_ATTEMPTS = 5;
+// Estados por los que pasa un pedido hasta entregarse, en orden.
+const FLOW: OrderStatus[] = ["NUEVO", "EN_PREPARACION", "LISTO", "ENTREGADO"];
 const MAX_QUANTITY = 99;
 
 export interface OrderLineRequest {
@@ -89,9 +91,12 @@ export async function buildOrderLines(items: OrderLineRequest[]) {
 export async function createWithUniqueCode(data: Omit<Partial<OrderDoc>, "_id" | "code">) {
   for (let attempt = 1; ; attempt++) {
     try {
-      // El historial empieza con la creacion (y quien lo tomo, si fue el personal).
-      const createdAt = new Date();
-      const statusHistory = [{ status: data.status ?? "NUEVO", at: createdAt, staffId: data.createdByStaffId }];
+      // El historial empieza con la creacion (y quien lo tomo, si fue el personal). Si nace mas
+      // adelante en el flujo (guardar y pagar: ya entregado), lleva todos los pasos hasta ese
+      // estado, todos con el mismo instante.
+      const createdAt = data.createdAt ?? new Date();
+      const steps = FLOW.slice(0, FLOW.indexOf(data.status ?? "NUEVO") + 1);
+      const statusHistory: OrderStatusChangeDoc[] = steps.map((status) => ({ status, at: createdAt, staffId: data.createdByStaffId }));
       return await Order.create({ ...data, createdAt, statusHistory, code: generateOrderCode() });
     } catch (err) {
       if (!isDuplicateCodeError(err) || attempt >= MAX_CODE_ATTEMPTS) throw err;

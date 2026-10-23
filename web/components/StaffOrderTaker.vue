@@ -3,7 +3,8 @@
   <section class="order-taker wide-layout">
     <div class="wide-main">
     <p v-if="lastCode" class="card sent-notice" role="status">
-      Pedido <strong class="code">{{ lastCode }}</strong> enviado a la cola.
+      Pedido <strong class="code">{{ lastCode }}</strong>
+      {{ lastPaidWith ? `guardado y cobrado (${PAYMENT_LABELS[lastPaidWith].toLowerCase()}).` : "enviado a la cola." }}
       <button class="button secondary" type="button" @click="lastCode = ''">Cerrar</button>
     </p>
 
@@ -135,9 +136,30 @@
 
       <p v-if="missingChoice" class="muted" style="color: var(--danger)">Elige la opción marcada en rojo: la de siempre está agotada.</p>
       <p v-if="submitError" class="muted" style="color: var(--danger)">{{ submitError }}</p>
-      <div class="ticket-actions">
-        <button class="button" type="button" :disabled="!canSubmit" @click="submit">
+      <!-- Guardar y pagar: ya se sirvio y se cobra en el acto; el pedido no pasa por la cola -->
+      <div v-if="choosingPayment" class="pay-box">
+        <span class="muted">Guardar y cobrar {{ formatPrice(totalCents + packagingCents) }} con:</span>
+        <div class="pay-methods">
+          <button
+            v-for="(label, method) in PAYMENT_LABELS"
+            :key="method"
+            class="button"
+            type="button"
+            :disabled="!canSubmit"
+            @click="submit(method)"
+          >
+            {{ submitting ? "Guardando…" : label }}
+          </button>
+        </div>
+        <button class="button secondary" type="button" :disabled="submitting" @click="choosingPayment = false">Volver</button>
+      </div>
+      <div v-else class="ticket-actions">
+        <button class="button" type="button" :disabled="!canSubmit" @click="submit()">
           {{ submitting ? "Haciendo pedido…" : "Hacer pedido" }}
+        </button>
+        <button class="button secondary" type="button" :disabled="!canSubmit" @click="choosingPayment = true">
+          <Banknote :size="16" :stroke-width="1.8" aria-hidden="true" />
+          Guardar y pagar
         </button>
         <button v-if="lines.length" class="button secondary" type="button" :disabled="submitting" @click="reset">Vaciar</button>
       </div>
@@ -153,7 +175,7 @@
 </template>
 
 <script setup lang="ts">
-import { Receipt, Search, SearchX } from "lucide-vue-next";
+import { Banknote, Receipt, Search, SearchX } from "lucide-vue-next";
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import { orderLinesInput, useCart } from "~/composables/useCart";
@@ -161,7 +183,7 @@ import { MENU_QUERY, defaultCartOptions, missingModifiers, type MenuCategory, ty
 import LineOptionsPicker from "~/components/LineOptionsPicker.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
 import { usePackagingFee } from "~/composables/useSiteSettings";
-import { type CustomerMatch } from "~/composables/useStaffOrders";
+import { PAYMENT_LABELS, type CustomerMatch, type PaymentMethod } from "~/composables/useStaffOrders";
 import { BAR_TABLE, TABLES } from "~/composables/useTables";
 
 const CREATE_STAFF_ORDER = gql`
@@ -248,6 +270,8 @@ const ticketEl = ref<HTMLElement | null>(null);
 const submitting = ref(false);
 const submitError = ref("");
 const lastCode = ref("");
+const lastPaidWith = ref<PaymentMethod | null>(null);
+const choosingPayment = ref(false);
 
 const canSubmit = computed(
   () => !submitting.value && lines.value.length > 0 && !!place.value && !missingChoice.value
@@ -260,9 +284,11 @@ function reset() {
   customer.value = null;
   note.value = "";
   search.value = "";
+  choosingPayment.value = false;
 }
 
-async function submit() {
+// Con metodo de pago: guardar y pagar (nace entregado y cobrado).
+async function submit(paymentMethod: PaymentMethod | null = null) {
   if (!canSubmit.value) return;
   submitting.value = true;
   submitError.value = "";
@@ -276,9 +302,11 @@ async function submit() {
         takeaway: isTakeaway.value,
         customerId: customer.value?.id ?? null,
         note: note.value.trim() || null,
+        paymentMethod,
       },
     });
     lastCode.value = res?.data?.createStaffOrder.code ?? "";
+    lastPaidWith.value = paymentMethod;
     reset();
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (err: any) {
@@ -467,6 +495,9 @@ input {
 .takeaway-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
 .customer-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ticket-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pay-box { display: flex; flex-direction: column; gap: 8px; }
+.pay-methods { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.pay-methods .button { min-height: 44px; }
 
 .sticky-bar {
   position: fixed;

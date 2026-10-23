@@ -171,7 +171,8 @@ const orderSchema = new Schema<OrderDoc>({
 orderSchema.index({ customerId: 1, createdAt: -1 });
 
 orderSchema.pre("save", function (next) {
-  this.updatedAt = new Date();
+  // Al crearlo, el mismo instante que createdAt (guardar y pagar fija todos sus pasos a uno solo).
+  this.updatedAt = this.isNew ? this.createdAt : new Date();
   next();
 });
 

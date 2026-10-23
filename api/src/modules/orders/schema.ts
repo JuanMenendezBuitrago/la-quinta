@@ -104,6 +104,9 @@ export const ordersTypeDefs = /* GraphQL */ `
     """Mesa o barra, pero se lo llevan (empaquetado): lleva el recargo por empaque y descuenta
     vasos, tapas... como un pedido para llevar. Con serviceType LLEVAR no hace falta."""
     takeaway: Boolean
+    """Guardar y pagar: ya se entrego y se cobra en el acto con este metodo. El pedido nace
+    entregado y cobrado (cerrado), sin pasar por la cola."""
+    paymentMethod: PaymentMethod
   }
 
   extend type Query {
