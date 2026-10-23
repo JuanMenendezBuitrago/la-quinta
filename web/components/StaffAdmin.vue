@@ -36,7 +36,7 @@
 
           <label class="field">
             <span class="muted">{{ form.id ? "Nueva contraseña" : "Contraseña" }}</span>
-            <input v-model="form.password" type="password" :required="!form.id" minlength="8" />
+            <PasswordInput v-model="form.password" :required="!form.id" minlength="8" autocomplete="new-password" />
             <span v-if="form.id" class="muted">Deja en blanco para no cambiarla.</span>
           </label>
 
@@ -83,6 +83,26 @@
               Cancelar
             </button>
           </div>
+          <!-- Borrar: solo cuentas sin pedidos ni otros registros a su nombre (la API lo comprueba);
+               las demas se desactivan, para no dejar el historial sin quien lo hizo -->
+          <div v-if="form.id && !isSelf" class="delete-zone">
+            <template v-if="!confirmingDelete">
+              <button class="button secondary delete" type="button" :disabled="saving || !form.deletable" @click="confirmingDelete = true">
+                <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
+                Eliminar cuenta
+              </button>
+              <span v-if="!form.deletable" class="muted">Tiene pedidos u otros registros a su nombre: no se puede eliminar, solo desactivar.</span>
+            </template>
+            <template v-else>
+              <span class="muted">¿Eliminar la cuenta de {{ form.name }}? No se puede deshacer.</span>
+              <div class="form-actions">
+                <button class="button secondary delete" type="button" :disabled="saving" @click="deleteUser">
+                  {{ saving ? "Eliminando…" : "Sí, eliminar" }}
+                </button>
+                <button class="button secondary" type="button" :disabled="saving" @click="confirmingDelete = false">No</button>
+              </div>
+            </template>
+          </div>
         </div>
       </div>
     </form>
@@ -109,11 +129,13 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { UserCog, Users, X } from "lucide-vue-next";
+import { Trash2, UserCog, Users, X } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { useStaffAuth } from "~/composables/useAuth";
 import UserAvatar from "~/components/UserAvatar.vue";
 import AvatarPicker from "~/components/AvatarPicker.vue";
+import PasswordInput from "~/components/PasswordInput.vue";
+import { SITE_SETTINGS_QUERY, type SiteSettings } from "~/composables/useSiteSettings";
 
 interface StaffUserAdmin {
   id: string;
@@ -122,6 +144,7 @@ interface StaffUserAdmin {
   role: "barra" | "gestion";
   avatar?: string | null;
   active: boolean;
+  deletable: boolean;
 }
 
 const STAFF_USERS_QUERY = gql`
@@ -133,6 +156,7 @@ const STAFF_USERS_QUERY = gql`
       role
       avatar
       active
+      deletable
     }
   }
 `;
@@ -153,16 +177,26 @@ const UPDATE_STAFF_USER = gql`
   }
 `;
 
+const DELETE_STAFF_USER = gql`
+  mutation DeleteStaffUser($id: ID!) {
+    deleteStaffUser(id: $id)
+  }
+`;
+
 const { staff } = useStaffAuth();
 const myId = computed(() => staff.value?.id ?? "");
 
 const { result, loading, error, refetch } = useQuery<{ staffUsers: StaffUserAdmin[] }>(STAFF_USERS_QUERY);
-const staffUsers = computed(() => result.value?.staffUsers ?? []);
+// Las desactivadas, solo si Configuracion lo permite (la propia cuenta siempre esta activa).
+const { result: settingsResult } = useQuery<{ siteSettings: SiteSettings }>(SITE_SETTINGS_QUERY);
+const showInactive = computed(() => settingsResult.value?.siteSettings.showInactiveStaff !== false);
+const staffUsers = computed(() => (result.value?.staffUsers ?? []).filter((u) => u.active || showInactive.value));
 const loadError = computed(() => (error.value ? "No se pudo cargar el personal." : ""));
 
 const formOpen = ref(false);
 const saving = ref(false);
 const formError = ref("");
+const confirmingDelete = ref(false);
 
 function emptyForm() {
   return {
@@ -172,6 +206,7 @@ function emptyForm() {
     password: "",
     role: "barra" as "barra" | "gestion",
     active: true,
+    deletable: false,
     avatar: null as string | null | undefined,
   };
 }
@@ -181,6 +216,7 @@ const isSelf = computed(() => !!form.id && form.id === myId.value);
 function startCreate() {
   Object.assign(form, emptyForm());
   formError.value = "";
+  confirmingDelete.value = false;
   formOpen.value = true;
 }
 
@@ -192,9 +228,11 @@ function startEdit(user: StaffUserAdmin) {
     password: "",
     role: user.role,
     active: user.active,
+    deletable: user.deletable,
     avatar: user.avatar,
   });
   formError.value = "";
+  confirmingDelete.value = false;
   formOpen.value = true;
 }
 
@@ -207,6 +245,23 @@ function onAvatarChanged(avatar: string | null) {
 function cancelForm() {
   formOpen.value = false;
   formError.value = "";
+  confirmingDelete.value = false;
+}
+
+async function deleteUser() {
+  saving.value = true;
+  formError.value = "";
+  try {
+    const { mutate } = useMutation(DELETE_STAFF_USER);
+    await mutate({ id: form.id });
+    await refetch();
+    cancelForm();
+  } catch (err: any) {
+    formError.value = err?.message ?? "No se pudo eliminar la cuenta";
+    confirmingDelete.value = false;
+  } finally {
+    saving.value = false;
+  }
 }
 
 async function submitForm() {
@@ -243,6 +298,7 @@ async function submitForm() {
 
 <style scoped>
 .staff-main { gap: 0; }
+.delete-zone { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
 .form-placeholder { display: none; }
 @media (min-width: 1000px) and (orientation: landscape) { .form-placeholder { display: block; } }
 .staff-list { gap: 0; }

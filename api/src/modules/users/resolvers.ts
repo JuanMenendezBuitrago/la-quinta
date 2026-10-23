@@ -5,6 +5,30 @@ import { requestOtp, verifyOtpAndIssueToken, loginStaff, loginStaffById, hashPas
 import { presetAvatarValue, removeAvatarFile } from "./avatar";
 import { UPLOAD_DIR } from "../uploads/router";
 import { MenuItem } from "../menu/model";
+import { Order } from "../orders/model";
+import { CashClosing } from "../cash/model";
+import { Expense } from "../expenses/model";
+import { LoyaltyTransaction } from "../loyalty/model";
+import { StockMovement } from "../inventory/model";
+import { NewsletterCampaign } from "../newsletter/model";
+
+/**
+ * Lo que queda a nombre de una cuenta del personal (pedidos que tomo, movio o cobro, cierres,
+ * gastos...). Con algo de eso no se borra: el historial perderia quien lo hizo; se desactiva.
+ */
+async function staffRecords(staffId: string) {
+  const id = new Types.ObjectId(staffId);
+  const checks: [string, Promise<unknown>][] = [
+    ["pedidos", Order.exists({ $or: [{ createdByStaffId: id }, { paidByStaffId: id }, { "statusHistory.staffId": id }] })],
+    ["cierres de caja", CashClosing.exists({ staffId: id })],
+    ["gastos", Expense.exists({ staffId: id })],
+    ["movimientos de sellos", LoyaltyTransaction.exists({ staffId: id })],
+    ["movimientos de inventario", StockMovement.exists({ staffId: id })],
+    ["envíos de novedades", NewsletterCampaign.exists({ createdByStaffId: id })],
+  ];
+  const found = await Promise.all(checks.map(([, check]) => check));
+  return checks.filter((_, i) => found[i]).map(([label]) => label);
+}
 
 const MAX_NAME_MATCHES = 8;
 
@@ -84,6 +108,9 @@ export const usersResolvers = {
       const existing = await findExistingCustomer(args.identifier);
       return { askName: !existing, askPrivacyConsent: !(existing && hasCurrentConsent(existing)) };
     },
+  },
+  Staff: {
+    deletable: async (doc: any) => (await staffRecords(doc._id.toString())).length === 0,
   },
   Mutation: {
     requestOtp: async (_: unknown, args: { identifier: string }) => {
@@ -198,6 +225,20 @@ export const usersResolvers = {
       const updated = await StaffUser.findByIdAndUpdate(args.id, update, { new: true });
       if (!updated) throw new Error("Usuario no encontrado");
       return updated;
+    },
+    deleteStaffUser: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
+      const staff = requireStaff(ctx, ["gestion"]);
+      if (!Types.ObjectId.isValid(args.id)) throw new Error("Usuario no encontrado");
+      if (args.id === staff.id) throw new Error("No puedes borrar tu propia cuenta");
+      const records = await staffRecords(args.id);
+      if (records.length) {
+        throw new Error(`Esta cuenta tiene ${records.join(", ")} a su nombre: no se puede borrar, desactívala`);
+      }
+      // Su sesion abierta deja de valer sola: el contexto exige que la cuenta exista.
+      const deleted = await StaffUser.findByIdAndDelete(args.id);
+      if (!deleted) throw new Error("Usuario no encontrado");
+      await removeAvatarFile(deleted.avatar, UPLOAD_DIR);
+      return true;
     },
   },
 };

@@ -27,6 +27,7 @@ export const SITE_SETTINGS_QUERY = gql`
       privacyEmail
       staffOnlyOrders
       orderQueueEnabled
+      showInactiveStaff
       packagingFeeCents
     }
   }
@@ -57,6 +58,7 @@ export const UPDATE_SITE_SETTINGS = gql`
       privacyEmail
       staffOnlyOrders
       orderQueueEnabled
+      showInactiveStaff
       packagingFeeCents
     }
   }
@@ -94,6 +96,8 @@ export interface SiteSettings {
   staffOnlyOrders: boolean;
   /** Cola de pedidos. Desactivada: solo "Guardar y pagar" y sin pedidos desde la web. */
   orderQueueEnabled: boolean;
+  /** Listado de "Personal": si muestra tambien las cuentas desactivadas. */
+  showInactiveStaff: boolean;
   /** Recargo por empaque de cada pedido para llevar (pesos). 0 = sin recargo. */
   packagingFeeCents: number;
 }

@@ -24,6 +24,15 @@
         <span class="muted">Desactivada, los pedidos se hacen y se pagan en caja en el mismo momento: desaparecen la sección «Cola» y el botón «Hacer pedido» (solo queda «Guardar y pagar»), y los clientes no pueden pedir desde la web. Para desactivarla, la cola tiene que estar vacía.</span>
       </div>
 
+      <div class="field">
+        <span class="muted">Personal</span>
+        <label class="day-toggle">
+          <input v-model="form.showInactiveStaff" type="checkbox" />
+          <span>Mostrar cuentas de staff desactivadas en el listado</span>
+        </label>
+        <span class="muted">En la sección «Personal». Ocultas, para reactivar una cuenta hay que volver a marcar esta opción.</span>
+      </div>
+
       <label class="field">
         <span class="muted">Recargo por empaque (COP)</span>
         <input v-model.number="form.packagingFeeCents" type="number" min="0" max="100000" step="1" inputmode="numeric" required />
@@ -156,6 +165,7 @@ function emptyForm() {
     privacyEmail: "",
     staffOnlyOrders: false,
     orderQueueEnabled: true,
+    showInactiveStaff: true,
     packagingFeeCents: 0 as number | "",
   };
 }
@@ -182,6 +192,7 @@ watch(
       privacyEmail: val.privacyEmail ?? "",
       staffOnlyOrders: val.staffOnlyOrders,
       orderQueueEnabled: val.orderQueueEnabled,
+      showInactiveStaff: val.showInactiveStaff,
       packagingFeeCents: val.packagingFeeCents,
     });
   },
@@ -217,6 +228,7 @@ async function submit() {
         privacyEmail: form.privacyEmail.trim() || null,
         staffOnlyOrders: form.staffOnlyOrders,
         orderQueueEnabled: form.orderQueueEnabled,
+        showInactiveStaff: form.showInactiveStaff,
         packagingFeeCents: Math.round(Number(form.packagingFeeCents) || 0),
       },
     });

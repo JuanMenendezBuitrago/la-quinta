@@ -32,6 +32,8 @@ export interface SiteSettingsDoc {
   staffOnlyOrders: boolean;
   // Cola de pedidos: apagada, el personal solo registra pedidos ya servidos y cobrados.
   orderQueueEnabled: boolean;
+  // Listado de "Personal": si salen tambien las cuentas desactivadas.
+  showInactiveStaff: boolean;
   // Recargo fijo por pedido para llevar (personal "Para llevar" y web de recogida), en pesos. 0 = sin recargo.
   packagingFeeCents: number;
 }
@@ -57,6 +59,7 @@ const siteSettingsSchema = new Schema<SiteSettingsDoc>({
   privacyEmail: { type: String, trim: true, lowercase: true },
   staffOnlyOrders: { type: Boolean, default: false },
   orderQueueEnabled: { type: Boolean, default: true },
+  showInactiveStaff: { type: Boolean, default: true },
   packagingFeeCents: { type: Number, default: DEFAULT_PACKAGING_FEE_CENTS, min: 0 },
 });
 

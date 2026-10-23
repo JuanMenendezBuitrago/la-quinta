@@ -17,6 +17,8 @@ export const usersTypeDefs = /* GraphQL */ `
     avatar: String
     """Desactivada: no sale en la pantalla de acceso ni puede entrar."""
     active: Boolean!
+    """Se puede borrar: no tiene pedidos ni otros registros a su nombre (si los tiene, se desactiva)."""
+    deletable: Boolean!
   }
 
   enum StaffRole {
@@ -113,5 +115,7 @@ export const usersTypeDefs = /* GraphQL */ `
     createStaffUser(name: String!, email: String!, password: String!, role: StaffRole!): Staff!
     """Edicion de personal: nombre, rol, contraseña y/o si la cuenta esta activa (requiere rol gestion)."""
     updateStaffUser(id: ID!, name: String, role: StaffRole, password: String, active: Boolean): Staff!
+    """Borra una cuenta de personal sin pedidos ni otros registros a su nombre (requiere rol gestion)."""
+    deleteStaffUser(id: ID!): Boolean!
   }
 `;
