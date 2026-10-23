@@ -26,6 +26,8 @@ const OPEN_ORDER = { $or: [{ status: { $in: ACTIVE_STATUSES } }, AWAITING_PAYMEN
 function iso(value: unknown) {
   return value ? new Date(value as string).toISOString() : null;
 }
+// Ventana de "los mas pedidos": lo reciente, para que siga a los cambios de carta y de temporada.
+const TOP_ITEMS_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 // Margen para relojes algo desfasados y para el rato que el cliente pasa en el carrito.
 const PICKUP_PAST_TOLERANCE_MS = 5 * 60 * 1000;
 
@@ -73,6 +75,18 @@ export const ordersResolvers = {
       if (args.customerId) filter.customerId = id(args.customerId);
       const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
       return Order.find(filter).sort({ updatedAt: -1 }).limit(limit).exec();
+    },
+    topMenuItems: async (_: unknown, args: { limit?: number | null }, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["barra", "gestion"]);
+      const limit = Math.min(Math.max(args.limit ?? 5, 1), 20);
+      const rows = await Order.aggregate<{ _id: Types.ObjectId }>([
+        { $match: { status: { $ne: "CANCELADO" }, createdAt: { $gte: new Date(Date.now() - TOP_ITEMS_WINDOW_MS) } } },
+        { $unwind: "$items" },
+        { $group: { _id: "$items.menuItemId", units: { $sum: "$items.quantity" } } },
+        { $sort: { units: -1, _id: 1 } },
+        { $limit: limit },
+      ]);
+      return rows.map((r) => r._id.toString());
     },
   },
   Order: {

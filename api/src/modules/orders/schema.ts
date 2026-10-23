@@ -120,6 +120,9 @@ export const ordersTypeDefs = /* GraphQL */ `
     o le cambio el estado, y cliente.
     """
     orderHistory(limit: Int, from: String, to: String, staffId: ID, customerId: ID): [Order!]!
+    """Personal: ids de los productos mas pedidos (por unidades) en los ultimos 30 dias, de mas a menos.
+    Para los atajos de "tomar pedido"; puede incluir productos ya borrados o no disponibles."""
+    topMenuItems(limit: Int): [ID!]!
   }
 
   extend type Mutation {

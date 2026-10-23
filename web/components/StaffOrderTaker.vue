@@ -20,6 +20,21 @@
       placeholder="Buscar producto"
       aria-label="Buscar producto"
     />
+    <!-- Atajos a los mas pedidos: un toque suma una unidad, como en la cuadricula -->
+    <div v-if="topItems.length && !search.trim()" class="shortcuts" aria-label="Más pedidos">
+      <button
+        v-for="item in topItems"
+        :key="item.id"
+        type="button"
+        class="shortcut"
+        :class="{ selected: quantityOf(item.id) }"
+        :aria-label="`Añadir ${item.name}`"
+        @click="addItem(item)"
+      >
+        <span class="shortcut-name">{{ item.name }}</span>
+        <span v-if="quantityOf(item.id)" class="shortcut-qty" aria-hidden="true">{{ quantityOf(item.id) }}</span>
+      </button>
+    </div>
     <div class="category-row">
     <button
       type="button"
@@ -154,12 +169,13 @@
         <button class="button secondary" type="button" :disabled="submitting" @click="choosingPayment = false">Volver</button>
       </div>
       <div v-else class="ticket-actions">
-        <button class="button" type="button" :disabled="!canSubmit" @click="submit()">
-          {{ submitting ? "Haciendo pedido…" : "Hacer pedido" }}
-        </button>
-        <button class="button secondary" type="button" :disabled="!canSubmit" @click="choosingPayment = true">
+        <!-- Lo mas habitual: se sirve y se cobra en el acto; por eso va destacado y primero -->
+        <button class="button" type="button" :disabled="!canSubmit" @click="choosingPayment = true">
           <Banknote :size="16" :stroke-width="1.8" aria-hidden="true" />
           Guardar y pagar
+        </button>
+        <button class="button secondary" type="button" :disabled="!canSubmit" @click="submit()">
+          {{ submitting ? "Haciendo pedido…" : "Hacer pedido" }}
         </button>
         <button v-if="lines.length" class="button secondary" type="button" :disabled="submitting" @click="reset">Vaciar</button>
       </div>
@@ -185,6 +201,14 @@ import UserAvatar from "~/components/UserAvatar.vue";
 import { usePackagingFee } from "~/composables/useSiteSettings";
 import { PAYMENT_LABELS, type CustomerMatch, type PaymentMethod } from "~/composables/useStaffOrders";
 import { BAR_TABLE, TABLES } from "~/composables/useTables";
+
+const TOP_MENU_ITEMS = gql`
+  query TopMenuItems($limit: Int) {
+    topMenuItems(limit: $limit)
+  }
+`;
+// Se piden algunos de mas: los borrados o no disponibles no estan en la carta y se descartan.
+const SHORTCUT_COUNT = 5;
 
 const CREATE_STAFF_ORDER = gql`
   mutation CreateStaffOrder($input: StaffOrderInput!) {
@@ -234,6 +258,14 @@ const visibleItems = computed<MenuItem[]>(() => {
 });
 
 const itemsById = computed(() => new Map(menu.value.flatMap((c) => c.items).map((i) => [i.id, i])));
+
+const { result: topResult } = useQuery<{ topMenuItems: string[] }>(TOP_MENU_ITEMS, { limit: SHORTCUT_COUNT + 5 });
+const topItems = computed(() =>
+  (topResult.value?.topMenuItems ?? [])
+    .map((id) => itemsById.value.get(id))
+    .filter((i): i is MenuItem => !!i)
+    .slice(0, SHORTCUT_COUNT)
+);
 
 function quantityOf(menuItemId: string) {
   return lines.value.filter((l) => l.menuItemId === menuItemId).reduce((sum, l) => sum + l.quantity, 0);
@@ -341,6 +373,44 @@ input {
 .sent-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; border-color: var(--accent); }
 
 .search { display: none; margin-bottom: 10px; }
+.shortcuts { display: flex; gap: 6px; overflow-x: auto; padding: 6px 6px 8px 0; margin-bottom: 4px; }
+.shortcut {
+  position: relative;
+  flex-shrink: 0;
+  max-width: 160px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease;
+}
+.shortcut:active { transform: scale(0.97); }
+.shortcut.selected { background: var(--accent); color: var(--bg); }
+.shortcut-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shortcut-qty {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  font-size: 11.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .search.search--open { display: block; }
 .category-row { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 6px; }
 .search-toggle {
@@ -503,7 +573,8 @@ input {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  /* Encima de la barra inferior del personal */
+  bottom: var(--quickbar-height, 0px);
   display: flex;
   align-items: center;
   justify-content: space-between;
