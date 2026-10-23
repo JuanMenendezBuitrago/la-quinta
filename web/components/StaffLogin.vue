@@ -19,11 +19,10 @@
       <UserAvatar :avatar="selected.avatar" :name="selected.name" :size="96" />
       <strong class="selected-name">{{ selected.name }}</strong>
       <label class="sr-only" for="staff-login-password">Contraseña</label>
-      <input
+      <PasswordInput
         id="staff-login-password"
         ref="passwordInput"
         v-model="password"
-        type="password"
         placeholder="Contraseña"
         autocomplete="current-password"
         required
@@ -38,7 +37,7 @@
     <!-- 3. Email y contraseña: si la lista no carga o la cuenta no aparece -->
     <form v-else class="card login-card" @submit.prevent="submitEmail">
       <input v-model="email" type="email" placeholder="Email del equipo" autocomplete="username" required />
-      <input v-model="password" type="password" placeholder="Contraseña" autocomplete="current-password" required />
+      <PasswordInput v-model="password" placeholder="Contraseña" autocomplete="current-password" required />
       <button class="button" type="submit" :disabled="loggingIn">
         {{ loggingIn ? "Entrando…" : "Entrar" }}
       </button>
@@ -56,6 +55,7 @@ import { gql } from "graphql-tag";
 import { useStaffAuth } from "~/composables/useAuth";
 import { primeAudio } from "~/composables/useOrderChime";
 import UserAvatar from "~/components/UserAvatar.vue";
+import PasswordInput from "~/components/PasswordInput.vue";
 
 interface StaffLoginOption {
   id: string;
@@ -87,7 +87,7 @@ const email = ref("");
 const password = ref("");
 const loggingIn = ref(false);
 const loginError = ref("");
-const passwordInput = ref<HTMLInputElement | null>(null);
+const passwordInput = ref<InstanceType<typeof PasswordInput> | null>(null);
 
 async function pick(option: StaffLoginOption) {
   selected.value = option;
@@ -112,6 +112,9 @@ async function run(action: () => Promise<unknown>) {
   loginError.value = "";
   try {
     await action();
+    // Al entrar, siempre la seccion por defecto (la cola o, si esta desactivada, tomar pedido),
+    // aunque se llegara al login desde otra seccion (sesion caducada, enlace...).
+    await navigateTo("/staff", { replace: true });
   } catch (err: any) {
     loginError.value = err?.message ?? "No se pudo iniciar sesión";
     password.value = "";
