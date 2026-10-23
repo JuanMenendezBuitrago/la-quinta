@@ -29,6 +29,9 @@ export interface AuthTokenPayload {
   sub: string;
   kind: "customer" | "staff";
   role?: StaffRole;
+  // Cuenta compartida: quien la esta usando. Las acciones quedan a su nombre; los permisos son los
+  // de la cuenta (sub). Lo valida el contexto GraphQL en cada peticion.
+  actor?: string;
 }
 
 export function signToken(payload: AuthTokenPayload): string {
@@ -159,8 +162,12 @@ async function issueStaffToken(staff: StaffUserDoc | null, password: string) {
   if (staff.active === false) throw new Error("Esta cuenta esta desactivada. Habla con gestion.");
 
   await redisClient.del(failsKey);
-  const token = signToken({ sub: staff._id.toString(), kind: "staff", role: staff.role });
-  return { token, staff };
+  return { token: signStaffToken(staff), staff };
+}
+
+/** Token del personal; con actorId, el de una cuenta compartida con la persona que la usa. */
+export function signStaffToken(account: Pick<StaffUserDoc, "_id" | "role">, actorId?: string) {
+  return signToken({ sub: account._id.toString(), kind: "staff", role: account.role, ...(actorId ? { actor: actorId } : {}) });
 }
 
 export async function loginStaff(email: string, password: string) {

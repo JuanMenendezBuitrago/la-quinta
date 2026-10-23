@@ -73,6 +73,14 @@
               {{ isSelf ? "No puedes desactivar tu propia cuenta." : "Desactivada no aparece al entrar al panel, no puede iniciar sesión y se cierra la que tenga abierta." }}
             </span>
           </div>
+          <div class="field">
+            <label class="switch">
+              <input v-model="form.shared" type="checkbox" role="switch" />
+              <span class="switch-track" aria-hidden="true"><span class="switch-thumb" /></span>
+              <span>Cuenta compartida</span>
+            </label>
+            <span class="muted">Al entrar con ella se elige quién la usa, y lo que se haga (pedidos, cobros, cierres…) queda a nombre de esa persona.</span>
+          </div>
           <p v-if="formError" class="muted" style="color: var(--danger)">{{ formError }}</p>
           <div class="form-actions">
             <button class="button" type="submit" :disabled="saving">
@@ -118,6 +126,7 @@
         <strong>{{ user.name }}</strong>
         <span v-if="user.id === myId" class="muted"> · tú</span>
         <span v-if="!user.active" class="inactive-badge">Desactivada</span>
+        <span v-if="user.shared" class="inactive-badge">Compartida</span>
         <p class="muted">{{ user.email }} · {{ user.role }}</p>
       </div>
       <button class="button secondary" type="button" @click="startEdit(user)">Editar</button>
@@ -144,6 +153,7 @@ interface StaffUserAdmin {
   role: "barra" | "gestion";
   avatar?: string | null;
   active: boolean;
+  shared: boolean;
   deletable: boolean;
 }
 
@@ -156,22 +166,23 @@ const STAFF_USERS_QUERY = gql`
       role
       avatar
       active
+      shared
       deletable
     }
   }
 `;
 
 const CREATE_STAFF_USER = gql`
-  mutation CreateStaffUser($name: String!, $email: String!, $password: String!, $role: StaffRole!) {
-    createStaffUser(name: $name, email: $email, password: $password, role: $role) {
+  mutation CreateStaffUser($name: String!, $email: String!, $password: String!, $role: StaffRole!, $shared: Boolean) {
+    createStaffUser(name: $name, email: $email, password: $password, role: $role, shared: $shared) {
       id
     }
   }
 `;
 
 const UPDATE_STAFF_USER = gql`
-  mutation UpdateStaffUser($id: ID!, $name: String, $role: StaffRole, $password: String, $active: Boolean) {
-    updateStaffUser(id: $id, name: $name, role: $role, password: $password, active: $active) {
+  mutation UpdateStaffUser($id: ID!, $name: String, $role: StaffRole, $password: String, $active: Boolean, $shared: Boolean) {
+    updateStaffUser(id: $id, name: $name, role: $role, password: $password, active: $active, shared: $shared) {
       id
     }
   }
@@ -206,6 +217,7 @@ function emptyForm() {
     password: "",
     role: "barra" as "barra" | "gestion",
     active: true,
+    shared: false,
     deletable: false,
     avatar: null as string | null | undefined,
   };
@@ -228,6 +240,7 @@ function startEdit(user: StaffUserAdmin) {
     password: "",
     role: user.role,
     active: user.active,
+    shared: user.shared,
     deletable: user.deletable,
     avatar: user.avatar,
   });
@@ -276,6 +289,7 @@ async function submitForm() {
         role: form.role,
         password: form.password || undefined,
         active: form.active,
+        shared: form.shared,
       });
     } else {
       const { mutate } = useMutation(CREATE_STAFF_USER);
@@ -284,6 +298,7 @@ async function submitForm() {
         email: form.email.trim(),
         password: form.password,
         role: form.role,
+        shared: form.shared,
       });
     }
     await refetch();

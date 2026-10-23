@@ -58,6 +58,7 @@ const STAFF_LOGIN = gql`
         email
         role
         avatar
+        shared
       }
     }
   }
@@ -73,6 +74,7 @@ const STAFF_LOGIN_BY_ID = gql`
         email
         role
         avatar
+        shared
       }
     }
   }
@@ -91,6 +93,12 @@ const SESSION_QUERY = gql`
       name
       role
       avatar
+      shared
+      actingAs {
+        id
+        name
+        avatar
+      }
     }
   }
 `;
@@ -164,14 +172,39 @@ export function useAuth() {
   return { customer, requestCode, verifyCode, logout };
 }
 
+const SET_ACTING_STAFF = gql`
+  mutation SetActingStaff($staffId: ID!) {
+    setActingStaff(staffId: $staffId) {
+      token
+    }
+  }
+`;
+
+export interface StaffPerson {
+  id: string;
+  name: string;
+  avatar?: string | null;
+}
+
+export interface StaffSession extends StaffPerson {
+  role: string;
+  /** Cuenta compartida: hay que elegir quien la usa (actingAs). */
+  shared?: boolean;
+  /** Quien esta usando la cuenta compartida: lo que se hace queda a su nombre. */
+  actingAs?: StaffPerson | null;
+}
+
 /** Sesion del personal del local (usuario/contraseña). Comparte el mismo
  * token/cookie que la sesion de cliente: el rol lo decide el backend segun
  * el contenido del JWT, no el frontend. */
 export function useStaffAuth() {
   const { onLogin, onLogout } = useApollo();
-  const staff = useState<{ id: string; name: string; role: string; avatar?: string | null } | null>("lq-staff", () => null);
+  const staff = useState<StaffSession | null>("lq-staff", () => null);
   const { mutate: staffLogin } = useMutation(STAFF_LOGIN);
   const { mutate: staffLoginById } = useMutation(STAFF_LOGIN_BY_ID);
+  const { mutate: setActing } = useMutation(SET_ACTING_STAFF);
+  // "Cambiar de persona": vuelve a mostrar el selector aunque ya haya alguien elegido.
+  const choosingPerson = useState("lq-staff-choosing", () => false);
 
   async function startSession(payload: { token: string; staff: any } | undefined) {
     if (!payload) throw new Error("Credenciales invalidas");
@@ -191,10 +224,21 @@ export function useStaffAuth() {
     return startSession(result?.data?.staffLoginById);
   }
 
+  /** Cuenta compartida: elige quien la usa. El token nuevo lleva a esa persona (ver la API). */
+  async function setActingStaff(person: StaffPerson) {
+    const result = await setActing({ staffId: person.id });
+    const token = result?.data?.setActingStaff.token;
+    if (!token) throw new Error("No se pudo cambiar de persona");
+    await onLogin(token);
+    if (staff.value) staff.value = { ...staff.value, actingAs: person };
+    choosingPerson.value = false;
+  }
+
   async function logout() {
     await onLogout();
     staff.value = null;
+    choosingPerson.value = false;
   }
 
-  return { staff, login, loginById, logout };
+  return { staff, login, loginById, logout, setActingStaff, choosingPerson };
 }

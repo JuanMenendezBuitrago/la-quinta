@@ -19,6 +19,11 @@ export const usersTypeDefs = /* GraphQL */ `
     active: Boolean!
     """Se puede borrar: no tiene pedidos ni otros registros a su nombre (si los tiene, se desactiva)."""
     deletable: Boolean!
+    """Cuenta compartida (p. ej. "Gestion La Quinta"): al entrar se elige quien la usa (setActingStaff)."""
+    shared: Boolean!
+    """Solo en myStaffProfile de una cuenta compartida: quien la esta usando (null si aun no se eligio).
+    Lo que se hace queda a su nombre; los permisos son los de la cuenta."""
+    actingAs: Staff
   }
 
   enum StaffRole {
@@ -75,6 +80,8 @@ export const usersTypeDefs = /* GraphQL */ `
     searchCustomers(query: String!): [CustomerMatch!]!
     """Publico: cuentas del personal para elegir en la pantalla de acceso (nombre y avatar)."""
     staffLoginOptions: [StaffLoginOption!]!
+    """Personal con sesion: quien puede usar una cuenta compartida (cuentas activas no compartidas)."""
+    actingStaffOptions: [StaffLoginOption!]!
     """Listado de personal del local (requiere rol gestion)."""
     staffUsers: [Staff!]!
     """Que datos pedir en el login a ese email (nombre, autorizacion de datos)."""
@@ -111,10 +118,13 @@ export const usersTypeDefs = /* GraphQL */ `
     staffLogin(email: String!, password: String!): StaffAuthPayload!
     """Login del equipo eligiendo la cuenta en staffLoginOptions: solo pide la contraseña."""
     staffLoginById(id: ID!, password: String!): StaffAuthPayload!
+    """Cuenta compartida: elige quien la esta usando. Devuelve un token nuevo con esa persona (sin
+    pedir su contraseña: solo cambia a nombre de quien queda lo que se hace, no los permisos)."""
+    setActingStaff(staffId: ID!): StaffAuthPayload!
     """Alta de personal (requiere rol gestion)."""
-    createStaffUser(name: String!, email: String!, password: String!, role: StaffRole!): Staff!
-    """Edicion de personal: nombre, rol, contraseña y/o si la cuenta esta activa (requiere rol gestion)."""
-    updateStaffUser(id: ID!, name: String, role: StaffRole, password: String, active: Boolean): Staff!
+    createStaffUser(name: String!, email: String!, password: String!, role: StaffRole!, shared: Boolean): Staff!
+    """Edicion de personal: nombre, rol, contraseña, si la cuenta esta activa y si es compartida (requiere rol gestion)."""
+    updateStaffUser(id: ID!, name: String, role: StaffRole, password: String, active: Boolean, shared: Boolean): Staff!
     """Borra una cuenta de personal sin pedidos ni otros registros a su nombre (requiere rol gestion)."""
     deleteStaffUser(id: ID!): Boolean!
   }

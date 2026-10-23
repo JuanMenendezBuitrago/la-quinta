@@ -140,7 +140,8 @@ uploadsRouter.post("/avatar", (req, res) => {
       // Devuelve el documento anterior: hace falta su avatar para borrar la foto vieja.
       const previous =
         payload.kind === "staff"
-          ? await StaffUser.findByIdAndUpdate(targetStaffId ?? payload.sub, { avatar }).lean()
+          ? // En una cuenta compartida, "mi avatar" es el de la persona que la esta usando
+            await StaffUser.findByIdAndUpdate(targetStaffId ?? payload.actor ?? payload.sub, { avatar }).lean()
           : await User.findOneAndUpdate({ _id: payload.sub, deletedAt: { $exists: false } }, { avatar }).lean();
       if (!previous) {
         await removeAvatarFile(avatar, UPLOAD_DIR);

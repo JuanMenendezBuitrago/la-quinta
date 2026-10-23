@@ -77,6 +77,9 @@ export interface StaffUserDoc {
   // puede entrar y su sesion abierta deja de valer. Se desactiva en vez de borrar para no perder
   // el rastro de quien hizo cada ajuste de sellos o canje.
   active: boolean;
+  // Cuenta compartida (p. ej. "Gestion La Quinta"): al entrar se elige quien la esta usando, y lo
+  // que se hace queda a nombre de esa persona (ver "actor" en el token, users/auth.ts).
+  shared: boolean;
   createdAt: Date;
 }
 
@@ -89,6 +92,7 @@ const staffUserSchema = new Schema<StaffUserDoc>({
   // Las cuentas creadas antes de existir este campo no lo tienen: en las consultas se filtra con
   // { active: { $ne: false } } para contarlas como activas.
   active: { type: Boolean, default: true },
+  shared: { type: Boolean, default: false },
   createdAt: { type: Date, default: () => new Date() },
 });
 

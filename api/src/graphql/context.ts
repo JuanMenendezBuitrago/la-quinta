@@ -1,5 +1,6 @@
 import { IncomingMessage } from "http";
 import { GraphQLError } from "graphql";
+import { Types } from "mongoose";
 import { verifyToken } from "../modules/users/auth";
 import { StaffRole, StaffUser, User } from "../modules/users/model";
 import { pubsub } from "../config/pubsub";
@@ -7,7 +8,11 @@ import { pubsub } from "../config/pubsub";
 export interface GraphQLContext {
   pubsub: typeof pubsub;
   customerId: string | null;
-  staff: { id: string; role: StaffRole } | null;
+  /**
+   * id: a quien se atribuye lo que se hace (en una cuenta compartida, la persona elegida).
+   * accountId: la cuenta con la que se inicio sesion, que es la que da los permisos (role).
+   */
+  staff: { id: string; accountId: string; role: StaffRole } | null;
 }
 
 function extractToken(authHeader?: string | null): string | null {
@@ -44,12 +49,24 @@ async function buildContextFromToken(token: string | null): Promise<GraphQLConte
   }
 
   // Igual con el personal: al desactivar una cuenta, su sesion abierta deja de valer al momento.
-  let staff = payload?.kind === "staff" && payload.role ? { id: payload.sub, role: payload.role } : null;
-  if (staff && !(await StaffUser.exists({ _id: staff.id, active: { $ne: false } }))) {
-    staff = null;
+  let staff: GraphQLContext["staff"] = null;
+  if (payload?.kind === "staff" && payload.role) {
+    const account = await StaffUser.findOne({ _id: payload.sub, active: { $ne: false } }).select("shared").lean();
+    if (account) {
+      staff = { id: payload.sub, accountId: payload.sub, role: payload.role };
+      // Cuenta compartida con alguien elegido: si ya no vale (desactivado, borrado, la cuenta dejo
+      // de ser compartida...), se ignora y la web vuelve a preguntar quien es.
+      if (payload.actor && account.shared && (await isActingCandidate(payload.actor))) staff.id = payload.actor;
+    }
   }
 
   return { pubsub, customerId, staff };
+}
+
+/** Puede usar una cuenta compartida: cuenta propia activa y no compartida. */
+export async function isActingCandidate(staffId: string) {
+  if (!Types.ObjectId.isValid(staffId)) return false;
+  return !!(await StaffUser.exists({ _id: staffId, active: { $ne: false }, shared: { $ne: true } }));
 }
 
 /**

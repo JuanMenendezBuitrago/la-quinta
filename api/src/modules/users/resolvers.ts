@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
-import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
+import { GraphQLContext, isActingCandidate, requireCustomer, requireStaff } from "../../graphql/context";
 import { User, StaffUser, hasCurrentConsent } from "./model";
-import { requestOtp, verifyOtpAndIssueToken, loginStaff, loginStaffById, hashPassword, findExistingCustomer } from "./auth";
+import { requestOtp, verifyOtpAndIssueToken, loginStaff, loginStaffById, hashPassword, findExistingCustomer, signStaffToken } from "./auth";
 import { presetAvatarValue, removeAvatarFile } from "./avatar";
 import { UPLOAD_DIR } from "../uploads/router";
 import { MenuItem } from "../menu/model";
@@ -58,9 +58,10 @@ export const usersResolvers = {
       if (!ctx.customerId) return null;
       return User.findById(ctx.customerId).exec();
     },
+    // La cuenta con la que se entro; en una compartida, quien la usa va en actingAs.
     myStaffProfile: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       if (!ctx.staff) return null;
-      return StaffUser.findById(ctx.staff.id).exec();
+      return StaffUser.findById(ctx.staff.accountId).exec();
     },
     myFavoriteMenuItemIds: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       if (!ctx.customerId) return [];
@@ -100,6 +101,11 @@ export const usersResolvers = {
       const staff = await StaffUser.find({ active: { $ne: false } }).select("name avatar").sort({ name: 1 }).lean();
       return staff.map((s) => ({ id: s._id.toString(), name: s.name, avatar: s.avatar ?? null }));
     },
+    actingStaffOptions: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      requireStaff(ctx);
+      const staff = await StaffUser.find({ active: { $ne: false }, shared: { $ne: true } }).select("name avatar").sort({ name: 1 }).lean();
+      return staff.map((s) => ({ id: s._id.toString(), name: s.name, avatar: s.avatar ?? null }));
+    },
     staffUsers: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireStaff(ctx, ["gestion"]);
       return StaffUser.find().sort({ name: 1 }).exec();
@@ -111,6 +117,13 @@ export const usersResolvers = {
   },
   Staff: {
     deletable: async (doc: any) => (await staffRecords(doc._id.toString())).length === 0,
+    shared: (doc: any) => !!doc.shared,
+    // Solo en la propia sesion (myStaffProfile): quien esta usando la cuenta compartida.
+    actingAs: (doc: any, _: unknown, ctx: GraphQLContext) => {
+      const staff = ctx.staff;
+      if (!staff || staff.id === staff.accountId || doc._id.toString() !== staff.accountId) return null;
+      return StaffUser.findById(staff.id).exec();
+    },
   },
   Mutation: {
     requestOtp: async (_: unknown, args: { identifier: string }) => {
@@ -189,9 +202,16 @@ export const usersResolvers = {
       const { token, staff } = await loginStaffById(args.id, args.password);
       return { token, staff };
     },
+    setActingStaff: async (_: unknown, args: { staffId: string }, ctx: GraphQLContext) => {
+      const session = requireStaff(ctx);
+      const account = await StaffUser.findById(session.accountId);
+      if (!account?.shared) throw new Error("Solo en una cuenta compartida se elige quien la usa");
+      if (!(await isActingCandidate(args.staffId))) throw new Error("Esa persona no puede usar la cuenta compartida");
+      return { token: signStaffToken(account, args.staffId), staff: account };
+    },
     createStaffUser: async (
       _: unknown,
-      args: { name: string; email: string; password: string; role: "barra" | "gestion" },
+      args: { name: string; email: string; password: string; role: "barra" | "gestion"; shared?: boolean | null },
       ctx: GraphQLContext
     ) => {
       requireStaff(ctx, ["gestion"]);
@@ -203,18 +223,21 @@ export const usersResolvers = {
         email,
         passwordHash: await hashPassword(args.password),
         role: args.role,
+        shared: !!args.shared,
       });
     },
     updateStaffUser: async (
       _: unknown,
-      args: { id: string; name?: string; role?: "barra" | "gestion"; password?: string; active?: boolean },
+      args: { id: string; name?: string; role?: "barra" | "gestion"; password?: string; active?: boolean; shared?: boolean | null },
       ctx: GraphQLContext
     ) => {
       const staff = requireStaff(ctx, ["gestion"]);
-      if (args.id === staff.id && args.role && args.role !== "gestion") {
+      // Propia: la de la sesion y, en una compartida, tambien la de quien la esta usando.
+      const own = args.id === staff.id || args.id === staff.accountId;
+      if (own && args.role && args.role !== "gestion") {
         throw new Error("No puedes quitarte a ti mismo el rol de gestion");
       }
-      if (args.id === staff.id && args.active === false) {
+      if (own && args.active === false) {
         throw new Error("No puedes desactivar tu propia cuenta");
       }
       const update: Record<string, unknown> = {};
@@ -222,6 +245,7 @@ export const usersResolvers = {
       if (args.role !== undefined) update.role = args.role;
       if (args.password) update.passwordHash = await hashPassword(args.password);
       if (typeof args.active === "boolean") update.active = args.active;
+      if (typeof args.shared === "boolean") update.shared = args.shared;
       const updated = await StaffUser.findByIdAndUpdate(args.id, update, { new: true });
       if (!updated) throw new Error("Usuario no encontrado");
       return updated;
@@ -229,7 +253,7 @@ export const usersResolvers = {
     deleteStaffUser: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
       const staff = requireStaff(ctx, ["gestion"]);
       if (!Types.ObjectId.isValid(args.id)) throw new Error("Usuario no encontrado");
-      if (args.id === staff.id) throw new Error("No puedes borrar tu propia cuenta");
+      if (args.id === staff.id || args.id === staff.accountId) throw new Error("No puedes borrar tu propia cuenta");
       const records = await staffRecords(args.id);
       if (records.length) {
         throw new Error(`Esta cuenta tiene ${records.join(", ")} a su nombre: no se puede borrar, desactívala`);

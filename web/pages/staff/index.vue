@@ -7,6 +7,14 @@
       <StaffLogin />
     </template>
 
+    <!-- Cuenta compartida: antes de nada, quien la esta usando (y al pulsar "Cambiar de persona") -->
+    <template v-else-if="staff.shared && (!staff.actingAs || choosingPerson)">
+      <header class="account-hero login-hero">
+        <h1>¿Quién eres?</h1>
+      </header>
+      <StaffActingPicker />
+    </template>
+
     <template v-else>
       <!-- En las secciones que usan mas ancho que la pagina (cola, caja), el titulo se alinea con ellas -->
       <header
@@ -317,6 +325,7 @@ import { primeAudio } from "~/composables/useOrderChime";
 import MenuAdmin from "~/components/MenuAdmin.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
 import StaffLogin from "~/components/StaffLogin.vue";
+import StaffActingPicker from "~/components/StaffActingPicker.vue";
 import CashClosingAdmin from "~/components/CashClosingAdmin.vue";
 import ReviewsAdmin from "~/components/ReviewsAdmin.vue";
 import CoffeeAdmin from "~/components/CoffeeAdmin.vue";
@@ -333,7 +342,7 @@ import InventoryAdmin from "~/components/InventoryAdmin.vue";
 import { formatQty, useInventoryAlerts } from "~/composables/useInventory";
 import { goToSection, STAFF_SECTIONS, useStaffBadges, useStaffSection } from "~/composables/useStaffSections";
 
-const { staff } = useStaffAuth();
+const { staff, choosingPerson } = useStaffAuth();
 // Si la sesion ya estaba abierta (se restaura sola con la cookie, sin pasar por doLogin()),
 // el audio nunca se desbloquea y el aviso sonoro queda mudo en silencio. Con esto, el primer
 // toque/clic en cualquier parte del panel sirve tambien para desbloquearlo.

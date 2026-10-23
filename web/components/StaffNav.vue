@@ -64,16 +64,26 @@
       </div>
 
       <!-- Sesion -->
+      <!-- En una cuenta compartida se muestra quien la esta usando (a su nombre queda lo que se hace) -->
       <div class="group account">
-        <span class="group-title">Sesión · {{ staff?.name }}</span>
+        <span class="group-title">Sesión · {{ person?.name }}</span>
         <button type="button" class="group-btn" :aria-expanded="open === 'account'" @click="toggle('account')">
-          <UserAvatar :avatar="staff?.avatar" :name="staff?.name" :size="24" />
-          {{ staff?.name }}
+          <UserAvatar :avatar="person?.avatar" :name="person?.name" :size="24" />
+          {{ person?.name }}
           <ChevronDown class="caret" :size="14" :stroke-width="2" />
         </button>
         <ul class="dropdown align-right" :class="{ open: open === 'account' }">
-          <li class="who muted">{{ staff?.name }} · {{ roleLabel }}</li>
-          <li>
+          <li class="who muted">
+            {{ person?.name }}<template v-if="staff?.actingAs"> · con {{ staff.name }}</template> · {{ roleLabel }}
+          </li>
+          <li v-if="staff?.shared">
+            <button type="button" class="entry" @click="changePerson">
+              <UserRoundCog class="entry-icon" :size="16" :stroke-width="1.8" />
+              <span class="entry-label">Cambiar de persona</span>
+            </button>
+          </li>
+          <!-- En la compartida, cada cual cambia su avatar desde su propia cuenta (o gestion en Personal) -->
+          <li v-if="!staff?.shared">
             <button type="button" class="entry" @click="openAvatarDialog">
               <CircleUserRound class="entry-icon" :size="16" :stroke-width="1.8" />
               <span class="entry-label">Cambiar avatar</span>
@@ -119,6 +129,7 @@ import {
   Package,
   Settings,
   SquarePen,
+  UserRoundCog,
   Users,
 } from "lucide-vue-next";
 import type { Component } from "vue";
@@ -161,7 +172,9 @@ const ENTRY_ICONS: Record<Entry["id"], Component> = {
   "ver-carta": ExternalLink,
 };
 
-const { staff, logout } = useStaffAuth();
+const { staff, logout, choosingPerson } = useStaffAuth();
+// Quien aparece en la cabecera: en una cuenta compartida, la persona elegida.
+const person = computed(() => staff.value?.actingAs ?? staff.value);
 const section = useStaffSection();
 const visibleSections = useVisibleSections();
 const badges = useStaffBadges();
@@ -228,6 +241,11 @@ function openAvatarDialog() {
 function select(entry: Entry) {
   open.value = null;
   if (!entry.external) goToSection(entry.id as StaffSectionId);
+}
+function changePerson() {
+  open.value = null;
+  choosingPerson.value = true;
+  window.scrollTo({ top: 0 });
 }
 async function doLogout() {
   open.value = null;
