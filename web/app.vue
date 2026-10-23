@@ -7,9 +7,12 @@
         <img src="/logo-laquintaesencia.png" alt="La Quinta" class="brand-logo brand-logo--wide" width="694" height="76" />
         <img src="/logo-5ta.svg" alt="La Quinta" class="brand-logo brand-logo--compact" width="245" height="102" />
       </NuxtLink>
+      <!-- Cuenta compartida: quien la usa, a un toque (en vez de hacer login cada vez). En
+           escritorio a la derecha, junto al menu; en movil, en una fila propia debajo, centrada. -->
+      <div v-if="inStaff && staff?.shared && staff.actingAs" class="acting-row">
+        <StaffActingSwitcher />
+      </div>
       <div class="topbar-end">
-      <!-- Cuenta compartida: quien la usa, a un toque (en vez de hacer login cada vez) -->
-      <StaffActingSwitcher v-if="inStaff && staff?.shared && staff.actingAs" />
       <!-- En el panel de personal, su propio menu: carrito y "mi cuenta" son cosas del cliente -->
       <StaffNav v-if="inStaff && staff" />
       <nav v-else-if="inStaff">
@@ -93,9 +96,11 @@ await useAsyncData("session", async () => {
 <style scoped>
 .app-shell { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
 .app-body { flex: 1 0 auto; }
-/* A la derecha y sin saltar de linea: si no cabe (p. ej. los avatares de la cuenta compartida en
-   movil), se encoge el selector de personas, que se desplaza en horizontal */
 .topbar-end { display: flex; align-items: center; gap: 14px; min-width: 0; margin-left: auto; }
+/* Selector de personas: a la derecha, justo antes del menu */
+.acting-row { display: flex; min-width: 0; margin-left: auto; }
+.acting-row + .topbar-end { margin-left: 4px; }
+.acting-row > .acting-switcher { max-width: 100%; }
 .topbar {
   position: sticky;
   top: 0;
@@ -135,6 +140,11 @@ await useAsyncData("session", async () => {
 @media (max-width: 760px) {
   .brand-logo--wide { display: none; }
   .brand-logo--compact { display: block; }
+  /* Movil: los avatares en una segunda fila a todo el ancho, centrados (si no caben, se desplazan) */
+  .topbar { flex-wrap: wrap; }
+  .acting-row { order: 3; flex: 1 1 100%; margin-left: 0; }
+  .acting-row + .topbar-end { margin-left: auto; }
+  .acting-row > .acting-switcher { margin: 0 auto; }
 }
 nav {
   display: flex;
