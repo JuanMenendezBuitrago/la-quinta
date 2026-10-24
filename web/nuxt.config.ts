@@ -46,7 +46,7 @@ export default defineNuxtConfig({
       short_name: "La Quinta",
       description: "Carta, pedidos para recoger y tarjeta de fidelización de La Quinta",
       theme_color: "#a85b2a",
-      background_color: "#f6f3ef",
+      background_color: "#1c1712",
       display: "standalone",
       icons: [
         { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },

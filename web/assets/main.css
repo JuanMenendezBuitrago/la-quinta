@@ -42,70 +42,9 @@
 }
 
 :root {
-  /* Colores de texto y de relleno con texto encima: todos llegan a 4.5:1 (WCAG AA) sobre
-     --bg, --surface y --surface-alt, y el crema de --bg tambien sobre ellos. */
-  --bg: #faf6ce;
-  --surface: #fffdf5;
-  --surface-alt: #f0e8c8;
-  --text: #876041;
-  --text-muted: #786728;
-  --accent: #2e726f;
-  --accent-strong: #245b59;
-  /* Turquesa claro de la marca: decorativo; si lleva texto encima, en --on-accent-soft. */
-  --accent-soft: #9ad2d0;
-  --on-accent-soft: #2f4948;
-  --danger: #b23920;
-  /* Texto e iconos sobre un relleno --danger (insignias, "Si, cancelar"). */
-  --on-danger: #faf6ce;
-  --border: rgba(243, 236, 225, 0.08);
-  --border-strong: rgba(243, 236, 225, 0.16);
-  /* Borde de los campos de formulario: el marron del texto, con 3:1 sobre el crema (WCAG 1.4.11). */
-  --field-border: rgba(135, 96, 65, 0.75);
-  --font-serif: "Bodoni Moda", serif;
-  --font-futura: "Futura Now Condensed", "Arial Narrow", sans-serif;
-  --font-futura-text: "Futura Now Text", Futura, "Century Gothic", sans-serif;
-  --font-sans: "Work Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --color1: #9ad2d0;
-  --color2: #6cc3c0;
-  --color3: #faf6ce;
-  --color4: #876041;
-  --color5: #786728;
-  /* Pie: marron con texto crema (en oscuro, cafe oscuro) */
-  --footer-bg: var(--color4);
-  --footer-text: var(--surface);
-  --stamp-img: url("/sellos/querubin-claro.svg");
-  color-scheme: light;
-}
-
-/*
- * Modo oscuro: tonos cafe con el crema de la marca como texto. Mismo contrato que el claro (todo
- * texto 4.5:1, bordes de campo 3:1), pero los rellenos con texto encima (botones, insignias) son
- * claros con texto oscuro. Se activa con el sistema salvo que el usuario elija "Claro" (data-theme
- * en <html>, ver composables/useTheme.ts), o a mano con "Oscuro".
- */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #1c1712;
-    --surface: #262019;
-    --surface-alt: #322a21;
-    --text: #f3ead0;
-    --text-muted: #c8b88e;
-    --accent: #8ccfca;
-    --accent-strong: #b3e3df;
-    --accent-soft: #2c4644;
-    --on-accent-soft: #f3ead0;
-    --danger: #f2876f;
-    --on-danger: #1c1712;
-    --field-border: rgba(243, 234, 208, 0.42);
-    --color4: #c99f78;
-    --color5: #cdb85e;
-    --footer-bg: #2e241b;
-    --footer-text: #f3ead0;
-    --stamp-img: url("/sellos/querubin-oscuro.svg");
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
+  /* Solo hay modo oscuro: tonos cafe con el crema de la marca como texto. Colores de texto: todos
+     llegan a 4.5:1 (WCAG AA) sobre --bg, --surface y --surface-alt; los bordes de campo, 3:1. Los
+     rellenos con texto encima (botones, insignias) son claros con texto oscuro. */
   --bg: #1c1712;
   --surface: #262019;
   --surface-alt: #322a21;
@@ -113,13 +52,25 @@
   --text-muted: #c8b88e;
   --accent: #8ccfca;
   --accent-strong: #b3e3df;
+  /* Turquesa de la marca, apagado: decorativo; si lleva texto encima, en --on-accent-soft. */
   --accent-soft: #2c4644;
   --on-accent-soft: #f3ead0;
   --danger: #f2876f;
+  /* Texto e iconos sobre un relleno --danger (insignias, "Si, cancelar"). */
   --on-danger: #1c1712;
+  --border: rgba(243, 236, 225, 0.08);
+  --border-strong: rgba(243, 236, 225, 0.16);
   --field-border: rgba(243, 234, 208, 0.42);
+  --font-serif: "Bodoni Moda", serif;
+  --font-futura: "Futura Now Condensed", "Arial Narrow", sans-serif;
+  --font-futura-text: "Futura Now Text", Futura, "Century Gothic", sans-serif;
+  --font-sans: "Work Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color1: #9ad2d0;
+  --color2: #6cc3c0;
+  --color3: #faf6ce;
   --color4: #c99f78;
   --color5: #cdb85e;
+  /* Pie: cafe oscuro con texto crema */
   --footer-bg: #2e241b;
   --footer-text: #f3ead0;
   --stamp-img: url("/sellos/querubin-oscuro.svg");

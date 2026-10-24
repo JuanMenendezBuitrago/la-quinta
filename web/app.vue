@@ -35,7 +35,6 @@
           <User v-else :size="22" :stroke-width="1.7" />
         </NuxtLink>
       </nav>
-      <ThemeToggle />
       </div>
     </header>
     <div class="app-body">
@@ -57,8 +56,6 @@ import StaffNav from "~/components/StaffNav.vue";
 import StaffActingSwitcher from "~/components/StaffActingSwitcher.vue";
 import StaffQuickBar from "~/components/StaffQuickBar.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
-import ThemeToggle from "~/components/ThemeToggle.vue";
-import { useThemeAttribute } from "~/composables/useTheme";
 
 const { cartCount, clear: clearCart } = useCart();
 // Si se activa "solo el personal crea pedidos", el carrito deja de existir para el cliente.
@@ -66,8 +63,6 @@ const canOrder = useCustomerOrdering();
 watch(canOrder, (enabled) => {
   if (!enabled) clearCart();
 });
-// Tema claro/oscuro elegido (o el del sistema): data-theme en <html> desde el servidor.
-useThemeAttribute();
 
 const { staff } = useStaffAuth();
 const { customer } = useAuth();

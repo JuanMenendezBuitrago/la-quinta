@@ -45,7 +45,7 @@ const backgroundStyle = computed(() =>
 .tone-teal { background: var(--accent-soft); color: var(--on-accent-soft); }
 .tone-brown { background: var(--color4); color: var(--bg); }
 .tone-olive { background: var(--color5); color: var(--bg); }
-/* Con foto el texto va siempre claro (sobre el degradado oscuro), sea cual sea el tono o el tema */
+/* Con foto el texto va siempre claro (sobre el degradado oscuro), sea cual sea el tono */
 .slide.has-image {
   background-color: #2e241b;
   background-size: cover;

@@ -81,7 +81,7 @@ const socials = computed(() => {
   margin-top: 40px;
   background: var(--footer-bg);
   /* Las reglas de abajo usan var(--text), var(--text-muted), etc.: se redefinen aqui para
-     contraste sobre el fondo del pie (marron; en modo oscuro, cafe oscuro). Las custom
+     contraste sobre el fondo del pie (cafe oscuro). Las custom
      properties atraviesan el scoping de Vue. */
   --text: var(--footer-text);
   --text-muted: rgba(255, 255, 255, 0.9);
