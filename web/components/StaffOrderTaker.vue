@@ -70,7 +70,11 @@
     <ul class="product-grid">
       <li v-for="item in visibleItems" :key="item.id" class="tile" :class="{ selected: quantityOf(item.id) }">
         <button type="button" class="tile-add" :aria-label="`Añadir ${item.name}`" @click="addItem(item)">
-          <span class="tile-name">{{ item.name }}</span>
+          <span class="tile-head">
+            <span class="tile-name">{{ item.name }}</span>
+            <!-- Que se le puede personalizar (p. ej. Adición · Base), para preguntarlo al tomar nota -->
+            <span v-if="item.modifiers?.length" class="tile-mods">{{ modifierNames(item) }}</span>
+          </span>
           <span class="tile-price">{{ formatPrice(item.priceCents) }}</span>
         </button>
         <template v-if="quantityOf(item.id)">
@@ -267,6 +271,10 @@ const topItems = computed(() =>
     .filter((i): i is MenuItem => !!i)
     .slice(0, SHORTCUT_COUNT)
 );
+
+function modifierNames(item: MenuItem) {
+  return (item.modifiers ?? []).map((m) => m.group.name).join(" · ");
+}
 
 function quantityOf(menuItemId: string) {
   return lines.value.filter((l) => l.menuItemId === menuItemId).reduce((sum, l) => sum + l.quantity, 0);
@@ -490,6 +498,10 @@ input {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.tile-head { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.tile-mods { font-size: 12px; line-height: 1.25; color: var(--accent); overflow-wrap: anywhere; }
+/* Con unidades, el "−" ocupa la esquina inferior derecha: que no tape las personalizaciones */
+.tile.selected .tile-mods { padding-right: 30px; }
 .tile-price { font-size: 12.5px; color: var(--text-muted); }
 .tile-qty {
   position: absolute;
@@ -594,6 +606,7 @@ input {
   .tile-add { min-height: 84px; padding: 12px 12px 10px; }
   .tile.selected .tile-add { padding: 11px 11px 9px; }
   .tile-name { font-size: 15px; }
+  .tile-mods { font-size: 13px; }
   .tile-price { font-size: 13.5px; }
 }
 /* Diseño ancho: tarjetas de producto mas grandes, en tres columnas */
@@ -602,6 +615,7 @@ input {
   .tile-add { min-height: 104px; padding: 14px 14px 12px; gap: 10px; }
   .tile.selected .tile-add { padding: 13px 13px 11px; }
   .tile-name { font-size: 17px; }
+  .tile-mods { font-size: 14px; }
   .tile-price { font-size: 15px; }
   .tile-qty { min-width: 28px; height: 28px; font-size: 15px; }
 }
