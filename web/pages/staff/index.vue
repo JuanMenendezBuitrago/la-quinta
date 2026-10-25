@@ -185,7 +185,7 @@
                   class="button"
                   type="button"
                   :disabled="busyOrderId === order.id"
-                  @click="doPay(order, method)"
+                  @click="method === 'EFECTIVO' ? openCash(order) : doPay(order, method)"
                 >
                   {{ label }}
                 </button>
@@ -313,6 +313,12 @@
         <SiteSettingsAdmin />
       </section>
     </template>
+    <CashChangeDialog
+      ref="cashDialog"
+      :total-cents="cashOrder?.totalCents ?? 0"
+      :busy="!!cashOrder && busyOrderId === cashOrder.id"
+      @confirm="payCash"
+    />
   </main>
 </template>
 
@@ -334,6 +340,7 @@ import NewsletterAdmin from "~/components/NewsletterAdmin.vue";
 import SiteSettingsAdmin from "~/components/SiteSettingsAdmin.vue";
 import CustomersAdmin from "~/components/CustomersAdmin.vue";
 import StaffOrderTaker from "~/components/StaffOrderTaker.vue";
+import CashChangeDialog from "~/components/CashChangeDialog.vue";
 import HeroAdmin from "~/components/HeroAdmin.vue";
 import CustomerLookup from "~/components/CustomerLookup.vue";
 import OrderItems from "~/components/OrderItems.vue";
@@ -428,6 +435,17 @@ async function doPay(order: any, method: PaymentMethod) {
   // Mesa: se cobra aparte. Para llevar o web: se entrega y se cobra a la vez (cuenta en el cierre de caja).
   const done = order.awaitingPayment ? await markPaid(order, method) : await deliverAndPay(order, method);
   if (done) payingId.value = "";
+}
+// Efectivo: el modal calcula el cambio antes de registrar el cobro.
+const cashDialog = ref<InstanceType<typeof CashChangeDialog> | null>(null);
+const cashOrder = ref<any>(null);
+function openCash(order: any) {
+  cashOrder.value = order;
+  cashDialog.value?.open();
+}
+async function payCash() {
+  if (cashOrder.value) await doPay(cashOrder.value, "EFECTIVO");
+  cashDialog.value?.close();
 }
 function paymentLabel(method: PaymentMethod | null) {
   return method ? PAYMENT_LABELS[method] : "";

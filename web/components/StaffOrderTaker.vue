@@ -165,11 +165,12 @@
             class="button"
             type="button"
             :disabled="!canSubmit"
-            @click="submit(method)"
+            @click="method === 'EFECTIVO' ? cashDialog?.open() : submit(method)"
           >
             {{ submitting ? "Guardando…" : label }}
           </button>
         </div>
+        <CashChangeDialog ref="cashDialog" :total-cents="totalCents + packagingCents" :busy="submitting" @confirm="payCash" />
         <button class="button secondary" type="button" :disabled="submitting" @click="choosingPayment = false">Volver</button>
       </div>
       <div v-else class="ticket-actions">
@@ -201,6 +202,7 @@ import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import { orderLinesInput, useCart } from "~/composables/useCart";
 import { MENU_QUERY, defaultCartOptions, missingModifiers, type MenuCategory, type MenuItem } from "~/composables/useMenu";
+import CashChangeDialog from "~/components/CashChangeDialog.vue";
 import LineOptionsPicker from "~/components/LineOptionsPicker.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
 import { useOrderQueueEnabled, usePackagingFee } from "~/composables/useSiteSettings";
@@ -327,6 +329,13 @@ function reset() {
   note.value = "";
   search.value = "";
   choosingPayment.value = false;
+}
+
+// Efectivo: antes, el modal calcula el cambio; al confirmar se guarda y se cierra (si falla, el error sale en el ticket).
+const cashDialog = ref<InstanceType<typeof CashChangeDialog> | null>(null);
+async function payCash() {
+  await submit("EFECTIVO");
+  cashDialog.value?.close();
 }
 
 // Con metodo de pago: guardar y pagar (nace entregado y cobrado).
