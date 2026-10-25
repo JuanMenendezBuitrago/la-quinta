@@ -74,7 +74,8 @@
         </button>
         <ul class="dropdown align-right" :class="{ open: open === 'account' }">
           <li class="who muted">
-            {{ person?.name }}<template v-if="staff?.actingAs"> · con {{ staff.name }}</template> · {{ roleLabel }}
+            <template v-if="staff?.actingAs">{{ person?.name }} · en la cuenta {{ staff.name }} ({{ roleLabel }})</template>
+            <template v-else>{{ person?.name }} · {{ roleLabel }}</template>
           </li>
           <!-- En la compartida, cada cual cambia su avatar desde su propia cuenta (o gestion en Personal) -->
           <li v-if="!staff?.shared">
