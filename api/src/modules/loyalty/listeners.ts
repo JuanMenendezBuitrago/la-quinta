@@ -1,5 +1,6 @@
-import { internalEvents, INTERNAL_EVENTS, OrderDeliveredPayload } from "../../config/events";
+import { internalEvents, INTERNAL_EVENTS, OrderCancelledPayload, OrderDeliveredPayload } from "../../config/events";
 import { LoyaltyTransaction, LOYALTY_RULES } from "./model";
+import { orderRedeemedStamps, refundOrderRedemption } from "./redemption";
 
 /**
  * Suscripcion del modulo de fidelizacion al evento interno "pedido cerrado" (entregado y, si es
@@ -9,7 +10,9 @@ import { LoyaltyTransaction, LOYALTY_RULES } from "./model";
 export function registerLoyaltyListeners() {
   internalEvents.on(INTERNAL_EVENTS.ORDER_COMPLETED, async (payload: OrderDeliveredPayload) => {
     if (!payload.customerId) return; // pedido sin cliente registrado: no hay a quien sumar sellos
-    const units = payload.items.reduce((sum, item) => sum + item.quantity, 0);
+    let units = payload.items.reduce((sum, item) => sum + item.quantity, 0);
+    // El producto que se llevo gratis con el canje de sellos no suma sello.
+    if ((await orderRedeemedStamps(payload.orderId)) > 0) units -= 1;
     const stamps = units * LOYALTY_RULES.stampsPerUnit;
     if (stamps <= 0) return;
 
@@ -19,5 +22,11 @@ export function registerLoyaltyListeners() {
       reason: "pedido",
       orderId: payload.orderId,
     });
+  });
+
+  // Pedido cancelado con el canje de sellos como descuento: los sellos vuelven al cliente.
+  internalEvents.on(INTERNAL_EVENTS.ORDER_CANCELLED, async (payload: OrderCancelledPayload) => {
+    if (!payload.customerId) return;
+    await refundOrderRedemption(payload.customerId, payload.orderId, "Pedido cancelado: canje devuelto");
   });
 }

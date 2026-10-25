@@ -13,16 +13,21 @@ export const loyaltyTypeDefs = /* GraphQL */ `
     history: [LoyaltyTransaction!]!
   }
 
+  extend type Customer {
+    """Si tiene sellos para canjear la recompensa (p. ej. como descuento "Canje de sellos" del pedido)."""
+    rewardAvailable: Boolean!
+  }
+
+  extend type CustomerMatch {
+    rewardAvailable: Boolean!
+  }
+
   extend type Query {
     """Saldo de sellos e historial del cliente autenticado."""
     myLoyaltyStatus: LoyaltyStatus!
   }
 
   extend type Mutation {
-    """Canjea la recompensa si el cliente tiene sellos suficientes."""
-    redeemLoyaltyReward: LoyaltyStatus!
-    """Personal (barra y gestion): canjea la recompensa de un cliente en el mostrador."""
-    redeemCustomerReward(customerId: ID!): LoyaltyStatus!
     """Personal (barra y gestion): suma (positivo) o resta (negativo) sellos a un cliente. El motivo es obligatorio."""
     adjustCustomerStamps(customerId: ID!, stamps: Int!, note: String!): LoyaltyStatus!
   }

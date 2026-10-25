@@ -97,15 +97,10 @@
               <p class="eyebrow">Sellos</p>
               <p class="stamps-balance">{{ detail.customer.stampsBalance }} de {{ detail.rewardThreshold }}</p>
             </div>
-            <button
-              v-if="detail.customer.rewardAvailable"
-              class="button"
-              type="button"
-              :disabled="stampsBusy"
-              @click="redeem"
-            >
-              Canjear recompensa
-            </button>
+            <!-- El canje va en el pedido (descuento "Canje de sellos"), ligado al ticket. -->
+            <p v-if="detail.customer.rewardAvailable" class="muted reward-hint">
+              Recompensa disponible: se canjea en el pedido, con el descuento «Canje de sellos».
+            </p>
           </div>
 
           <form class="adjust-form" @submit.prevent="adjust">
@@ -205,11 +200,6 @@ const DETAIL_QUERY = gql`
       orders { id code status totalCents createdAt items { name quantity } }
       stamps { id stamps reason note orderCode staffName createdAt }
     }
-  }
-`;
-const REDEEM = gql`
-  mutation RedeemCustomerReward($customerId: ID!) {
-    redeemCustomerReward(customerId: $customerId) { balance }
   }
 `;
 const ADJUST = gql`
@@ -335,7 +325,7 @@ function closeDetail() {
   loadPage(true);
 }
 
-// --- Sellos: canje en mostrador y ajustes ---
+// --- Sellos: ajustes (el canje se hace en el pedido) ---
 const stampsBusy = ref(false);
 const stampsMessage = ref("");
 const stampsError = ref(false);
@@ -358,11 +348,6 @@ async function runStampsAction(action: () => Promise<unknown>, okMessage: string
   } finally {
     stampsBusy.value = false;
   }
-}
-
-async function redeem() {
-  const { mutate } = useMutation(REDEEM);
-  await runStampsAction(() => mutate({ customerId: selectedId.value }), "Recompensa canjeada ✓");
 }
 
 async function adjust() {
@@ -490,6 +475,7 @@ input {
 .stamps-card { display: flex; flex-direction: column; gap: 12px; }
 .stamps-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .stamps-head .eyebrow { margin: 0; }
+.reward-hint { margin: 0; font-size: 13px; }
 .stamps-balance { margin: 2px 0 0; font-size: 20px; font-weight: 700; }
 .adjust-form { display: flex; flex-direction: column; gap: 6px; }
 .adjust-row { display: grid; grid-template-columns: minmax(0, 7rem) minmax(0, 1fr) auto; gap: 8px; }

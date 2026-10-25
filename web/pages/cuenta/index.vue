@@ -116,9 +116,11 @@
                 />
               </div>
               <p class="stamps-label">{{ loyalty.balance }} de {{ loyalty.rewardThreshold }} sellos</p>
-              <button v-if="loyalty.rewardAvailable" class="button" :disabled="redeeming" @click="redeem">
-                {{ redeeming ? "Canjeando…" : "Canjear recompensa" }}
-              </button>
+              <!-- El canje se hace en el local, como descuento del pedido (asi el producto gratis
+                   queda ligado al ticket y los sellos vuelven si se cancela). -->
+              <p v-if="loyalty.rewardAvailable" class="reward-hint">
+                ¡Tienes un producto gratis! Pídelo en el local y da tu código de cliente al hacer el pedido.
+              </p>
             </div>
           </section>
 
@@ -184,15 +186,6 @@ const ORDERS_QUERY = gql`
   }
 `;
 
-const REDEEM = gql`
-  mutation RedeemLoyaltyReward {
-    redeemLoyaltyReward {
-      balance
-      rewardAvailable
-    }
-  }
-`;
-
 const STATUS_SUBSCRIPTION = gql`
   subscription MyOrderStatusChanged {
     orderStatusChanged {
@@ -203,7 +196,6 @@ const STATUS_SUBSCRIPTION = gql`
 `;
 
 const { customer, logout } = useAuth();
-const redeeming = ref(false);
 const accountDeleted = ref(false);
 
 const { result: loyaltyResult, refetch: refetchLoyalty } = useQuery(LOYALTY_QUERY, null, () => ({
@@ -266,17 +258,6 @@ async function onLoggedIn() {
   await Promise.all([refetchLoyalty(), refetchOrders()]);
 }
 
-async function redeem() {
-  redeeming.value = true;
-  try {
-    const { mutate } = useMutation(REDEEM);
-    await mutate();
-    await refetchLoyalty();
-  } finally {
-    redeeming.value = false;
-  }
-}
-
 const { formatDateTime: formatDate } = useStoreTime();
 
 const STATUS_LABELS: Record<string, string> = {
@@ -334,6 +315,7 @@ function statusLabel(status: string) {
 .stamp { width: 24px; height: 34px; background: var(--stamp-img) center / contain no-repeat; opacity: 0.22; }
 .stamp.filled { opacity: 1; }
 .stamps-label { color: var(--text-muted); font-size: 13px; margin: 0; }
+.reward-hint { margin: 0; font-weight: 600; text-align: center; }
 
 .order-row {
   display: flex;

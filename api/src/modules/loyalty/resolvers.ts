@@ -1,6 +1,7 @@
 import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
 import { User } from "../users/model";
 import { LoyaltyTransaction, LOYALTY_RULES } from "./model";
+import { stampsBalance } from "./redemption";
 
 async function loadStatus(customerId: string) {
   const history = await LoyaltyTransaction.find({ customerId }).sort({ createdAt: -1 });
@@ -20,44 +21,18 @@ export const loyaltyResolvers = {
       return loadStatus(customerId);
     },
   },
+  // Customer llega como documento de User (_id); CustomerMatch, ya con id en texto.
+  Customer: {
+    rewardAvailable: async (c: any) => (await stampsBalance(String(c._id))) >= LOYALTY_RULES.rewardThresholdStamps,
+  },
+  CustomerMatch: {
+    rewardAvailable: async (c: any) => (await stampsBalance(c.id)) >= LOYALTY_RULES.rewardThresholdStamps,
+  },
   LoyaltyTransaction: {
     id: (doc: any) => doc._id.toString(),
     createdAt: (doc: any) => doc.createdAt.toISOString(),
   },
   Mutation: {
-    redeemLoyaltyReward: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
-      const customerId = requireCustomer(ctx);
-      const status = await loadStatus(customerId);
-
-      if (!status.rewardAvailable) {
-        throw new Error("Todavia no tienes sellos suficientes para canjear");
-      }
-
-      await LoyaltyTransaction.create({
-        customerId,
-        stamps: -LOYALTY_RULES.rewardThresholdStamps,
-        reason: "canje",
-      });
-
-      return loadStatus(customerId);
-    },
-
-    redeemCustomerReward: async (_: unknown, args: { customerId: string }, ctx: GraphQLContext) => {
-      const staff = requireStaff(ctx, ["barra", "gestion"]);
-      await requireActiveCustomer(args.customerId);
-      const status = await loadStatus(args.customerId);
-      if (!status.rewardAvailable) throw new Error("El cliente todavia no tiene sellos suficientes para canjear");
-
-      await LoyaltyTransaction.create({
-        customerId: args.customerId,
-        stamps: -LOYALTY_RULES.rewardThresholdStamps,
-        reason: "canje",
-        staffId: staff.id,
-        note: "Canje en mostrador",
-      });
-      return loadStatus(args.customerId);
-    },
-
     adjustCustomerStamps: async (
       _: unknown,
       args: { customerId: string; stamps: number; note: string },

@@ -5,6 +5,7 @@ import { ALLOWED_FROM, AWAITING_PAYMENT, CUSTOMER_TABLES, OPEN_ORDER, isTakeaway
 import { tryComplete } from "./complete";
 import { buildOrderLines, createWithUniqueCode, type OrderLineRequest } from "./create";
 import { buildDiscount, type OrderDiscountInput } from "./discount";
+import { assertRewardAvailable, redeemForOrder, refundOrderRedemption } from "../loyalty/redemption";
 import { MenuItem } from "../menu/model";
 import { StaffUser, User } from "../users/model";
 import { EVENTS } from "../../config/pubsub";
@@ -114,6 +115,7 @@ export const ordersResolvers = {
   },
   OrderDiscount: {
     note: (d: any) => d.note || null,
+    lineIndex: (d: any) => d.lineIndex ?? null,
     percent: (d: any) => d.percent ?? null,
     staffName: async (d: any) => {
       if (!d.staffId) return null;
@@ -217,7 +219,12 @@ export const ordersResolvers = {
       const packagingCents = takeaway ? await packagingFeeCents() : 0;
       // Lo toma el personal en el local: la recogida es ahora y no se valida contra el horario.
       const now = new Date();
-      const discount = input.discount ? buildDiscount(input.discount, totalCents + packagingCents, staff, now) : null;
+      const discount = input.discount ? buildDiscount(input.discount, totalCents + packagingCents, staff, now, lines) : null;
+      const redeems = discount?.reason === "CANJE";
+      if (redeems) {
+        if (!input.customerId) throw new Error("Para canjear sellos, identifica antes al cliente");
+        await assertRewardAvailable(input.customerId);
+      }
       const order = await createWithUniqueCode({
         customerId: (input.customerId || null) as any,
         source: "STAFF",
@@ -239,6 +246,8 @@ export const ordersResolvers = {
           : {}),
       });
 
+      // Antes del cierre: al cerrar, el producto canjeado ya no suma sello (ver loyalty/listeners.ts).
+      if (redeems) await redeemForOrder(input.customerId!, order._id.toString(), staff.id);
       await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
       // Como al entregarlo desde la cola: sale la mercancia y, ya cobrado, se cierra (sellos y hoja).
       if (paidNow) {
@@ -282,7 +291,7 @@ export const ordersResolvers = {
       const staff = requireStaff(ctx, ["barra", "gestion"]);
       // Solo antes de cobrarlo: lo cobrado ya cuenta en la caja tal cual.
       const unpaid = { paidAt: { $exists: false }, completedAt: { $exists: false }, status: { $ne: "CANCELADO" } };
-      const current = await Order.findOne({ _id: args.id, ...unpaid }).select("totalCents discount").lean();
+      const current = await Order.findOne({ _id: args.id, ...unpaid }).select("totalCents discount customerId items").lean();
       if (!current) {
         const order = await Order.findById(args.id).select("code status").lean();
         if (!order) throw new Error("Pedido no encontrado");
@@ -292,7 +301,18 @@ export const ordersResolvers = {
       // Lo que vale el pedido sin descuento (el total guardado ya lo lleva restado).
       const grossCents = current.totalCents + (current.discount?.amountCents ?? 0);
       const now = new Date();
-      const discount = args.discount ? buildDiscount(args.discount, grossCents, staff, now) : null;
+      const discount = args.discount ? buildDiscount(args.discount, grossCents, staff, now, current.items) : null;
+
+      // Canje de sellos: se restan antes de aplicar el descuento (y se devuelven si no se aplica),
+      // y se devuelven al cambiarlo por otro motivo o quitarlo. Cambiar solo el producto no los toca.
+      const customerId = current.customerId?.toString();
+      const wasRedeemed = current.discount?.reason === "CANJE";
+      const redeems = discount?.reason === "CANJE";
+      if (redeems && !wasRedeemed) {
+        if (!customerId) throw new Error("Para canjear sellos, asocia antes el pedido a un cliente");
+        await assertRewardAvailable(customerId);
+        await redeemForOrder(customerId, args.id, staff.id);
+      }
 
       // Atomico: si entretanto se cobro o cambio el total, no se aplica sobre cifras viejas.
       const order = await Order.findOneAndUpdate(
@@ -302,7 +322,13 @@ export const ordersResolvers = {
           : { $set: { totalCents: grossCents, updatedAt: now }, $unset: { discount: 1 } },
         { new: true }
       );
-      if (!order) throw new Error("El pedido acaba de cambiar: vuelve a intentarlo");
+      if (!order) {
+        if (redeems && !wasRedeemed) await refundOrderRedemption(customerId!, args.id, "Canje no aplicado: devuelto", staff.id);
+        throw new Error("El pedido acaba de cambiar: vuelve a intentarlo");
+      }
+      if (wasRedeemed && !redeems && customerId) {
+        await refundOrderRedemption(customerId, args.id, "Descuento quitado: canje devuelto", staff.id);
+      }
 
       await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
       return order;

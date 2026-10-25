@@ -115,8 +115,8 @@
         </li>
         <li v-if="packagingCents" class="ticket-packaging muted"><span>Empaque (para llevar)</span><span>{{ formatPrice(packagingCents) }}</span></li>
         <li v-if="discount" class="ticket-discount">
-          <button type="button" class="link-button" title="Cambiar o quitar el descuento" @click="discountDialog?.open(discount)">
-            Descuento · {{ discountLabel(discount) }}
+          <button type="button" class="link-button" title="Cambiar o quitar el descuento" @click="discountDialog?.open(discountForApi)">
+            Descuento · {{ discountLabel(discountForApi!) }}
           </button>
           <span>− {{ formatPrice(discountCents) }}</span>
         </li>
@@ -127,7 +127,7 @@
         <Percent :size="15" :stroke-width="1.8" aria-hidden="true" />
         Aplicar descuento
       </button>
-      <DiscountDialog ref="discountDialog" :gross-cents="grossCents" @apply="onDiscount" />
+      <DiscountDialog ref="discountDialog" :gross-cents="grossCents" :lines="lines" :customer="customer" @apply="onDiscount" />
 
       <div class="field">
         <span class="muted">¿Dónde?</span>
@@ -335,16 +335,28 @@ const note = ref("");
 // Descuento del ticket: se recalcula si cambian los productos (un 10 % sigue siendo un 10 %) y,
 // si deja de valer (p. ej. un importe fijo mayor que lo que queda), no deja enviar el pedido.
 const { staff } = useStaffAuth();
+// El canje de sellos sigue al producto (su linea, por key) aunque cambie el orden del ticket; si
+// se quita del ticket, el descuento deja de valer hasta que se elija otro.
 const discount = ref<DiscountInput | null>(null);
+const redeemLineKey = ref<string | null>(null);
 const discountDialog = ref<InstanceType<typeof DiscountDialog> | null>(null);
 const grossCents = computed(() => totalCents.value + packagingCents.value);
-const discountCents = computed(() => (discount.value ? discountAmount(discount.value, grossCents.value) : 0));
+const discountForApi = computed<DiscountInput | null>(() => {
+  if (!discount.value || discount.value.reason !== "CANJE") return discount.value;
+  const lineIndex = lines.value.findIndex((l) => l.key === redeemLineKey.value);
+  return { ...discount.value, lineIndex: lineIndex === -1 ? null : lineIndex, note: lines.value[lineIndex]?.name ?? null };
+});
+const discountCents = computed(() => (discountForApi.value ? discountAmount(discountForApi.value, grossCents.value, lines.value) : 0));
 const finalCents = computed(() => Math.max(grossCents.value - discountCents.value, 0));
-const discountIssue = computed(() =>
-  discount.value && lines.value.length ? discountProblem(discount.value, grossCents.value, staff.value?.role) : null
-);
+const discountIssue = computed(() => {
+  const d = discountForApi.value;
+  if (!d || !lines.value.length) return null;
+  if (d.reason === "CANJE" && !customer.value) return "Para canjear sellos, identifica al cliente";
+  return discountProblem(d, grossCents.value, staff.value?.role, lines.value);
+});
 function onDiscount(value: DiscountInput | null) {
   discount.value = value;
+  redeemLineKey.value = value?.reason === "CANJE" ? lines.value[value.lineIndex ?? -1]?.key ?? null : null;
   discountDialog.value?.close();
 }
 const ticketEl = ref<HTMLElement | null>(null);
@@ -366,6 +378,7 @@ function reset() {
   customer.value = null;
   note.value = "";
   discount.value = null;
+  redeemLineKey.value = null;
   search.value = "";
   choosingPayment.value = false;
 }
@@ -393,7 +406,7 @@ async function submit(paymentMethod: PaymentMethod | null = null) {
         customerId: customer.value?.id ?? null,
         note: note.value.trim() || null,
         paymentMethod,
-        discount: discount.value,
+        discount: discountForApi.value && { ...discountForApi.value, note: discountForApi.value.reason === "CANJE" ? null : discountForApi.value.note },
       },
     });
     lastCode.value = res?.data?.createStaffOrder.code ?? "";

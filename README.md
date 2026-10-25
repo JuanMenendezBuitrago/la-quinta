@@ -93,7 +93,10 @@ abiertas" en la propuesta de arquitectura):
   Hay que conectar un proveedor de email o SMS.
 - **Regla de fidelización.** Decidida: 1 sello por cada producto de un
   pedido entregado y recompensa a los 10 sellos
-  (`api/src/modules/loyalty/model.ts`, `LOYALTY_RULES`).
+  (`api/src/modules/loyalty/model.ts`, `LOYALTY_RULES`). En el local se
+  canjea como descuento «Canje de sellos» del pedido: un producto gratis,
+  que no suma sello; los sellos se devuelven si se quita el descuento o se
+  cancela el pedido (`api/src/modules/loyalty/redemption.ts`).
 - **Protección de datos (Ley 1581 de 2012).** Hay autorización en el login,
   política en `/privacidad` y, en «Mi cuenta → Mis datos», corrección del
   nombre, descarga de datos y supresión de la cuenta. Falta: completar la

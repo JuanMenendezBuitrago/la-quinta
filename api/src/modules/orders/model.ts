@@ -68,9 +68,11 @@ export function requiresPayment(order: Pick<OrderDoc, "serviceType">) {
 }
 
 /** Por que se rebaja un pedido: se pide siempre, para que el cierre de caja explique cada descuento. */
-export type DiscountReason = "INVITACION" | "PERSONAL" | "ERROR" | "HABITUAL" | "OTRO";
-export const DISCOUNT_REASONS: DiscountReason[] = ["INVITACION", "PERSONAL", "ERROR", "HABITUAL", "OTRO"];
+// CANJE: la recompensa de los sellos, un producto del pedido gratis (ver discount.ts).
+export type DiscountReason = "CANJE" | "INVITACION" | "PERSONAL" | "ERROR" | "HABITUAL" | "OTRO";
+export const DISCOUNT_REASONS: DiscountReason[] = ["CANJE", "INVITACION", "PERSONAL", "ERROR", "HABITUAL", "OTRO"];
 export const DISCOUNT_REASON_LABELS: Record<DiscountReason, string> = {
+  CANJE: "Canje de sellos",
   INVITACION: "Invitación de la casa",
   PERSONAL: "Consumo del personal",
   ERROR: "Producto defectuoso o error",
@@ -87,6 +89,8 @@ export interface OrderDiscountDoc {
   amountCents: number;
   reason: DiscountReason;
   note?: string;
+  // Solo en el canje de sellos: la linea (posicion en items) del producto que sale gratis.
+  lineIndex?: number | null;
   staffId: Types.ObjectId;
   at: Date;
 }
@@ -150,6 +154,7 @@ const orderDiscountSchema = new Schema<OrderDiscountDoc>(
     amountCents: { type: Number, required: true, min: 1 },
     reason: { type: String, enum: DISCOUNT_REASONS, required: true },
     note: { type: String, trim: true, maxlength: 120 },
+    lineIndex: { type: Number, min: 0 },
     staffId: { type: Schema.Types.ObjectId, ref: "StaffUser", required: true },
     at: { type: Date, required: true },
   },

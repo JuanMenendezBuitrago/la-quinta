@@ -336,6 +336,8 @@
     <DiscountDialog
       ref="discountDialog"
       :gross-cents="discountOrder ? discountOrder.totalCents + (discountOrder.discount?.amountCents ?? 0) : 0"
+      :lines="discountOrder?.items ?? []"
+      :customer="discountOrder?.customer ?? null"
       :busy="!!discountOrder && busyOrderId === discountOrder.id"
       :error="discountError"
       @apply="applyDiscount"

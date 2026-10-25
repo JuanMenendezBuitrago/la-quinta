@@ -47,6 +47,7 @@ const SEARCH = gql`
       name
       customerCode
       avatar
+      rewardAvailable
     }
   }
 `;

@@ -12,8 +12,9 @@ export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
 };
 
 /** Motivo de un descuento: siempre se pide, para que el cierre de caja explique cada rebaja. */
-export type DiscountReason = "INVITACION" | "PERSONAL" | "ERROR" | "HABITUAL" | "OTRO";
+export type DiscountReason = "CANJE" | "INVITACION" | "PERSONAL" | "ERROR" | "HABITUAL" | "OTRO";
 export const DISCOUNT_REASON_LABELS: Record<DiscountReason, string> = {
+  CANJE: "Canje de sellos",
   INVITACION: "Invitación de la casa",
   PERSONAL: "Consumo del personal",
   ERROR: "Producto defectuoso o error",
@@ -23,21 +24,52 @@ export const DISCOUNT_REASON_LABELS: Record<DiscountReason, string> = {
 /** Barra puede rebajar hasta este porcentaje del pedido; gestion, sin limite (la API lo comprueba igual). */
 export const BARRA_MAX_DISCOUNT_PERCENT = 20;
 
-/** Descuento en porcentaje o en pesos (uno de los dos), con su motivo. "Otro" pide una nota. */
+/**
+ * Descuento en porcentaje o en pesos (uno de los dos), con su motivo. "Otro" pide una nota.
+ * El canje de sellos (CANJE) no lleva ni porcentaje ni pesos: sale gratis una unidad de la linea
+ * lineIndex del pedido, y la API resta los sellos al cliente.
+ */
 export interface DiscountInput {
   percent: number | null;
   amountCents: number | null;
   reason: DiscountReason;
   note: string | null;
+  lineIndex?: number | null;
+}
+
+/** Linea de un pedido, para elegir el producto del canje (priceCents: por unidad, con suplementos). */
+export interface DiscountLine {
+  name: string;
+  priceCents: number;
+  quantity: number;
 }
 
 /** Lo que se resta de un pedido de `grossCents` (productos + empaque), redondeado como en la API. */
-export function discountAmount(d: Pick<DiscountInput, "percent" | "amountCents">, grossCents: number) {
+export function discountAmount(
+  d: Pick<DiscountInput, "percent" | "amountCents"> & Partial<Pick<DiscountInput, "reason" | "lineIndex">>,
+  grossCents: number,
+  lines: DiscountLine[] = []
+) {
+  if (d.reason === "CANJE") return lines[d.lineIndex ?? -1]?.priceCents ?? 0;
   return d.percent !== null ? Math.round((grossCents * d.percent) / 100) : d.amountCents ?? 0;
 }
 
+/** La linea que la API canjea si no se elige: la mas barata que se cobre. -1 si no hay ninguna. */
+export function cheapestLineIndex(lines: DiscountLine[]) {
+  let best = -1;
+  lines.forEach((line, i) => {
+    if (line.priceCents >= 1 && (best === -1 || line.priceCents < lines[best].priceCents)) best = i;
+  });
+  return best;
+}
+
 /** Por que no se puede aplicar ese descuento (o null): las mismas reglas que la API. */
-export function discountProblem(d: DiscountInput, grossCents: number, role: string | undefined) {
+export function discountProblem(d: DiscountInput, grossCents: number, role: string | undefined, lines: DiscountLine[] = []) {
+  if (d.reason === "CANJE") {
+    if (!lines[d.lineIndex ?? -1]) return "Elige el producto que se canjea";
+    if (discountAmount(d, grossCents, lines) < 1) return "Ese producto ya es gratis: elige otro";
+    return null;
+  }
   const amount = discountAmount(d, grossCents);
   if (amount < 1) return "Indica cuánto se descuenta";
   if (amount > grossCents) return "El descuento no puede ser mayor que el pedido";
@@ -48,9 +80,14 @@ export function discountProblem(d: DiscountInput, grossCents: number, role: stri
   return null;
 }
 
-/** "Invitación de la casa" u "Otro: cumpleaños", para el ticket, la cola y el historial. */
+/** "Invitación de la casa", "Otro: cumpleaños" o "Canje de sellos: Latte", para el ticket, la cola y el historial. */
 export function discountLabel(d: { reason: DiscountReason; note?: string | null; percent?: number | null }) {
-  const reason = d.reason === "OTRO" && d.note ? d.note : DISCOUNT_REASON_LABELS[d.reason];
+  const reason =
+    d.reason === "OTRO" && d.note
+      ? d.note
+      : d.reason === "CANJE" && d.note
+        ? `${DISCOUNT_REASON_LABELS.CANJE}: ${d.note}`
+        : DISCOUNT_REASON_LABELS[d.reason];
   return d.percent ? `${reason} (${d.percent} %)` : reason;
 }
 
@@ -60,6 +97,8 @@ export interface CustomerMatch {
   name: string;
   customerCode: string;
   avatar?: string | null;
+  // Tiene sellos para canjear la recompensa (motivo "Canje de sellos").
+  rewardAvailable?: boolean;
 }
 
 // Campos compartidos por la cola en vivo y el historial: mismo tipo `Order` en ambos casos.
@@ -82,6 +121,7 @@ const ORDER_FIELDS = `
     amountCents
     reason
     note
+    lineIndex
     staffName
   }
   takeaway
@@ -94,9 +134,11 @@ const ORDER_FIELDS = `
     name
     customerCode
     avatar
+    rewardAvailable
   }
   items {
     name
+    priceCents
     quantity
     options {
       name
@@ -155,6 +197,7 @@ const SET_DISCOUNT = gql`
         amountCents
         reason
         note
+        lineIndex
         staffName
       }
     }

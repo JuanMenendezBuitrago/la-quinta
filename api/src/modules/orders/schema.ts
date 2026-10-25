@@ -46,6 +46,8 @@ export const ordersTypeDefs = /* GraphQL */ `
 
   """Por que se rebaja un pedido."""
   enum DiscountReason {
+    """Canje de los sellos del cliente: una unidad de un producto del pedido, gratis."""
+    CANJE
     INVITACION
     PERSONAL
     """Producto defectuoso o error."""
@@ -62,18 +64,25 @@ export const ordersTypeDefs = /* GraphQL */ `
     """Lo que se resta del pedido, en pesos."""
     amountCents: Int!
     reason: DiscountReason!
+    """En el canje de sellos, el nombre del producto canjeado."""
     note: String
+    """Solo en el canje de sellos: posicion en items del producto canjeado."""
+    lineIndex: Int
     """Quien lo aplico (en una cuenta compartida, la persona elegida)."""
     staffName: String
   }
 
-  """Descuento en porcentaje (1-100) o en pesos (uno de los dos). Barra, hasta el 20 % del pedido."""
+  """Descuento en porcentaje (1-100) o en pesos (uno de los dos). Barra, hasta el 20 % del pedido.
+  Con el motivo CANJE, ni porcentaje ni pesos: sale gratis una unidad de la linea lineIndex (o de la
+  mas barata), el pedido debe tener cliente con la recompensa disponible y se le restan los sellos."""
   input OrderDiscountInput {
     percent: Int
     amountCents: Int
     reason: DiscountReason!
     """Obligatoria con el motivo OTRO."""
     note: String
+    """Solo con CANJE: posicion en items del producto que se canjea."""
+    lineIndex: Int
   }
 
   """Un cambio de estado del pedido."""
