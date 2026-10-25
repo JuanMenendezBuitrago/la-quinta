@@ -67,6 +67,30 @@ export function requiresPayment(order: Pick<OrderDoc, "serviceType">) {
   return order.serviceType === "MESA";
 }
 
+/** Por que se rebaja un pedido: se pide siempre, para que el cierre de caja explique cada descuento. */
+export type DiscountReason = "INVITACION" | "PERSONAL" | "ERROR" | "HABITUAL" | "OTRO";
+export const DISCOUNT_REASONS: DiscountReason[] = ["INVITACION", "PERSONAL", "ERROR", "HABITUAL", "OTRO"];
+export const DISCOUNT_REASON_LABELS: Record<DiscountReason, string> = {
+  INVITACION: "Invitación de la casa",
+  PERSONAL: "Consumo del personal",
+  ERROR: "Producto defectuoso o error",
+  HABITUAL: "Cliente habitual",
+  OTRO: "Otro",
+};
+
+/**
+ * Rebaja sobre el pedido (productos + empaque). amountCents es lo que se resta, ya calculado;
+ * percent solo se guarda si se pidio en porcentaje. Quien lo aplico y cuando, como en el cobro.
+ */
+export interface OrderDiscountDoc {
+  percent?: number | null;
+  amountCents: number;
+  reason: DiscountReason;
+  note?: string;
+  staffId: Types.ObjectId;
+  at: Date;
+}
+
 /** Un cambio de estado: cuando y, si lo hizo el personal, quien (el NUEVO de un pedido web no lo tiene). */
 export interface OrderStatusChangeDoc {
   status: OrderStatus;
@@ -86,8 +110,10 @@ export interface OrderDoc {
   note?: string;
   createdByStaffId?: Types.ObjectId;
   items: OrderLineDoc[];
-  // Productos + recargo por empaque (packagingCents, solo en pedidos para llevar).
+  // Lo que se cobra: productos + recargo por empaque (packagingCents, solo en pedidos para
+  // llevar) - descuento (discount.amountCents).
   totalCents: number;
+  discount?: OrderDiscountDoc | null;
   packagingCents?: number;
   // Va empaquetado. Sin valor (pedidos anteriores): para llevar o web de recogida (ver isTakeaway).
   takeaway?: boolean;
@@ -114,6 +140,18 @@ const orderLineOptionSchema = new Schema<OrderLineOptionDoc>(
     priceDeltaCents: { type: Number, required: true, min: 0 },
     isDefault: { type: Boolean, required: true },
     defaultOptionId: { type: Schema.Types.ObjectId },
+  },
+  { _id: false }
+);
+
+const orderDiscountSchema = new Schema<OrderDiscountDoc>(
+  {
+    percent: { type: Number, min: 1, max: 100 },
+    amountCents: { type: Number, required: true, min: 1 },
+    reason: { type: String, enum: DISCOUNT_REASONS, required: true },
+    note: { type: String, trim: true, maxlength: 120 },
+    staffId: { type: Schema.Types.ObjectId, ref: "StaffUser", required: true },
+    at: { type: Date, required: true },
   },
   { _id: false }
 );
@@ -150,6 +188,7 @@ const orderSchema = new Schema<OrderDoc>({
   items: { type: [orderLineSchema], required: true, validate: (v: unknown[]) => v.length > 0 },
   totalCents: { type: Number, required: true, min: 0 },
   packagingCents: { type: Number, default: 0, min: 0 },
+  discount: { type: orderDiscountSchema, default: undefined },
   takeaway: { type: Boolean },
   pickupSlot: { type: Date, required: true },
   status: {

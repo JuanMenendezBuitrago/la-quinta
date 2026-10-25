@@ -1,5 +1,12 @@
 import { Schema, model, Types } from "mongoose";
 
+/** Descuentos de un motivo en el periodo (reason: el de los pedidos, p. ej. INVITACION). */
+export interface DiscountTotalDoc {
+  reason: string;
+  count: number;
+  amountCents: number;
+}
+
 /**
  * Cierre de caja: lo cobrado desde el cierre anterior (periodStart) hasta este (periodEnd),
  * repartido por metodo de pago, y el arqueo del efectivo (fondo inicial + contado).
@@ -18,6 +25,10 @@ export interface CashClosingDoc {
   transferCents: number;
   // Pedidos para llevar o web entregados antes de que se pidiera el metodo de pago al entregar.
   unknownMethodCents: number;
+  // Rebajas de los pedidos cobrados (ya restadas de totalCents): cuantas, cuanto y por motivo.
+  discountsCount: number;
+  discountsCents: number;
+  discountsByReason: DiscountTotalDoc[];
   // Gastos que entraron en este cierre (ver modules/expenses). Solo los de CAJA salen del cajon.
   expensesCount: number;
   expensesCashCents: number;
@@ -45,6 +56,13 @@ const cashClosingSchema = new Schema<CashClosingDoc>({
   cardCents: { type: Number, required: true },
   transferCents: { type: Number, required: true },
   unknownMethodCents: { type: Number, required: true },
+  // Cierres anteriores a los descuentos no los tienen: cuentan como 0.
+  discountsCount: { type: Number, default: 0 },
+  discountsCents: { type: Number, default: 0 },
+  discountsByReason: {
+    type: [new Schema<DiscountTotalDoc>({ reason: String, count: Number, amountCents: Number }, { _id: false })],
+    default: [],
+  },
   // Cierres anteriores a los gastos no los tienen: cuentan como 0.
   expensesCount: { type: Number, default: 0 },
   expensesCashCents: { type: Number, default: 0 },

@@ -39,6 +39,9 @@ export interface OrderClosedPayload {
   customerId: string | null; // null: pedido del personal sin cliente registrado
   totalCents: number;
   packagingCents?: number;
+  // Rebaja ya restada de totalCents, y su motivo en texto ("" sin descuento).
+  discountCents?: number;
+  discountReason?: string;
   // Va empaquetado (vasos, tapas... en el inventario).
   takeaway?: boolean;
   // Instantanea del pedido para los modulos que necesitan registrarlo (p. ej. "sheets")

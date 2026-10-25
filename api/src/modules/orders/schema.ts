@@ -44,6 +44,38 @@ export const ordersTypeDefs = /* GraphQL */ `
     TRANSFERENCIA
   }
 
+  """Por que se rebaja un pedido."""
+  enum DiscountReason {
+    INVITACION
+    PERSONAL
+    """Producto defectuoso o error."""
+    ERROR
+    HABITUAL
+    """Pide una nota que lo explique."""
+    OTRO
+  }
+
+  """Rebaja sobre el pedido (productos + empaque)."""
+  type OrderDiscount {
+    """Solo si se pidio en porcentaje."""
+    percent: Int
+    """Lo que se resta del pedido, en pesos."""
+    amountCents: Int!
+    reason: DiscountReason!
+    note: String
+    """Quien lo aplico (en una cuenta compartida, la persona elegida)."""
+    staffName: String
+  }
+
+  """Descuento en porcentaje (1-100) o en pesos (uno de los dos). Barra, hasta el 20 % del pedido."""
+  input OrderDiscountInput {
+    percent: Int
+    amountCents: Int
+    reason: DiscountReason!
+    """Obligatoria con el motivo OTRO."""
+    note: String
+  }
+
   """Un cambio de estado del pedido."""
   type OrderStatusChange {
     status: OrderStatus!
@@ -66,8 +98,9 @@ export const ordersTypeDefs = /* GraphQL */ `
     table: String
     note: String
     items: [OrderLine!]!
-    """Productos + empaque."""
+    """Lo que se cobra: productos + empaque - descuento."""
     totalCents: Int!
+    discount: OrderDiscount
     """Recargo por empaque de este pedido (el vigente al crearlo; 0 en mesa o barra)."""
     packagingCents: Int!
     """Va empaquetado: para llevar, recogida web, o mesa/barra marcado "para llevar"."""
@@ -107,6 +140,8 @@ export const ordersTypeDefs = /* GraphQL */ `
     """Guardar y pagar: ya se entrego y se cobra en el acto con este metodo. El pedido nace
     entregado y cobrado (cerrado), sin pasar por la cola."""
     paymentMethod: PaymentMethod
+    """Descuento con su motivo (ver OrderDiscountInput)."""
+    discount: OrderDiscountInput
   }
 
   extend type Query {
@@ -138,6 +173,8 @@ export const ordersTypeDefs = /* GraphQL */ `
     markOrderPaid(id: ID!, method: PaymentMethod!): Order!
     """Personal: pedido tomado en el local (mesero o barra). La recogida es ahora."""
     createStaffOrder(input: StaffOrderInput!): Order!
+    """Personal: pone, cambia o quita (discount null) el descuento de un pedido aun sin cobrar."""
+    setOrderDiscount(id: ID!, discount: OrderDiscountInput): Order!
     """Personal: asocia un cliente a un pedido activo que no tenia."""
     assignOrderCustomer(orderId: ID!, customerId: ID!): Order!
   }

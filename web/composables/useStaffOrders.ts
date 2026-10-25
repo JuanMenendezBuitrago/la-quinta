@@ -11,6 +11,49 @@ export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
   TRANSFERENCIA: "Transferencia/Nequi",
 };
 
+/** Motivo de un descuento: siempre se pide, para que el cierre de caja explique cada rebaja. */
+export type DiscountReason = "INVITACION" | "PERSONAL" | "ERROR" | "HABITUAL" | "OTRO";
+export const DISCOUNT_REASON_LABELS: Record<DiscountReason, string> = {
+  INVITACION: "Invitación de la casa",
+  PERSONAL: "Consumo del personal",
+  ERROR: "Producto defectuoso o error",
+  HABITUAL: "Cliente habitual",
+  OTRO: "Otro",
+};
+/** Barra puede rebajar hasta este porcentaje del pedido; gestion, sin limite (la API lo comprueba igual). */
+export const BARRA_MAX_DISCOUNT_PERCENT = 20;
+
+/** Descuento en porcentaje o en pesos (uno de los dos), con su motivo. "Otro" pide una nota. */
+export interface DiscountInput {
+  percent: number | null;
+  amountCents: number | null;
+  reason: DiscountReason;
+  note: string | null;
+}
+
+/** Lo que se resta de un pedido de `grossCents` (productos + empaque), redondeado como en la API. */
+export function discountAmount(d: Pick<DiscountInput, "percent" | "amountCents">, grossCents: number) {
+  return d.percent !== null ? Math.round((grossCents * d.percent) / 100) : d.amountCents ?? 0;
+}
+
+/** Por que no se puede aplicar ese descuento (o null): las mismas reglas que la API. */
+export function discountProblem(d: DiscountInput, grossCents: number, role: string | undefined) {
+  const amount = discountAmount(d, grossCents);
+  if (amount < 1) return "Indica cuánto se descuenta";
+  if (amount > grossCents) return "El descuento no puede ser mayor que el pedido";
+  if (d.reason === "OTRO" && !d.note?.trim()) return "Explica el motivo del descuento";
+  if (role !== "gestion" && amount * 100 > grossCents * BARRA_MAX_DISCOUNT_PERCENT) {
+    return `Desde barra, hasta el ${BARRA_MAX_DISCOUNT_PERCENT} % del pedido: para más, pide a gestión`;
+  }
+  return null;
+}
+
+/** "Invitación de la casa" u "Otro: cumpleaños", para el ticket, la cola y el historial. */
+export function discountLabel(d: { reason: DiscountReason; note?: string | null; percent?: number | null }) {
+  const reason = d.reason === "OTRO" && d.note ? d.note : DISCOUNT_REASON_LABELS[d.reason];
+  return d.percent ? `${reason} (${d.percent} %)` : reason;
+}
+
 /** Cliente identificado por el personal (lookupCustomer): solo nombre y codigo, sin contacto. */
 export interface CustomerMatch {
   id: string;
@@ -34,6 +77,13 @@ const ORDER_FIELDS = `
   status
   totalCents
   packagingCents
+  discount {
+    percent
+    amountCents
+    reason
+    note
+    staffName
+  }
   takeaway
   pickupSlot
   updatedAt
@@ -91,6 +141,22 @@ const MARK_PAID = gql`
       paidAt
       paymentMethod
       awaitingPayment
+    }
+  }
+`;
+
+const SET_DISCOUNT = gql`
+  mutation SetOrderDiscount($id: ID!, $discount: OrderDiscountInput) {
+    setOrderDiscount(id: $id, discount: $discount) {
+      id
+      totalCents
+      discount {
+        percent
+        amountCents
+        reason
+        note
+        staffName
+      }
     }
   }
 `;
@@ -325,6 +391,23 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     }
   }
 
+  // Descuento de un pedido aun sin cobrar (null lo quita). Devuelve el error para mostrarlo en el
+  // propio modal, que sigue abierto; la cola se actualiza con la suscripcion.
+  const { mutate: setDiscountMutation } = useMutation(SET_DISCOUNT);
+  async function setDiscount(order: any, discount: DiscountInput | null): Promise<string | null> {
+    if (busyOrderId.value) return "Espera a que termine la acción en curso";
+    busyOrderId.value = order.id;
+    try {
+      await setDiscountMutation({ id: order.id, discount });
+      return null;
+    } catch (err: any) {
+      await refetchQueue()?.catch(() => {});
+      return err?.message ?? "No se pudo aplicar el descuento";
+    } finally {
+      busyOrderId.value = "";
+    }
+  }
+
   // Cobro de pedidos de mesa o barra (antes o despues de entregar).
   const { mutate: markPaidMutation } = useMutation(MARK_PAID);
   async function markPaid(order: any, method: PaymentMethod) {
@@ -371,6 +454,7 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     cancelOrder,
     assignCustomer,
     markPaid,
+    setDiscount,
     busyOrderId,
     actionError,
     nextStatus,

@@ -1,6 +1,6 @@
 import { GraphQLContext, requireStaff } from "../../graphql/context";
 import { env } from "../../config/env";
-import { Order } from "../orders/model";
+import { DISCOUNT_REASONS, Order } from "../orders/model";
 import { StaffUser } from "../users/model";
 import { CashClosing, CashClosingDoc } from "./model";
 import { Expense } from "../expenses/model";
@@ -40,7 +40,7 @@ async function summarize(start: Date, end: Date) {
       { paidAt: { $exists: false }, serviceType: { $ne: "MESA" }, status: "ENTREGADO", deliveredAt: { $gte: start, $lt: end } },
     ],
   })
-    .select("totalCents paymentMethod paidAt")
+    .select("totalCents paymentMethod paidAt discount")
     .lean();
 
   const sum = { cashCents: 0, cardCents: 0, transferCents: 0, unknownMethodCents: 0 };
@@ -52,7 +52,25 @@ async function summarize(start: Date, end: Date) {
     else sum.unknownMethodCents += o.totalCents;
   }
   const totalCents = sum.cashCents + sum.cardCents + sum.transferCents + sum.unknownMethodCents;
-  return { ordersCount: orders.length, totalCents, ...sum, ...(await summarizeExpenses(end)) };
+  return { ordersCount: orders.length, totalCents, ...sum, ...summarizeDiscounts(orders), ...(await summarizeExpenses(end)) };
+}
+
+/** Descuentos de esos pedidos, por motivo (en el orden de los motivos, solo los que hay). */
+function summarizeDiscounts(orders: { discount?: { reason: string; amountCents: number } | null }[]) {
+  const byReason = new Map<string, { count: number; amountCents: number }>();
+  for (const o of orders) {
+    if (!o.discount) continue;
+    const row = byReason.get(o.discount.reason) ?? { count: 0, amountCents: 0 };
+    row.count += 1;
+    row.amountCents += o.discount.amountCents;
+    byReason.set(o.discount.reason, row);
+  }
+  const discountsByReason = DISCOUNT_REASONS.filter((r) => byReason.has(r)).map((reason) => ({ reason, ...byReason.get(reason)! }));
+  return {
+    discountsCount: discountsByReason.reduce((n, r) => n + r.count, 0),
+    discountsCents: discountsByReason.reduce((n, r) => n + r.amountCents, 0),
+    discountsByReason,
+  };
 }
 
 /** Gastos aun sin cierre registrados antes de `end`: los que se lleva el cierre (ver modules/expenses). */
@@ -116,6 +134,9 @@ export const cashResolvers = {
     periodEnd: (doc: CashClosingDoc) => doc.periodEnd.toISOString(),
     createdAt: (doc: CashClosingDoc) => doc.createdAt.toISOString(),
     expectedCashInDrawerCents: (doc: CashClosingDoc) => doc.openingFloatCents + doc.cashCents - (doc.expensesCashCents ?? 0),
+    discountsCount: (doc: CashClosingDoc) => doc.discountsCount ?? 0,
+    discountsCents: (doc: CashClosingDoc) => doc.discountsCents ?? 0,
+    discountsByReason: (doc: CashClosingDoc) => doc.discountsByReason ?? [],
     expensesCount: (doc: CashClosingDoc) => doc.expensesCount ?? 0,
     expensesCashCents: (doc: CashClosingDoc) => doc.expensesCashCents ?? 0,
     expensesOtherCents: (doc: CashClosingDoc) => doc.expensesOtherCents ?? 0,

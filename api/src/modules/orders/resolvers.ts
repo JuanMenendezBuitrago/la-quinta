@@ -4,6 +4,7 @@ import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/con
 import { ALLOWED_FROM, AWAITING_PAYMENT, CUSTOMER_TABLES, OPEN_ORDER, isTakeaway, Order, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
 import { tryComplete } from "./complete";
 import { buildOrderLines, createWithUniqueCode, type OrderLineRequest } from "./create";
+import { buildDiscount, type OrderDiscountInput } from "./discount";
 import { MenuItem } from "../menu/model";
 import { StaffUser, User } from "../users/model";
 import { EVENTS } from "../../config/pubsub";
@@ -105,10 +106,20 @@ export const ordersResolvers = {
         };
       });
     },
+    discount: (doc: any) => doc.discount ?? null,
     paidAt: (doc: any) => iso(doc.paidAt),
     paymentMethod: (doc: any) => doc.paymentMethod ?? null,
     awaitingPayment: (doc: any) =>
       doc.serviceType === "MESA" && !doc.paidAt && !doc.completedAt && doc.status !== "CANCELADO",
+  },
+  OrderDiscount: {
+    note: (d: any) => d.note || null,
+    percent: (d: any) => d.percent ?? null,
+    staffName: async (d: any) => {
+      if (!d.staffId) return null;
+      const who = await StaffUser.findById(d.staffId).select("name").lean();
+      return who?.name ?? null;
+    },
   },
   OrderLine: {
     // Pedidos anteriores a las personalizaciones: sin opciones.
@@ -183,6 +194,7 @@ export const ordersResolvers = {
           note?: string | null;
           takeaway?: boolean | null;
           paymentMethod?: PaymentMethod | null;
+          discount?: OrderDiscountInput | null;
         };
       },
       ctx: GraphQLContext
@@ -205,6 +217,7 @@ export const ordersResolvers = {
       const packagingCents = takeaway ? await packagingFeeCents() : 0;
       // Lo toma el personal en el local: la recogida es ahora y no se valida contra el horario.
       const now = new Date();
+      const discount = input.discount ? buildDiscount(input.discount, totalCents + packagingCents, staff, now) : null;
       const order = await createWithUniqueCode({
         customerId: (input.customerId || null) as any,
         source: "STAFF",
@@ -213,8 +226,9 @@ export const ordersResolvers = {
         note: input.note?.trim() || undefined,
         createdByStaffId: staff.id as any,
         items: lines,
-        totalCents: totalCents + packagingCents,
+        totalCents: totalCents + packagingCents - (discount?.amountCents ?? 0),
         packagingCents,
+        ...(discount ? { discount } : {}),
         takeaway,
         pickupSlot: now,
         // Guardar y pagar: creado, entregado, cobrado y cerrado en el mismo instante.
@@ -255,6 +269,40 @@ export const ordersResolvers = {
         if (current.customerId) throw new Error("El pedido ya tiene un cliente asignado");
         throw new Error("Solo se puede asignar cliente a un pedido que no se ha cerrado ni cancelado");
       }
+
+      await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
+      return order;
+    },
+
+    setOrderDiscount: async (
+      _: unknown,
+      args: { id: string; discount?: OrderDiscountInput | null },
+      ctx: GraphQLContext
+    ) => {
+      const staff = requireStaff(ctx, ["barra", "gestion"]);
+      // Solo antes de cobrarlo: lo cobrado ya cuenta en la caja tal cual.
+      const unpaid = { paidAt: { $exists: false }, completedAt: { $exists: false }, status: { $ne: "CANCELADO" } };
+      const current = await Order.findOne({ _id: args.id, ...unpaid }).select("totalCents discount").lean();
+      if (!current) {
+        const order = await Order.findById(args.id).select("code status").lean();
+        if (!order) throw new Error("Pedido no encontrado");
+        if (order.status === "CANCELADO") throw new Error(`El pedido ${order.code} esta cancelado`);
+        throw new Error(`El pedido ${order.code} ya esta cobrado: no se puede cambiar el descuento`);
+      }
+      // Lo que vale el pedido sin descuento (el total guardado ya lo lleva restado).
+      const grossCents = current.totalCents + (current.discount?.amountCents ?? 0);
+      const now = new Date();
+      const discount = args.discount ? buildDiscount(args.discount, grossCents, staff, now) : null;
+
+      // Atomico: si entretanto se cobro o cambio el total, no se aplica sobre cifras viejas.
+      const order = await Order.findOneAndUpdate(
+        { _id: args.id, ...unpaid, totalCents: current.totalCents },
+        discount
+          ? { $set: { discount, totalCents: grossCents - discount.amountCents, updatedAt: now } }
+          : { $set: { totalCents: grossCents, updatedAt: now }, $unset: { discount: 1 } },
+        { new: true }
+      );
+      if (!order) throw new Error("El pedido acaba de cambiar: vuelve a intentarlo");
 
       await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
       return order;

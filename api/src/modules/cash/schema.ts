@@ -1,4 +1,11 @@
 export const cashTypeDefs = /* GraphQL */ `
+  """Descuentos de un motivo en el periodo."""
+  type DiscountTotal {
+    reason: DiscountReason!
+    count: Int!
+    amountCents: Int!
+  }
+
   """Lo cobrado en un periodo, por metodo de pago (pesos). Sin los pedidos cancelados."""
   type CashSummary {
     """Fin del ultimo cierre (o inicio del dia, en la zona horaria del local, si aun no hay ninguno)."""
@@ -11,6 +18,10 @@ export const cashTypeDefs = /* GraphQL */ `
     transferCents: Int!
     """Pedidos para llevar o web entregados sin indicar el metodo (anteriores a pedirlo al entregar)."""
     unknownMethodCents: Int!
+    """Descuentos de los pedidos cobrados (ya restados del total): cuantos, cuanto y por motivo."""
+    discountsCount: Int!
+    discountsCents: Int!
+    discountsByReason: [DiscountTotal!]!
     """Gastos pendientes (los que entrarian en el cierre) o del cierre: numero, pagados de la caja y el resto."""
     expensesCount: Int!
     expensesCashCents: Int!
@@ -42,6 +53,10 @@ export const cashTypeDefs = /* GraphQL */ `
     cardCents: Int!
     transferCents: Int!
     unknownMethodCents: Int!
+    """Descuentos de los pedidos cobrados (ya restados del total): cuantos, cuanto y por motivo."""
+    discountsCount: Int!
+    discountsCents: Int!
+    discountsByReason: [DiscountTotal!]!
     """Gastos pendientes (los que entrarian en el cierre) o del cierre: numero, pagados de la caja y el resto."""
     expensesCount: Int!
     expensesCashCents: Int!

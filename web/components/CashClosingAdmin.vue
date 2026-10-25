@@ -30,6 +30,22 @@
       <BalanceTable :balances="summary.balances" :format="formatPrice" />
     </div>
 
+    <!-- Descuentos del periodo: ya restados de lo cobrado; aqui, cuanto se dejo de cobrar y por que -->
+    <div v-if="summary?.discountsCount" class="card">
+      <h2 class="card-title">Descuentos del periodo</h2>
+      <p class="muted period">
+        {{ summary.discountsCount }} {{ summary.discountsCount === 1 ? "pedido" : "pedidos" }} con descuento · ya
+        restados del total cobrado
+      </p>
+      <dl class="totals">
+        <div v-for="d in summary.discountsByReason" :key="d.reason">
+          <dt>{{ DISCOUNT_REASON_LABELS[d.reason] }} ({{ d.count }})</dt>
+          <dd>{{ formatPrice(d.amountCents) }}</dd>
+        </div>
+        <div class="total"><dt>Total descontado</dt><dd>{{ formatPrice(summary.discountsCents) }}</dd></div>
+      </dl>
+    </div>
+
     <!-- Gastos que entraran en este cierre -->
     <div v-if="summary" class="card expenses">
       <div class="expenses-head">
@@ -173,6 +189,10 @@
           v-if="c.unknownMethodCents"
         > · Sin método {{ formatPrice(c.unknownMethodCents) }}</template>
       </p>
+      <p v-if="c.discountsCount" class="closing-figures">
+        Descuentos {{ formatPrice(c.discountsCents) }}:
+        {{ c.discountsByReason.map((d) => `${DISCOUNT_REASON_LABELS[d.reason]} ${formatPrice(d.amountCents)}`).join(" · ") }}
+      </p>
       <p v-if="c.expensesCount" class="closing-figures">
         Gastos {{ formatPrice(c.expensesTotalCents) }} (de la caja {{ formatPrice(c.expensesCashCents) }}) · Neto
         {{ formatPrice(c.netCents) }}
@@ -225,6 +245,7 @@ import { useStoreTime } from "~/composables/useStoreTime";
 import { useStaffAuth } from "~/composables/useAuth";
 import { useLightbox } from "~/composables/useLightbox";
 import { useImageUrl } from "~/composables/useImageUrl";
+import { DISCOUNT_REASON_LABELS, type DiscountReason } from "~/composables/useStaffOrders";
 import { EXPENSE_CATEGORY_LABELS, EXPENSE_FIELDS, EXPENSE_METHOD_LABELS, type Expense } from "~/composables/useExpenses";
 import ExpenseForm from "~/components/ExpenseForm.vue";
 import ImageLightbox from "~/components/ImageLightbox.vue";
@@ -239,6 +260,9 @@ interface CashSummary {
   cardCents: number;
   transferCents: number;
   unknownMethodCents: number;
+  discountsCount: number;
+  discountsCents: number;
+  discountsByReason: { reason: DiscountReason; count: number; amountCents: number }[];
   expensesCount: number;
   expensesCashCents: number;
   expensesOtherCents: number;
@@ -257,6 +281,7 @@ interface CashClosing extends CashSummary {
 }
 
 const SUMMARY_FIELDS = `periodStart periodEnd ordersCount totalCents cashCents cardCents transferCents unknownMethodCents
+  discountsCount discountsCents discountsByReason { reason count amountCents }
   expensesCount expensesCashCents expensesOtherCents expensesTotalCents netCents
   balances { method inCents outCents balanceCents }`;
 const CASH_QUERY = gql`

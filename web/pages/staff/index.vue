@@ -144,6 +144,9 @@
               <p v-if="order.packagingCents || (order.takeaway && order.serviceType === 'MESA')" class="muted packaging-note">
                 + Empaque para llevar{{ order.packagingCents ? ` (${formatPrice(order.packagingCents)})` : "" }}
               </p>
+              <p v-if="order.discount" class="muted discount-note">
+                Descuento · {{ discountLabel(order.discount) }}: − {{ formatPrice(order.discount.amountCents) }}
+              </p>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
               <p v-if="order.paidAt" class="paid-badge">Cobrado · {{ paymentLabel(order.paymentMethod) }}</p>
             </div>
@@ -190,7 +193,13 @@
                   {{ label }}
                 </button>
               </div>
-              <button class="button secondary" type="button" @click="payingId = ''">Volver</button>
+              <div class="pay-extra">
+                <button class="button secondary" type="button" :disabled="busyOrderId === order.id" @click="openDiscount(order)">
+                  <Percent :size="16" :stroke-width="1.8" aria-hidden="true" />
+                  {{ order.discount ? "Cambiar descuento" : "Descuento" }}
+                </button>
+                <button class="button secondary" type="button" @click="payingId = ''">Volver</button>
+              </div>
             </div>
             <div v-else class="order-actions">
               <button
@@ -257,6 +266,11 @@
                 order.paidAt ? ` · Cobrado con ${paymentLabel(order.paymentMethod)}` : ""
               }}
             </p>
+            <p v-if="order.discount" class="muted discount-note">
+              Descuento · {{ discountLabel(order.discount) }}: − {{ formatPrice(order.discount.amountCents) }}{{
+                order.discount.staffName ? ` · ${order.discount.staffName}` : ""
+              }}
+            </p>
           </div>
           <span class="status-badge" :class="`status-${order.status}`">{{ statusLabel(order.status) }}</span>
         </div>
@@ -319,14 +333,29 @@
       :busy="!!cashOrder && busyOrderId === cashOrder.id"
       @confirm="payCash"
     />
+    <DiscountDialog
+      ref="discountDialog"
+      :gross-cents="discountOrder ? discountOrder.totalCents + (discountOrder.discount?.amountCents ?? 0) : 0"
+      :busy="!!discountOrder && busyOrderId === discountOrder.id"
+      :error="discountError"
+      @apply="applyDiscount"
+    />
   </main>
 </template>
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, SearchX, UserPlus, X } from "lucide-vue-next";
+import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, Percent, SearchX, UserPlus, X } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
-import { PAYMENT_LABELS, useStaffOrders, type CustomerMatch, type HistoryFilter, type PaymentMethod } from "~/composables/useStaffOrders";
+import {
+  PAYMENT_LABELS,
+  discountLabel,
+  useStaffOrders,
+  type CustomerMatch,
+  type DiscountInput,
+  type HistoryFilter,
+  type PaymentMethod,
+} from "~/composables/useStaffOrders";
 import { primeAudio } from "~/composables/useOrderChime";
 import MenuAdmin from "~/components/MenuAdmin.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
@@ -341,6 +370,7 @@ import SiteSettingsAdmin from "~/components/SiteSettingsAdmin.vue";
 import CustomersAdmin from "~/components/CustomersAdmin.vue";
 import StaffOrderTaker from "~/components/StaffOrderTaker.vue";
 import CashChangeDialog from "~/components/CashChangeDialog.vue";
+import DiscountDialog from "~/components/DiscountDialog.vue";
 import HeroAdmin from "~/components/HeroAdmin.vue";
 import CustomerLookup from "~/components/CustomerLookup.vue";
 import OrderItems from "~/components/OrderItems.vue";
@@ -383,6 +413,7 @@ const {
   cancelOrder,
   assignCustomer,
   markPaid,
+  setDiscount,
   busyOrderId,
   actionError,
   nextStatus,
@@ -446,6 +477,20 @@ function openCash(order: any) {
 async function payCash() {
   if (cashOrder.value) await doPay(cashOrder.value, "EFECTIVO");
   cashDialog.value?.close();
+}
+// Descuento al cobrar: se guarda en el pedido (con motivo) y el importe a cobrar baja al momento.
+const discountDialog = ref<InstanceType<typeof DiscountDialog> | null>(null);
+const discountOrder = ref<any>(null);
+const discountError = ref<string | null>(null);
+function openDiscount(order: any) {
+  discountOrder.value = order;
+  discountError.value = null;
+  discountDialog.value?.open(order.discount);
+}
+async function applyDiscount(discount: DiscountInput | null) {
+  if (!discountOrder.value) return;
+  discountError.value = await setDiscount(discountOrder.value, discount);
+  if (!discountError.value) discountDialog.value?.close();
 }
 function paymentLabel(method: PaymentMethod | null) {
   return method ? PAYMENT_LABELS[method] : "";
@@ -656,6 +701,8 @@ watchEffect(() => {
 .pay-box { display: flex; flex-direction: column; gap: 8px; }
 .pay-methods { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .pay-methods .button { min-height: 44px; }
+.pay-extra { display: flex; gap: 8px; flex-wrap: wrap; }
+.discount-note { color: var(--accent); font-size: 14px; }
 
 @keyframes order-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(154, 210, 208, 0); }

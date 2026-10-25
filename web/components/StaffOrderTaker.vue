@@ -114,8 +114,20 @@
           />
         </li>
         <li v-if="packagingCents" class="ticket-packaging muted"><span>Empaque (para llevar)</span><span>{{ formatPrice(packagingCents) }}</span></li>
-        <li class="ticket-total"><span>Total</span><span>{{ formatPrice(totalCents + packagingCents) }}</span></li>
+        <li v-if="discount" class="ticket-discount">
+          <button type="button" class="link-button" title="Cambiar o quitar el descuento" @click="discountDialog?.open(discount)">
+            Descuento · {{ discountLabel(discount) }}
+          </button>
+          <span>− {{ formatPrice(discountCents) }}</span>
+        </li>
+        <li class="ticket-total"><span>Total</span><span>{{ formatPrice(finalCents) }}</span></li>
       </ul>
+      <p v-if="discountIssue" class="muted" style="color: var(--danger)">{{ discountIssue }}</p>
+      <button v-if="lines.length && !discount" type="button" class="link-button add-discount" @click="discountDialog?.open(null)">
+        <Percent :size="15" :stroke-width="1.8" aria-hidden="true" />
+        Aplicar descuento
+      </button>
+      <DiscountDialog ref="discountDialog" :gross-cents="grossCents" @apply="onDiscount" />
 
       <div class="field">
         <span class="muted">¿Dónde?</span>
@@ -157,7 +169,7 @@
       <p v-if="submitError" class="muted" style="color: var(--danger)">{{ submitError }}</p>
       <!-- Guardar y pagar: ya se sirvio y se cobra en el acto; el pedido no pasa por la cola -->
       <div v-if="choosingPayment" class="pay-box">
-        <span class="muted">Guardar y cobrar {{ formatPrice(totalCents + packagingCents) }} con:</span>
+        <span class="muted">Guardar y cobrar {{ formatPrice(finalCents) }} con:</span>
         <div class="pay-methods">
           <button
             v-for="(label, method) in PAYMENT_LABELS"
@@ -170,7 +182,7 @@
             {{ submitting ? "Guardando…" : label }}
           </button>
         </div>
-        <CashChangeDialog ref="cashDialog" :total-cents="totalCents + packagingCents" :busy="submitting" @confirm="payCash" />
+        <CashChangeDialog ref="cashDialog" :total-cents="finalCents" :busy="submitting" @confirm="payCash" />
         <button class="button secondary" type="button" :disabled="submitting" @click="choosingPayment = false">Volver</button>
       </div>
       <div v-else class="ticket-actions">
@@ -190,23 +202,33 @@
 
     <!-- Resumen fijo: con la lista larga, el ticket queda lejos (en el diseño ancho no hace falta) -->
     <div v-if="cartCount" class="sticky-bar">
-      <span>{{ cartCount }} {{ cartCount === 1 ? "producto" : "productos" }} · {{ formatPrice(totalCents + packagingCents) }}</span>
+      <span>{{ cartCount }} {{ cartCount === 1 ? "producto" : "productos" }} · {{ formatPrice(finalCents) }}</span>
       <button class="button" type="button" @click="ticketEl?.scrollIntoView({ behavior: 'smooth', block: 'start' })">Ver ticket</button>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { Banknote, Receipt, Search, SearchX } from "lucide-vue-next";
+import { Banknote, Percent, Receipt, Search, SearchX } from "lucide-vue-next";
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import { orderLinesInput, useCart } from "~/composables/useCart";
 import { MENU_QUERY, defaultCartOptions, missingModifiers, type MenuCategory, type MenuItem } from "~/composables/useMenu";
 import CashChangeDialog from "~/components/CashChangeDialog.vue";
+import DiscountDialog from "~/components/DiscountDialog.vue";
+import { useStaffAuth } from "~/composables/useAuth";
 import LineOptionsPicker from "~/components/LineOptionsPicker.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
 import { useOrderQueueEnabled, usePackagingFee } from "~/composables/useSiteSettings";
-import { PAYMENT_LABELS, type CustomerMatch, type PaymentMethod } from "~/composables/useStaffOrders";
+import {
+  PAYMENT_LABELS,
+  discountAmount,
+  discountLabel,
+  discountProblem,
+  type CustomerMatch,
+  type DiscountInput,
+  type PaymentMethod,
+} from "~/composables/useStaffOrders";
 import { BAR_TABLE, TABLES } from "~/composables/useTables";
 
 const TOP_MENU_ITEMS = gql`
@@ -309,6 +331,22 @@ const isTakeaway = computed(() => place.value === "LLEVAR" || (!!place.value && 
 const packagingCents = computed(() => (isTakeaway.value ? packagingFee.value : 0));
 const customer = ref<CustomerMatch | null>(null);
 const note = ref("");
+
+// Descuento del ticket: se recalcula si cambian los productos (un 10 % sigue siendo un 10 %) y,
+// si deja de valer (p. ej. un importe fijo mayor que lo que queda), no deja enviar el pedido.
+const { staff } = useStaffAuth();
+const discount = ref<DiscountInput | null>(null);
+const discountDialog = ref<InstanceType<typeof DiscountDialog> | null>(null);
+const grossCents = computed(() => totalCents.value + packagingCents.value);
+const discountCents = computed(() => (discount.value ? discountAmount(discount.value, grossCents.value) : 0));
+const finalCents = computed(() => Math.max(grossCents.value - discountCents.value, 0));
+const discountIssue = computed(() =>
+  discount.value && lines.value.length ? discountProblem(discount.value, grossCents.value, staff.value?.role) : null
+);
+function onDiscount(value: DiscountInput | null) {
+  discount.value = value;
+  discountDialog.value?.close();
+}
 const ticketEl = ref<HTMLElement | null>(null);
 
 const submitting = ref(false);
@@ -318,7 +356,7 @@ const lastPaidWith = ref<PaymentMethod | null>(null);
 const choosingPayment = ref(false);
 
 const canSubmit = computed(
-  () => !submitting.value && lines.value.length > 0 && !!place.value && !missingChoice.value
+  () => !submitting.value && lines.value.length > 0 && !!place.value && !missingChoice.value && !discountIssue.value
 );
 
 function reset() {
@@ -327,6 +365,7 @@ function reset() {
   takeaway.value = false;
   customer.value = null;
   note.value = "";
+  discount.value = null;
   search.value = "";
   choosingPayment.value = false;
 }
@@ -354,6 +393,7 @@ async function submit(paymentMethod: PaymentMethod | null = null) {
         customerId: customer.value?.id ?? null,
         note: note.value.trim() || null,
         paymentMethod,
+        discount: discount.value,
       },
     });
     lastCode.value = res?.data?.createStaffOrder.code ?? "";
@@ -565,6 +605,9 @@ input {
 }
 .qty-value { min-width: 18px; text-align: center; font-variant-numeric: tabular-nums; }
 
+.ticket-lines li.ticket-discount { align-items: baseline; color: var(--accent); }
+.link-button { border: none; background: none; padding: 2px 0; color: var(--accent); font: inherit; font-size: 14px; text-decoration: underline; text-align: left; cursor: pointer; }
+.add-discount { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; }
 .ticket-total { border-top: 1px solid var(--border); padding-top: 6px; font-weight: 700; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 /* Botones grandes: 3 mesas por fila en movil; barra y para llevar ocupan media fila cada uno */

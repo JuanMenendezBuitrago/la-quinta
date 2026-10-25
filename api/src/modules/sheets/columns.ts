@@ -73,6 +73,8 @@ export function sheetColumns(kind: SheetsExportKind): Column[] {
     { title: "Unidades", value: (p) => p.items.reduce((sum, i) => sum + i.quantity, 0) },
     // pesos colombianos sin decimales: en la carta, priceCents son pesos
     { title: "Empaque (COP)", value: (p) => p.packagingCents ?? 0 },
+    { title: "Descuento (COP)", value: (p) => p.discountCents ?? 0 },
+    { title: "Motivo descuento", value: (p) => text(p.discountReason ?? "") },
     { title: "Total (COP)", value: (p) => p.totalCents },
   ];
 }
