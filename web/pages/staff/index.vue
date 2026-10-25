@@ -147,6 +147,16 @@
               <p v-if="order.discount" class="muted discount-note">
                 Descuento · {{ discountLabel(order.discount) }}: − {{ formatPrice(order.discount.amountCents) }}
               </p>
+              <!-- Como en el ticket de tomar pedido: que no se olvide el producto gratis antes de cobrar. -->
+              <div v-if="order.customer?.rewardAvailable && !order.paidAt && order.discount?.reason !== 'CANJE'" class="reward-alert" role="status">
+                <Stamp :size="18" :stroke-width="1.8" aria-hidden="true" />
+                <span>
+                  Tiene un <strong>canje de sellos</strong> disponible<template v-if="order.discount">: para canjearlo, cambia el descuento</template>.
+                </span>
+                <button class="link-button" type="button" :disabled="busyOrderId === order.id" @click="openDiscount(order)">
+                  {{ order.discount ? "Cambiar descuento" : "Aplicar canje" }}
+                </button>
+              </div>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
               <p v-if="order.paidAt" class="paid-badge">Cobrado · {{ paymentLabel(order.paymentMethod) }}</p>
             </div>
@@ -347,7 +357,7 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, Percent, SearchX, UserPlus, X } from "lucide-vue-next";
+import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, Percent, SearchX, Stamp, UserPlus, X } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import {
   PAYMENT_LABELS,
@@ -705,6 +715,21 @@ watchEffect(() => {
 .pay-methods .button { min-height: 44px; }
 .pay-extra { display: flex; gap: 8px; flex-wrap: wrap; }
 .discount-note { color: var(--accent); font-size: 14px; }
+.reward-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--on-accent-soft);
+  font-size: 14px;
+}
+.reward-alert svg { flex-shrink: 0; color: var(--accent); }
+.reward-alert .link-button { border: none; background: none; padding: 2px 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
 
 @keyframes order-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(154, 210, 208, 0); }

@@ -93,6 +93,22 @@
       <div v-if="customer" class="ticket-customer">
         <UserAvatar :avatar="customer.avatar" :name="customer.name" :size="56" />
         <strong>{{ customer.name }}</strong>
+        <!-- Que no se olvide ofrecerle el producto gratis: hasta que se aplique el canje. -->
+        <div v-if="customer.rewardAvailable && discount?.reason !== 'CANJE'" class="reward-alert" role="status">
+          <Stamp :size="18" :stroke-width="1.8" aria-hidden="true" />
+          <span>
+            Tiene un <strong>canje de sellos</strong> disponible: un producto gratis.
+            <template v-if="discount">Para canjearlo, cambia el descuento del ticket.</template>
+          </span>
+          <button
+            v-if="lines.length"
+            type="button"
+            class="link-button"
+            @click="discountDialog?.open(discountForApi)"
+          >
+            {{ discount ? "Cambiar descuento" : "Aplicar canje" }}
+          </button>
+        </div>
       </div>
       <h3>Ticket</h3>
       <EmptyState v-if="!lines.length" :icon="Receipt" title="El ticket está vacío">Añade productos de la carta.</EmptyState>
@@ -209,7 +225,7 @@
 </template>
 
 <script setup lang="ts">
-import { Banknote, Percent, Receipt, Search, SearchX } from "lucide-vue-next";
+import { Banknote, Percent, Receipt, Search, SearchX, Stamp } from "lucide-vue-next";
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import { orderLinesInput, useCart } from "~/composables/useCart";
@@ -640,6 +656,23 @@ input {
 .places button.active { background: var(--accent); color: var(--bg); }
 .ticket-customer { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 .ticket-customer strong { font-size: 17px; overflow-wrap: anywhere; }
+.reward-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 8px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--on-accent-soft);
+  font-size: 14px;
+}
+.reward-alert strong { font-size: inherit; }
+.reward-alert svg { flex-shrink: 0; color: var(--accent); }
 .takeaway-check { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 15px; font-weight: 600; cursor: pointer; align-self: flex-start; }
 .takeaway-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
 .customer-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
