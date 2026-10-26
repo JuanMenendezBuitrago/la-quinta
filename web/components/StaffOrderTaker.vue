@@ -5,7 +5,12 @@
     <p v-if="lastCode" class="card sent-notice" role="status">
       Pedido <strong class="code">{{ lastCode }}</strong>
       {{ lastPaidWith ? `guardado y cobrado (${PAYMENT_LABELS[lastPaidWith].toLowerCase()}).` : "enviado a la cola." }}
+      <button v-if="ticketPrintingEnabled && lastOrder" class="button" type="button" @click="printLastTicket">
+        <Printer :size="16" :stroke-width="1.8" aria-hidden="true" />
+        Imprimir ticket
+      </button>
       <button class="button secondary" type="button" @click="lastCode = ''">Cerrar</button>
+      <span v-if="printNotice" class="print-notice" role="alert">{{ printNotice }}</span>
     </p>
 
     <!-- Carta: mismos datos que la carta publica, en formato compacto para teclear rapido -->
@@ -221,7 +226,8 @@
 </template>
 
 <script setup lang="ts">
-import { Banknote, Percent, Receipt, Search, SearchX, Stamp } from "lucide-vue-next";
+import { Banknote, Percent, Printer, Receipt, Search, SearchX, Stamp } from "lucide-vue-next";
+import { useTicketPrinter } from "~/composables/useTicketPrinter";
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import { orderLinesInput, useCart } from "~/composables/useCart";
@@ -233,6 +239,7 @@ import LineOptionsPicker from "~/components/LineOptionsPicker.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
 import { useOrderQueueEnabled, usePackagingFee } from "~/composables/useSiteSettings";
 import {
+  ORDER_FIELDS,
   PAYMENT_LABELS,
   discountAmount,
   discountLabel,
@@ -258,8 +265,7 @@ const SHORTCUT_COUNT = 5;
 const CREATE_STAFF_ORDER = gql`
   mutation CreateStaffOrder($input: StaffOrderInput!) {
     createStaffOrder(input: $input) {
-      id
-      code
+      ${ORDER_FIELDS}
     }
   }
 `;
@@ -393,6 +399,13 @@ const submitting = ref(false);
 const submitError = ref("");
 const lastCode = ref("");
 const lastPaidWith = ref<PaymentMethod | null>(null);
+// El ultimo pedido guardado, para imprimir su ticket desde el aviso (sin pasar por la cola).
+const lastOrder = ref<any>(null);
+const { enabled: ticketPrintingEnabled, printTicket } = useTicketPrinter();
+const printNotice = ref("");
+async function printLastTicket() {
+  if (lastOrder.value) printNotice.value = (await printTicket(lastOrder.value)) ?? "";
+}
 const choosingPayment = ref(false);
 
 const canSubmit = computed(
@@ -442,6 +455,8 @@ async function submit(paymentMethod: PaymentMethod | null = null, cashReceivedCe
       },
     });
     lastCode.value = res?.data?.createStaffOrder.code ?? "";
+    lastOrder.value = res?.data?.createStaffOrder ?? null;
+    printNotice.value = "";
     lastPaidWith.value = paymentMethod;
     reset();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -474,7 +489,8 @@ input {
 }
 .code { font-family: ui-monospace, monospace; font-weight: 700; letter-spacing: 0.06em; color: var(--accent); }
 
-.sent-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; border-color: var(--accent); }
+.sent-notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; border-color: var(--accent); }
+.print-notice { flex-basis: 100%; color: var(--danger); font-size: 14px; }
 
 .search { display: none; margin-bottom: 10px; }
 .shortcuts { display: flex; gap: 6px; overflow-x: auto; padding: 6px 6px 8px 0; margin-bottom: 4px; }

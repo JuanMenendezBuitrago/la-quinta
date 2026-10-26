@@ -25,6 +25,15 @@
       </div>
 
       <div class="field">
+        <span class="muted">Tickets</span>
+        <label class="day-toggle">
+          <input v-model="form.ticketPrintingEnabled" type="checkbox" />
+          <span>Imprimir tickets en la impresora térmica</span>
+        </label>
+        <span class="muted">Añade «Imprimir ticket» a los pedidos de la cola y del historial. Imprime desde la tablet Android con la app RawBT instalada y configurada con la IP de la impresora (puerto 9100).</span>
+      </div>
+
+      <div class="field">
         <span class="muted">Personal</span>
         <label class="day-toggle">
           <input v-model="form.showInactiveStaff" type="checkbox" />
@@ -167,6 +176,7 @@ function emptyForm() {
     orderQueueEnabled: true,
     showInactiveStaff: true,
     packagingFeeCents: 0 as number | "",
+    ticketPrintingEnabled: false,
   };
 }
 
@@ -194,6 +204,7 @@ watch(
       orderQueueEnabled: val.orderQueueEnabled,
       showInactiveStaff: val.showInactiveStaff,
       packagingFeeCents: val.packagingFeeCents,
+      ticketPrintingEnabled: val.ticketPrintingEnabled,
     });
   },
   { immediate: true }
@@ -230,6 +241,7 @@ async function submit() {
         orderQueueEnabled: form.orderQueueEnabled,
         showInactiveStaff: form.showInactiveStaff,
         packagingFeeCents: Math.round(Number(form.packagingFeeCents) || 0),
+        ticketPrintingEnabled: form.ticketPrintingEnabled,
       },
     });
     await refetch();

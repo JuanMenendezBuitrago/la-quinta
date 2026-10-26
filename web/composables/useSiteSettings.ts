@@ -29,6 +29,7 @@ export const SITE_SETTINGS_QUERY = gql`
       orderQueueEnabled
       showInactiveStaff
       packagingFeeCents
+      ticketPrintingEnabled
     }
   }
 `;
@@ -60,6 +61,7 @@ export const UPDATE_SITE_SETTINGS = gql`
       orderQueueEnabled
       showInactiveStaff
       packagingFeeCents
+      ticketPrintingEnabled
     }
   }
 `;
@@ -100,6 +102,8 @@ export interface SiteSettings {
   showInactiveStaff: boolean;
   /** Recargo por empaque de cada pedido para llevar (pesos). 0 = sin recargo. */
   packagingFeeCents: number;
+  /** Boton "Imprimir ticket" del panel (impresora termica por RawBT en la tablet Android). */
+  ticketPrintingEnabled: boolean;
 }
 
 /**

@@ -36,6 +36,8 @@ export interface SiteSettingsDoc {
   showInactiveStaff: boolean;
   // Recargo fijo por pedido para llevar (personal "Para llevar" y web de recogida), en pesos. 0 = sin recargo.
   packagingFeeCents: number;
+  // Boton "Imprimir ticket" del panel (impresora termica por RawBT en la tablet Android).
+  ticketPrintingEnabled: boolean;
 }
 
 // Documento unico (singleton): siempre se lee/escribe con un findOneAndUpdate sin filtro,
@@ -61,6 +63,7 @@ const siteSettingsSchema = new Schema<SiteSettingsDoc>({
   orderQueueEnabled: { type: Boolean, default: true },
   showInactiveStaff: { type: Boolean, default: true },
   packagingFeeCents: { type: Number, default: DEFAULT_PACKAGING_FEE_CENTS, min: 0 },
+  ticketPrintingEnabled: { type: Boolean, default: false },
 });
 
 export const SiteSettings = model<SiteSettingsDoc>("SiteSettings", siteSettingsSchema);

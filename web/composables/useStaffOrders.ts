@@ -115,8 +115,9 @@ export interface CustomerMatch {
   rewardAvailable?: boolean;
 }
 
-// Campos compartidos por la cola en vivo y el historial: mismo tipo `Order` en ambos casos.
-const ORDER_FIELDS = `
+// Campos compartidos por la cola en vivo y el historial (y lo que devuelve "Tomar pedido", para
+// imprimir su ticket): mismo tipo `Order` en todos los casos.
+export const ORDER_FIELDS = `
   id
   code
   statusHistory {
@@ -145,6 +146,7 @@ const ORDER_FIELDS = `
   }
   takeaway
   pickupSlot
+  createdAt
   updatedAt
   paidAt
   paymentMethod
@@ -156,14 +158,17 @@ const ORDER_FIELDS = `
     customerCode
     avatar
     rewardAvailable
+    stampsBalance
   }
   items {
     name
     priceCents
     quantity
     options {
+      groupName
       name
       isDefault
+      priceDeltaCents
     }
   }
 `;

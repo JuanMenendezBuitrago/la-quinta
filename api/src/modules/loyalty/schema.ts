@@ -16,6 +16,8 @@ export const loyaltyTypeDefs = /* GraphQL */ `
   extend type Customer {
     """Si tiene sellos para canjear la recompensa (p. ej. como descuento "Canje de sellos" del pedido)."""
     rewardAvailable: Boolean!
+    """Sellos que tiene ahora (para el ticket impreso)."""
+    stampsBalance: Int!
   }
 
   extend type CustomerMatch {

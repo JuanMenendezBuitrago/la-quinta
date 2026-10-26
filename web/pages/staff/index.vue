@@ -73,6 +73,12 @@
         </span>
       </p>
 
+      <!-- Imprimir ticket desde un dispositivo sin RawBT (cola o historial) -->
+      <p v-if="printNotice && (activeTab === 'cola' || activeTab === 'historial')" class="action-error" role="alert">
+        {{ printNotice }}
+        <button class="button secondary" type="button" @click="printNotice = ''">Cerrar</button>
+      </p>
+
       <!-- Cola -->
       <p v-if="activeTab === 'cola' && actionError" class="action-error" role="alert">
         {{ actionError }}
@@ -234,6 +240,10 @@
                 <Check v-if="order.status === 'EN_PREPARACION' || order.status === 'LISTO'" :size="16" :stroke-width="2" aria-hidden="true" />
                 {{ nextStatusLabel(order) }}
               </button>
+              <button v-if="ticketPrintingEnabled" class="button secondary" type="button" @click="printOrderTicket(order)">
+                <Printer :size="16" :stroke-width="1.8" aria-hidden="true" />
+                Imprimir ticket
+              </button>
               <button
                 class="button secondary cancel"
                 type="button"
@@ -287,6 +297,15 @@
                 order.discount.staffName ? ` · ${order.discount.staffName}` : ""
               }}
             </p>
+            <button
+              v-if="ticketPrintingEnabled && order.status !== 'CANCELADO'"
+              class="button secondary history-print"
+              type="button"
+              @click="printOrderTicket(order)"
+            >
+              <Printer :size="16" :stroke-width="1.8" aria-hidden="true" />
+              Imprimir ticket
+            </button>
           </div>
           <span class="status-badge" :class="`status-${order.status}`">{{ statusLabel(order.status) }}</span>
         </div>
@@ -367,7 +386,7 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, Percent, SearchX, Stamp, UserPlus, X } from "lucide-vue-next";
+import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, Percent, Printer, SearchX, Stamp, UserPlus, X } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import {
   PAYMENT_LABELS,
@@ -380,6 +399,7 @@ import {
   type PaymentMethod,
 } from "~/composables/useStaffOrders";
 import { primeAudio } from "~/composables/useOrderChime";
+import { useTicketPrinter } from "~/composables/useTicketPrinter";
 import MenuAdmin from "~/components/MenuAdmin.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
 import StaffLogin from "~/components/StaffLogin.vue";
@@ -491,6 +511,12 @@ async function doPay(order: any, method: PaymentMethod, cashReceivedCents: numbe
     ? await markPaid(order, method, cashReceivedCents)
     : await deliverAndPay(order, method, cashReceivedCents);
   if (done) payingId.value = "";
+}
+// Ticket en la impresora termica (RawBT), si esta activado en Configuración.
+const { enabled: ticketPrintingEnabled, printTicket } = useTicketPrinter();
+const printNotice = ref("");
+async function printOrderTicket(order: any) {
+  printNotice.value = (await printTicket(order)) ?? "";
 }
 // Efectivo: el modal calcula el cambio antes de registrar el cobro.
 const cashDialog = ref<InstanceType<typeof CashChangeDialog> | null>(null);
@@ -728,6 +754,7 @@ watchEffect(() => {
 .pay-methods .button { min-height: 44px; }
 .pay-extra { display: flex; gap: 8px; flex-wrap: wrap; }
 .discount-note { color: var(--accent); font-size: 14px; }
+.history-print { align-self: flex-start; margin-top: 4px; }
 .reward-alert {
   display: flex;
   flex-wrap: wrap;

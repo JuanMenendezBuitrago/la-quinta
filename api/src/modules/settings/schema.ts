@@ -57,6 +57,9 @@ export const settingsTypeDefs = /* GraphQL */ `
     """Recargo por empaque (pesos) que se suma una vez a cada pedido para llevar: los "Para llevar"
     del personal y los de recogida de la web (no los de mesa o barra). 0 = sin recargo."""
     packagingFeeCents: Int!
+    """Boton "Imprimir ticket" en el panel: imprime en la impresora termica a traves de RawBT
+    (app Android de la tablet, que tiene configurada la impresora)."""
+    ticketPrintingEnabled: Boolean!
   }
 
   input SiteSettingsInput {
@@ -77,6 +80,7 @@ export const settingsTypeDefs = /* GraphQL */ `
     orderQueueEnabled: Boolean
     showInactiveStaff: Boolean
     packagingFeeCents: Int
+    ticketPrintingEnabled: Boolean
   }
 
   extend type Query {

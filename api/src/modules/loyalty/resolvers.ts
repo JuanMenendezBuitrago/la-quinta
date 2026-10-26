@@ -24,6 +24,7 @@ export const loyaltyResolvers = {
   // Customer llega como documento de User (_id); CustomerMatch, ya con id en texto.
   Customer: {
     rewardAvailable: async (c: any) => (await stampsBalance(String(c._id))) >= LOYALTY_RULES.rewardThresholdStamps,
+    stampsBalance: (c: any) => stampsBalance(String(c._id)),
   },
   CustomerMatch: {
     rewardAvailable: async (c: any) => (await stampsBalance(c.id)) >= LOYALTY_RULES.rewardThresholdStamps,

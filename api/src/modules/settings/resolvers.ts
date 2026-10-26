@@ -45,6 +45,7 @@ export const settingsResolvers = {
     orderQueueEnabled: (doc: any) => doc.orderQueueEnabled !== false,
     showInactiveStaff: (doc: any) => doc.showInactiveStaff !== false,
     packagingFeeCents: (doc: any) => doc.packagingFeeCents ?? DEFAULT_PACKAGING_FEE_CENTS,
+    ticketPrintingEnabled: (doc: any) => !!doc.ticketPrintingEnabled,
   },
   Mutation: {
     updateSiteSettings: async (_: unknown, args: { input: Record<string, unknown> }, ctx: GraphQLContext) => {
@@ -71,7 +72,10 @@ export const settingsResolvers = {
       const update: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(args.input)) {
         // null en un booleano no significa "borrar": se ignora como si no viniera.
-        if ((key === "staffOnlyOrders" || key === "orderQueueEnabled" || key === "showInactiveStaff" || key === "packagingFeeCents") && value === null) continue;
+        if (
+          (key === "staffOnlyOrders" || key === "orderQueueEnabled" || key === "showInactiveStaff" || key === "packagingFeeCents" || key === "ticketPrintingEnabled") &&
+          value === null
+        ) continue;
         if (value !== undefined) update[key] = value;
       }
       return SiteSettings.findOneAndUpdate({}, update, {
