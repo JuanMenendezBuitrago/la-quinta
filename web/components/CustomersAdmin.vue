@@ -216,7 +216,7 @@ const STATUS_LABELS: Record<string, string> = {
   ENTREGADO: "Entregado",
   CANCELADO: "Cancelado",
 };
-const REASON_LABELS: Record<string, string> = { pedido: "Pedido", canje: "Canje", ajuste: "Ajuste" };
+const REASON_LABELS: Record<string, string> = { pedido: "Pedido", canje: "Canje", ajuste: "Ajuste", foto: "Foto aprobada" };
 
 const { formatDateTime } = useStoreTime();
 function formatDate(iso: string) {

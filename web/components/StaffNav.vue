@@ -125,6 +125,7 @@ import {
   Settings,
   SquarePen,
   Users,
+  Camera,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 import { useStaffAuth } from "~/composables/useAuth";
@@ -159,6 +160,7 @@ const ENTRY_ICONS: Record<Entry["id"], Component> = {
   clientes: Users,
   personal: IdCard,
   carta: BookOpen,
+  fotos: Camera,
   cafe: Coffee,
   portada: ImageIcon,
   novedades: Megaphone,

@@ -79,6 +79,7 @@
 </template>
 
 <script setup lang="ts">
+import { shrinkImage } from "~/composables/useImageResize";
 import { gql } from "graphql-tag";
 import { Camera, Check, X } from "lucide-vue-next";
 import { useImageUrl } from "~/composables/useImageUrl";
@@ -152,25 +153,6 @@ async function save() {
   }
 }
 
-/** Lado mayor del recibo: legible y ligero. Al redibujarla se pierden los EXIF (ubicacion, etc.). */
-const RECEIPT_MAX_SIDE = 1600;
-async function shrink(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-  const scale = Math.min(1, RECEIPT_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("No se pudo procesar la imagen");
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
-  if (!blob) throw new Error("No se pudo procesar la imagen");
-  return blob;
-}
-
 async function uploadReceipt(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -179,7 +161,8 @@ async function uploadReceipt(event: Event) {
   error.value = "";
   try {
     const body = new FormData();
-    body.append("file", await shrink(file), "recibo.jpg");
+    // Lado mayor 1600 px: legible y ligero, y sin los EXIF (ubicacion, etc.).
+    body.append("file", await shrinkImage(file), "recibo.jpg");
     const uploadsBase = String(config.public.graphqlHttp).replace(/\/graphql\/?$/, "");
     const res = await fetch(`${uploadsBase}/uploads/receipt`, {
       method: "POST",

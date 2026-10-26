@@ -82,7 +82,39 @@
                   <Star :size="14" :stroke-width="1.8" aria-hidden="true" />
                   ¿Qué tal tu pedido? Valóralo
                 </button>
+                <!-- Fotos de lo que pidio: hasta 30 dias despues de la entrega (lo comprueba la API) -->
+                <ProductPhotoUpload
+                  v-if="photoOrderId === order.id"
+                  :order-id="order.id"
+                  :items="order.items"
+                  @sent="onPhotoSent"
+                  @cancel="photoOrderId = ''"
+                />
+                <button v-else-if="canSendPhotos(order)" type="button" class="link-button rate photo-link" @click="photoOrderId = order.id">
+                  <Camera :size="14" :stroke-width="1.8" aria-hidden="true" />
+                  Envíanos una foto de tu pedido
+                </button>
               </div>
+            </div>
+          </section>
+
+          <!-- Fotos enviadas: su estado y, si se quiere, retirarlas -->
+          <section v-if="myPhotos.length" style="order: 5" class="photos-section">
+            <p class="eyebrow">Mis fotos</p>
+            <p v-if="photoNotice" class="muted photo-notice" role="status">{{ photoNotice }}</p>
+            <div class="my-photos">
+              <figure v-for="p in myPhotos" :key="p.id" class="my-photo">
+                <img v-if="p.url" :src="resolveImageUrl(p.url) ?? ''" :alt="`Tu foto de ${p.menuItemName}`" />
+                <div v-else class="my-photo-gone" aria-hidden="true"><Camera :size="20" :stroke-width="1.6" /></div>
+                <figcaption>
+                  <strong>{{ p.menuItemName }}</strong>
+                  <span class="photo-status" :data-status="p.status">{{ PHOTO_STATUS_LABELS[p.status] }}</span>
+                  <span v-if="p.rejectReason" class="muted">{{ p.rejectReason }}</span>
+                  <button type="button" class="link-button" :disabled="withdrawingId === p.id" @click="withdrawPhoto(p.id)">
+                    {{ p.status === "RECHAZADA" ? "Quitar" : "Retirar" }}
+                  </button>
+                </figcaption>
+              </figure>
             </div>
           </section>
 
@@ -150,8 +182,9 @@ import UserAvatar from "~/components/UserAvatar.vue";
 import AvatarPicker from "~/components/AvatarPicker.vue";
 import FavoritesList from "~/components/FavoritesList.vue";
 import ReviewForm, { type MyReview } from "~/components/ReviewForm.vue";
+import ProductPhotoUpload from "~/components/ProductPhotoUpload.vue";
 import StarRating from "~/components/StarRating.vue";
-import { ShoppingBag, Star } from "lucide-vue-next";
+import { Camera, ShoppingBag, Star } from "lucide-vue-next";
 import { useImageUrl } from "~/composables/useImageUrl";
 import { tableLabel } from "~/composables/useTables";
 
@@ -172,8 +205,10 @@ const ORDERS_QUERY = gql`
       code
       status
       pickupSlot
+      deliveredAt
       table
       items {
+        menuItemId
         name
         quantity
         imageUrl
@@ -229,6 +264,60 @@ const editingOrderId = ref("");
 function onReviewSaved(review: MyReview) {
   localReviews.value = [...myReviews.value.filter((r) => r.id !== review.id), review];
   editingOrderId.value = "";
+}
+
+// --- Fotos de clientes: se envian desde cada pedido entregado y las revisa el local ---
+const MY_PHOTOS = gql`
+  query MyProductPhotos {
+    myProductPhotos {
+      id
+      url
+      menuItemName
+      orderCode
+      status
+      rejectReason
+      createdAt
+    }
+  }
+`;
+const WITHDRAW_PHOTO = gql`
+  mutation WithdrawProductPhoto($id: ID!) {
+    withdrawProductPhoto(id: $id)
+  }
+`;
+type PhotoStatus = "PENDIENTE" | "APROBADA" | "RECHAZADA";
+const PHOTO_STATUS_LABELS: Record<PhotoStatus, string> = {
+  PENDIENTE: "Pendiente de revisar",
+  APROBADA: "Publicada en la carta",
+  RECHAZADA: "No publicada",
+};
+const PHOTO_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // como PHOTO_ORDER_MAX_AGE_DAYS en la API
+const { result: photosResult, refetch: refetchPhotos } = useQuery<{
+  myProductPhotos: { id: string; url: string | null; menuItemName: string; status: PhotoStatus; rejectReason: string | null }[];
+}>(MY_PHOTOS, null, () => ({ enabled: !!customer.value }));
+const myPhotos = computed(() => photosResult.value?.myProductPhotos ?? []);
+const photoOrderId = ref("");
+const photoNotice = ref("");
+const withdrawingId = ref("");
+function canSendPhotos(order: any) {
+  const delivered = order.deliveredAt ? new Date(order.deliveredAt).getTime() : 0;
+  return !!delivered && Date.now() - delivered < PHOTO_MAX_AGE_MS;
+}
+async function onPhotoSent() {
+  photoOrderId.value = "";
+  photoNotice.value = "¡Gracias! La revisaremos pronto; si la publicamos, te sumamos un sello.";
+  await refetchPhotos();
+}
+async function withdrawPhoto(id: string) {
+  withdrawingId.value = id;
+  try {
+    const { mutate } = useMutation(WITHDRAW_PHOTO);
+    await mutate({ id });
+    photoNotice.value = "";
+    await refetchPhotos();
+  } finally {
+    withdrawingId.value = "";
+  }
 }
 
 const loyalty = computed(() => loyaltyResult.value?.myLoyaltyStatus);
@@ -342,6 +431,16 @@ function statusLabel(status: string) {
   cursor: pointer;
 }
 .link-button.rate { display: inline-flex; align-items: center; gap: 6px; }
+.link-button.photo-link { display: flex; margin-top: 6px; }
+.photos-section .photo-notice { margin: 0 0 10px; color: var(--accent); }
+.my-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.my-photo { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.my-photo img, .my-photo-gone { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: var(--surface-alt); }
+.my-photo-gone { display: grid; place-items: center; color: var(--text-muted); }
+.my-photo figcaption { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: 13px; }
+.photo-status { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.photo-status[data-status="APROBADA"] { color: var(--accent); }
+.photo-status[data-status="RECHAZADA"] { color: var(--danger); }
 .review-intro { margin: 0 0 10px; }
 .order-thumbs { display: flex; gap: 6px; flex-shrink: 0; }
 .order-thumb {

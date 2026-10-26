@@ -352,6 +352,11 @@
         <ReviewsAdmin />
       </section>
 
+      <!-- Fotos de clientes: moderacion (solo gestion) -->
+      <section v-else-if="activeTab === 'fotos'">
+        <PhotosModeration />
+      </section>
+
       <!-- Cierre de caja (barra y gestion) -->
       <section v-else-if="activeTab === 'caja'">
         <CashClosingAdmin />
@@ -386,6 +391,7 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
+import { gql } from "graphql-tag";
 import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, Percent, Printer, SearchX, Stamp, UserPlus, X } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import {
@@ -406,6 +412,7 @@ import StaffLogin from "~/components/StaffLogin.vue";
 import StaffActingPicker from "~/components/StaffActingPicker.vue";
 import CashClosingAdmin from "~/components/CashClosingAdmin.vue";
 import ReviewsAdmin from "~/components/ReviewsAdmin.vue";
+import PhotosModeration from "~/components/PhotosModeration.vue";
 import CoffeeAdmin from "~/components/CoffeeAdmin.vue";
 import StaffAdmin from "~/components/StaffAdmin.vue";
 import NewsletterAdmin from "~/components/NewsletterAdmin.vue";
@@ -420,7 +427,7 @@ import OrderItems from "~/components/OrderItems.vue";
 import HistoryFilters from "~/components/HistoryFilters.vue";
 import InventoryAdmin from "~/components/InventoryAdmin.vue";
 import { formatQty, useInventoryAlerts } from "~/composables/useInventory";
-import { goToSection, STAFF_SECTIONS, useStaffBadges, useStaffSection } from "~/composables/useStaffSections";
+import { goToSection, STAFF_SECTIONS, usePendingPhotosCount, useStaffBadges, useStaffSection } from "~/composables/useStaffSections";
 
 const { staff } = useStaffAuth();
 // Si la sesion ya estaba abierta (se restaura sola con la cookie, sin pasar por doLogin()),
@@ -576,12 +583,24 @@ watch(
   { immediate: true }
 );
 
-// Contadores del menu: pedidos en cola e insumos bajo minimo.
+// Fotos de clientes pendientes de moderar (solo gestion las modera): se vuelve a mirar cada minuto.
+const pendingPhotos = usePendingPhotosCount();
+const { result: pendingPhotosResult } = useQuery<{ pendingProductPhotosCount: number }>(
+  gql`query PendingProductPhotosCount { pendingProductPhotosCount }`,
+  null,
+  () => ({ enabled: staff.value?.role === "gestion", pollInterval: 60_000 })
+);
+watch(pendingPhotosResult, (r) => {
+  if (r) pendingPhotos.value = r.pendingProductPhotosCount;
+});
+
+// Contadores del menu: pedidos en cola, insumos bajo minimo y fotos por moderar.
 const badges = useStaffBadges();
 watchEffect(() => {
   badges.value = {
     cola: groupedQueue.value.reduce((sum: number, g: { orders: unknown[] }) => sum + g.orders.length, 0),
     inventario: lowCount.value,
+    fotos: pendingPhotos.value,
   };
 });
 </script>

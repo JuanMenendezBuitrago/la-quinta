@@ -1,6 +1,7 @@
 import { Schema, model, Types } from "mongoose";
 
-export type LoyaltyReason = "pedido" | "canje" | "ajuste";
+// foto: el sello por una foto de cliente aprobada (ver loyalty/redemption.ts, awardPhotoStamp).
+export type LoyaltyReason = "pedido" | "canje" | "ajuste" | "foto";
 
 export interface LoyaltyTransactionDoc {
   _id: Types.ObjectId;
@@ -20,7 +21,7 @@ export interface LoyaltyTransactionDoc {
 const loyaltyTransactionSchema = new Schema<LoyaltyTransactionDoc>({
   customerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
   stamps: { type: Number, required: true },
-  reason: { type: String, enum: ["pedido", "canje", "ajuste"], required: true },
+  reason: { type: String, enum: ["pedido", "canje", "ajuste", "foto"], required: true },
   orderId: { type: Schema.Types.ObjectId, ref: "Order" },
   staffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
   note: { type: String, trim: true, maxlength: 200 },
@@ -38,4 +39,5 @@ export const LoyaltyTransaction = model<LoyaltyTransactionDoc>(
 export const LOYALTY_RULES = {
   stampsPerUnit: 1,
   rewardThresholdStamps: 10, // a partir de 10 sellos, hay recompensa disponible
+  stampsPerApprovedPhoto: 1, // por foto de cliente aprobada (una vez por producto y pedido)
 };

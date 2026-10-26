@@ -17,3 +17,7 @@ google-sa.json
 
 # Imagenes generadas para la carta (pesadas, no van al repositorio)
 api/generated-images/
+
+# Archivos subidos (fotos de la carta, avatares, recibos, fotos de clientes): datos, no codigo.
+# En produccion viven en el volumen api-uploads (docker-compose.yml).
+api/uploads/

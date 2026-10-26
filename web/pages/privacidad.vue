@@ -32,6 +32,10 @@
         <li>Tu avatar, si eliges uno: una de nuestras ilustraciones o una foto que subas tú (opcional).</li>
         <li>Los productos de la carta que marques como favoritos.</li>
         <li>Las opiniones que nos dejes (estrellas y comentario): solo las lee el equipo del local.</li>
+        <li>
+          Las fotos que nos envíes de tus pedidos (opcional), con tu autorización para publicarlas. Las
+          reducimos en tu móvil antes de enviarlas, lo que borra sus datos de ubicación.
+        </li>
       </ul>
       <p>No pedimos datos sensibles ni datos de pago: los pedidos se pagan en el local.</p>
     </section>
@@ -42,6 +46,11 @@
         <li>Crear y mantener tu cuenta, y enviarte el código para iniciar sesión.</li>
         <li>Recibir, preparar y entregarte tus pedidos, y avisarte de su estado.</li>
         <li>Gestionar tu tarjeta de sellos y tus recompensas.</li>
+        <li>
+          Si nos envías fotos de tus pedidos y las aprobamos, mostrarlas en nuestra carta con tu nombre y
+          la inicial de tu apellido. Puedes retirarlas cuando quieras desde «Mi cuenta». Si suprimes tu
+          cuenta, las ya publicadas siguen en la carta sin tu nombre y las demás se borran.
+        </li>
         <li>Llevar la contabilidad del local y cumplir nuestras obligaciones legales.</li>
         <li>Atender tus consultas y reclamos sobre tus datos.</li>
         <li>

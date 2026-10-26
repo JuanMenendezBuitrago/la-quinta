@@ -8,6 +8,16 @@ import { Types } from "mongoose";
 import { StaffUser, User } from "../users/model";
 import { AVATAR_UPLOAD_PREFIX, removeAvatarFile } from "../users/avatar";
 import { RECEIPT_UPLOAD_PREFIX } from "../expenses/model";
+import { Order } from "../orders/model";
+import {
+  CustomerPhoto,
+  MAX_PENDING_PHOTOS,
+  PHOTO_CONSENT_VERSION,
+  PHOTO_ORDER_MAX_AGE_DAYS,
+  PHOTO_UPLOAD_PREFIX,
+  PHOTOS_PER_ORDER_ITEM,
+  removePhotoFile,
+} from "../photos/model";
 
 export const UPLOAD_DIR = path.join(__dirname, "../../../uploads");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -15,6 +25,8 @@ const AVATAR_DIR = path.join(UPLOAD_DIR, "avatars");
 fs.mkdirSync(AVATAR_DIR, { recursive: true });
 const RECEIPT_DIR = path.join(UPLOAD_DIR, "receipts");
 fs.mkdirSync(RECEIPT_DIR, { recursive: true });
+const PHOTO_DIR = path.join(UPLOAD_DIR, "photos");
+fs.mkdirSync(PHOTO_DIR, { recursive: true });
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -198,5 +210,95 @@ uploadsRouter.post("/receipt", (req, res) => {
       return;
     }
     res.json({ url: `${RECEIPT_UPLOAD_PREFIX}${req.file.filename}` });
+  });
+});
+
+/**
+ * Foto de un cliente de un producto de su pedido (ver modules/photos). Como /avatar, el propio
+ * endpoint crea el registro (pendiente de moderar): asi nadie puede asociar a un pedido el
+ * archivo de otro. La web ya la reescala a 1600 px y la vuelve a codificar, lo que quita el EXIF
+ * (ubicacion GPS...). Campos: orderId, menuItemId y consent=true (autoriza publicarla).
+ */
+const PHOTO_MAX_FILE_SIZE = 2 * 1024 * 1024;
+const photoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, PHOTO_DIR),
+    filename: (_req, file, cb) => cb(null, `${crypto.randomUUID()}${AVATAR_MIME_EXTENSIONS[file.mimetype]}`),
+  }),
+  limits: { fileSize: PHOTO_MAX_FILE_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (!AVATAR_MIME_EXTENSIONS[file.mimetype]) {
+      cb(new Error("Formato de imagen no soportado (usa JPG, PNG o WEBP)"));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+/** Por que no se puede enviar esa foto (o null): pedido suyo, entregado y reciente, con ese producto. */
+async function photoProblem(customerId: string, orderId: unknown, menuItemId: unknown, consent: unknown) {
+  if (consent !== "true") return "Para enviar la foto tienes que autorizar que la publiquemos";
+  if (typeof orderId !== "string" || !Types.ObjectId.isValid(orderId)) return "Pedido no valido";
+  if (typeof menuItemId !== "string" || !Types.ObjectId.isValid(menuItemId)) return "Producto no valido";
+  const order = await Order.findOne({ _id: orderId, customerId }).select("status deliveredAt updatedAt items").lean();
+  if (!order) return "Pedido no encontrado";
+  if (order.status !== "ENTREGADO") return "Solo se pueden enviar fotos de pedidos entregados";
+  const deliveredAt = order.deliveredAt ?? order.updatedAt;
+  if (Date.now() - new Date(deliveredAt).getTime() > PHOTO_ORDER_MAX_AGE_DAYS * 24 * 60 * 60 * 1000) {
+    return `Solo se pueden enviar fotos de pedidos de los ultimos ${PHOTO_ORDER_MAX_AGE_DAYS} dias`;
+  }
+  const line = order.items.find((i) => i.menuItemId.toString() === menuItemId);
+  if (!line) return "Ese producto no estaba en el pedido";
+  const [sameItem, pending] = await Promise.all([
+    CustomerPhoto.countDocuments({ customerId, orderId, menuItemId }),
+    CustomerPhoto.countDocuments({ customerId, status: "PENDIENTE" }),
+  ]);
+  if (sameItem >= PHOTOS_PER_ORDER_ITEM) return `Ya enviaste ${PHOTOS_PER_ORDER_ITEM} fotos de este producto en este pedido`;
+  if (pending >= MAX_PENDING_PHOTOS) return `Tienes ${MAX_PENDING_PHOTOS} fotos pendientes de revisar: espera a que las revisemos`;
+  return { menuItemName: line.name };
+}
+
+uploadsRouter.post("/photo", (req, res) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const payload = token ? verifyToken(token) : null;
+  if (!payload || payload.kind !== "customer") {
+    res.status(401).json({ error: "Inicia sesion para enviar fotos" });
+    return;
+  }
+
+  photoUpload.single("file")(req, res, async (err: unknown) => {
+    if (err) {
+      const tooBig = err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE";
+      res.status(400).json({ error: tooBig ? "La foto es demasiado grande (maximo 2 MB)" : err instanceof Error ? err.message : "No se pudo subir la foto" });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: "No se envio ningun archivo" });
+      return;
+    }
+    const url = `${PHOTO_UPLOAD_PREFIX}${req.file.filename}`;
+    try {
+      const active = await User.exists({ _id: payload.sub, deletedAt: { $exists: false } });
+      const check = active ? await photoProblem(payload.sub, req.body?.orderId, req.body?.menuItemId, req.body?.consent) : "No autorizado";
+      if (typeof check === "string") {
+        await removePhotoFile(url, UPLOAD_DIR);
+        res.status(active ? 400 : 401).json({ error: check });
+        return;
+      }
+      const photo = await CustomerPhoto.create({
+        customerId: payload.sub,
+        orderId: req.body.orderId,
+        menuItemId: req.body.menuItemId,
+        menuItemName: check.menuItemName,
+        url,
+        consentAt: new Date(),
+        consentVersion: PHOTO_CONSENT_VERSION,
+      });
+      res.json({ id: photo._id.toString(), url, status: photo.status });
+    } catch {
+      await removePhotoFile(url, UPLOAD_DIR);
+      res.status(500).json({ error: "No se pudo guardar la foto" });
+    }
   });
 });

@@ -27,7 +27,7 @@ export const customersTypeDefs = /* GraphQL */ `
   type CustomerStampMovement {
     id: ID!
     stamps: Int!
-    """pedido, canje o ajuste."""
+    """pedido, canje, ajuste o foto (foto de cliente aprobada)."""
     reason: String!
     note: String
     """Codigo del pedido que dio los sellos, si lo hay."""

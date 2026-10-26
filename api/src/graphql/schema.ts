@@ -26,6 +26,8 @@ import { newsletterResolvers } from "../modules/newsletter/resolvers";
 import { cashTypeDefs } from "../modules/cash/schema";
 import { cashResolvers } from "../modules/cash/resolvers";
 import { reviewsTypeDefs } from "../modules/reviews/schema";
+import { photosTypeDefs } from "../modules/photos/schema";
+import { photosResolvers } from "../modules/photos/resolvers";
 import { reviewsResolvers } from "../modules/reviews/resolvers";
 import { expensesTypeDefs } from "../modules/expenses/schema";
 import { expensesResolvers } from "../modules/expenses/resolvers";
@@ -58,6 +60,7 @@ const typeDefs = mergeTypeDefs([
   newsletterTypeDefs,
   cashTypeDefs,
   reviewsTypeDefs,
+  photosTypeDefs,
   expensesTypeDefs,
 ]);
 
@@ -76,6 +79,7 @@ const resolvers = mergeResolvers([
   newsletterResolvers,
   cashResolvers,
   reviewsResolvers,
+  photosResolvers,
   expensesResolvers,
 ]);
 

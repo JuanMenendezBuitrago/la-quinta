@@ -50,6 +50,21 @@ export async function redeemForOrder(customerId: string, orderId: string, staffI
   });
 }
 
+/**
+ * Sello por una foto de cliente aprobada. Quien la aprueba (modules/photos) decide si toca:
+ * uno por producto y pedido, que lleva la cuenta en la propia foto (stampAwarded).
+ */
+export async function awardPhotoStamp(customerId: string, orderId: string, menuItemName: string, staffId: string) {
+  await LoyaltyTransaction.create({
+    customerId,
+    stamps: LOYALTY_RULES.stampsPerApprovedPhoto,
+    reason: "foto",
+    orderId,
+    staffId,
+    note: `Foto aprobada: ${menuItemName}`.slice(0, 200),
+  });
+}
+
 /** Devuelve los sellos canjeados en ese pedido, si los hay (se quito el descuento o se cancelo). */
 export async function refundOrderRedemption(
   customerId: string,

@@ -28,7 +28,12 @@
         <div class="lightbox-card" @click.stop @touchstart.passive="onTouchStart" @touchend.passive="onTouchEnd">
           <Transition :name="direction === -1 ? 'slide-prev' : 'slide-next'" mode="out-in">
             <div :key="url" class="lightbox-page">
-              <img :src="url" alt="" class="lightbox-image" />
+              <img :src="shownPhoto ? shownPhoto.src : url" alt="" class="lightbox-image" />
+              <!-- Mirando una foto de cliente: quien la hizo y volver a la del local -->
+              <p v-if="shownPhoto" class="customer-photo-caption">
+                Foto de {{ shownPhoto.authorLabel ?? "un cliente" }}
+                <button type="button" class="link-button" @click="shownPhoto = null">Ver la foto del producto</button>
+              </p>
 
               <div v-if="product" class="lightbox-info">
                 <div class="lightbox-heading">
@@ -47,6 +52,24 @@
                   </button>
                 </div>
                 <p v-if="product.description" class="lightbox-desc">{{ product.description }}</p>
+                <!-- Fotos de clientes aprobadas: un toque la muestra arriba, en grande -->
+                <div v-if="customerPhotos.length" class="customer-photos">
+                  <span class="lightbox-qty-label">Fotos de clientes</span>
+                  <!-- Deslizar la tira no debe pasar de producto (el swipe de la ficha) -->
+                  <div class="customer-photo-strip" @touchstart.passive.stop @touchend.passive.stop>
+                    <button
+                      v-for="p in customerPhotos"
+                      :key="p.id"
+                      type="button"
+                      class="customer-photo-thumb"
+                      :class="{ active: shownPhoto?.id === p.id }"
+                      :aria-label="`Ver foto de ${p.authorLabel ?? 'un cliente'}`"
+                      @click="shownPhoto = p"
+                    >
+                      <img :src="p.src" alt="" loading="lazy" />
+                    </button>
+                  </div>
+                </div>
                 <!-- Bolsas de cafe en grano: la ficha del cafe -->
                 <dl v-if="coffeeFacts.length" class="coffee-facts">
                   <template v-for="fact in coffeeFacts" :key="fact.label">
@@ -129,6 +152,8 @@ import { cartLineKey, useCart } from "~/composables/useCart";
 import { ROAST_LABELS, cartOption, defaultCartOptions, missingModifiers } from "~/composables/useMenu";
 import { useCustomerOrdering } from "~/composables/useSiteSettings";
 import type { LightboxProduct } from "~/composables/useLightbox";
+import { gql } from "graphql-tag";
+import { useImageUrl } from "~/composables/useImageUrl";
 
 const props = withDefaults(
   defineProps<{
@@ -202,6 +227,29 @@ const target = computed(() => {
   const size = product?.sizes?.find((s) => s.menuItemId === sizeId.value);
   return size && product ? { ...product, id: size.menuItemId, name: size.name, priceCents: size.priceCents } : product;
 });
+
+// Fotos de clientes aprobadas del producto: se piden al abrir su ficha, no para toda la carta.
+const PRODUCT_PHOTOS = gql`
+  query ProductPhotos($menuItemId: ID!) {
+    productPhotos(menuItemId: $menuItemId, limit: 12) {
+      id
+      url
+      authorLabel
+    }
+  }
+`;
+const { resolveImageUrl } = useImageUrl();
+const { result: photosResult } = useQuery<{ productPhotos: { id: string; url: string; authorLabel: string | null }[] }>(
+  PRODUCT_PHOTOS,
+  () => ({ menuItemId: target.value?.id ?? "" }),
+  () => ({ enabled: !!props.url && !!target.value?.id })
+);
+const customerPhotos = computed(() =>
+  (photosResult.value?.productPhotos ?? []).map((p) => ({ ...p, src: resolveImageUrl(p.url) ?? p.url }))
+);
+// La foto de cliente que se esta mirando en grande; al cambiar de producto, vuelve la del local.
+const shownPhoto = ref<(typeof customerPhotos.value)[number] | null>(null);
+watch(() => props.product?.id, () => (shownPhoto.value = null));
 
 // Opcion elegida en cada grupo de una sola opcion; al pasar a otro producto vuelve a la de su receta.
 const singleChoice = computed(() => (props.product?.modifiers ?? []).filter((m) => m.group.maxSelect === 1));
@@ -430,6 +478,13 @@ function formatPrice(priceCents: number) {
   .lightbox-nav-next { right: 24px; }
 }
 
+.customer-photo-caption { margin: 6px 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 13px; color: var(--text-muted); }
+.customer-photo-caption .link-button { border: none; background: none; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+.customer-photos { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.customer-photo-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.customer-photo-thumb { flex: 0 0 auto; width: 64px; height: 64px; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: var(--surface-alt); cursor: pointer; }
+.customer-photo-thumb.active { border-color: var(--accent); }
+.customer-photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .lightbox-fade-enter-active, .lightbox-fade-leave-active { transition: opacity 0.15s ease; }
 .lightbox-fade-enter-from, .lightbox-fade-leave-to { opacity: 0; }
 

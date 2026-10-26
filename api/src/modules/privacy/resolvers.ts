@@ -12,6 +12,7 @@ import { Order } from "../orders/model";
 import { MenuItem } from "../menu/model";
 import { Review } from "../reviews/model";
 import { LoyaltyTransaction } from "../loyalty/model";
+import { CustomerPhoto, removePhotoFile } from "../photos/model";
 
 /**
  * Derechos del titular sobre sus datos. Es el unico modulo que lee de varios a la vez
@@ -28,6 +29,7 @@ export const privacyResolvers = {
       ]);
       if (!user) throw new Error("Cuenta no encontrada");
       const reviews = await Review.find({ customerId }).sort({ createdAt: 1 }).lean();
+      const photos = await CustomerPhoto.find({ customerId }).sort({ createdAt: 1 }).lean();
       const favorites = await MenuItem.find({ _id: { $in: user.favoriteMenuItemIds ?? [] } }).select("name").lean();
       const orderCodes = new Map(orders.map((o) => [o._id.toString(), o.code]));
 
@@ -70,6 +72,15 @@ export const privacyResolvers = {
             creadaEl: r.createdAt,
             actualizadaEl: r.updatedAt,
           })),
+          fotos: photos.map((p) => ({
+            producto: p.menuItemName,
+            pedido: orderCodes.get(p.orderId.toString()) ?? null,
+            estado: p.status,
+            archivo: p.url ?? null,
+            motivoRechazo: p.rejectReason ?? null,
+            autorizacionPublicar: { aceptadaEl: p.consentAt, versionTexto: p.consentVersion },
+            enviadaEl: p.createdAt,
+          })),
           sellos: loyalty.map((t) => ({
             sellos: t.stamps,
             motivo: t.reason,
@@ -103,6 +114,11 @@ export const privacyResolvers = {
       // Opiniones: el comentario puede identificar a la persona y se borra; la puntuacion queda
       // (anonima, como los pedidos) para la media del local.
       await Review.updateMany({ customerId }, { $unset: { comment: 1 } });
+      // Fotos: las aprobadas siguen en la carta (lo autorizo al enviarlas), ya sin su nombre (ver
+      // authorLabel en photos/resolvers.ts); las pendientes y rechazadas se borran con su archivo.
+      const unpublished = await CustomerPhoto.find({ customerId, status: { $ne: "APROBADA" } }).select("url").lean();
+      for (const p of unpublished) await removePhotoFile(p.url, UPLOAD_DIR);
+      await CustomerPhoto.deleteMany({ customerId, status: { $ne: "APROBADA" } });
 
       // La sesion deja de valer en la siguiente peticion (ver buildContextFromToken). Los pedidos
       // y los sellos no guardan datos personales propios: al anonimizar al usuario quedan anonimos.
