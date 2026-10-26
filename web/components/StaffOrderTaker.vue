@@ -60,13 +60,14 @@
     >
       <Search :size="18" :stroke-width="2" aria-hidden="true" />
     </button>
-    <nav v-if="!search.trim() && menu.length" class="chips" aria-label="Categorías">
+    <nav v-if="!search.trim() && menu.length" ref="chipsNav" class="chips" aria-label="Categorías">
       <button
         v-for="category in menu"
         :key="category.id"
         type="button"
         class="chip"
         :class="{ active: activeCategoryId === category.id }"
+        :data-cat-id="category.id"
         @click="chosenCategoryId = category.id"
       >
         {{ category.name }}
@@ -78,8 +79,9 @@
     <p v-if="error" class="muted" style="color: var(--danger)">No se pudo cargar la carta.</p>
     <EmptyState v-if="menu.length && !visibleItems.length" :icon="SearchX" title="Ningún producto coincide con la búsqueda" />
 
-    <!-- Cuadricula: un toque en la tarjeta suma una unidad; "−" resta -->
-    <ul class="product-grid">
+    <!-- Cuadricula: un toque en la tarjeta suma una unidad; "−" resta. Deslizar a izquierda o
+         derecha pasa a la categoria siguiente o anterior. -->
+    <ul class="product-grid" @touchstart.passive="onGridTouchStart" @touchend.passive="onGridTouchEnd">
       <li v-for="item in visibleItems" :key="item.id" class="tile" :class="{ selected: quantityOf(item.id) }">
         <button type="button" class="tile-add" :aria-label="`Añadir ${item.name}`" @click="addItem(item)">
           <span class="tile-head">
@@ -303,6 +305,35 @@ const chosenCategoryId = ref<string | null>(null);
 const activeCategoryId = computed(() =>
   menu.value.some((c) => c.id === chosenCategoryId.value) ? chosenCategoryId.value : menu.value[0]?.id ?? null
 );
+
+// Swipe horizontal sobre los productos: categoria siguiente (hacia la izquierda) o anterior. Se
+// mide al empezar y al acabar el toque, sin seguir el dedo, como en la ficha de la carta
+// (ImageLightbox.vue): asi no interfiere con el scroll vertical. Con busqueda no hay categorias.
+const SWIPE_THRESHOLD = 45;
+let swipeStartX = 0;
+let swipeStartY = 0;
+function onGridTouchStart(event: TouchEvent) {
+  swipeStartX = event.touches[0].clientX;
+  swipeStartY = event.touches[0].clientY;
+}
+function onGridTouchEnd(event: TouchEvent) {
+  if (search.value.trim() || menu.value.length < 2) return;
+  const deltaX = event.changedTouches[0].clientX - swipeStartX;
+  const deltaY = event.changedTouches[0].clientY - swipeStartY;
+  if (Math.abs(deltaX) < SWIPE_THRESHOLD || Math.abs(deltaX) < Math.abs(deltaY)) return;
+  const index = menu.value.findIndex((c) => c.id === activeCategoryId.value);
+  const next = menu.value[index + (deltaX < 0 ? 1 : -1)];
+  if (next) chosenCategoryId.value = next.id;
+}
+
+// La categoria elegida (con un toque o con un swipe), visible en la fila de categorias.
+const chipsNav = ref<HTMLElement | null>(null);
+watch(activeCategoryId, async (id) => {
+  await nextTick();
+  chipsNav.value
+    ?.querySelector<HTMLElement>(`[data-cat-id="${id}"]`)
+    ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+});
 
 function normalize(text: string) {
   return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
