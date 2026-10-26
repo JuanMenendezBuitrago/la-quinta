@@ -144,17 +144,18 @@
               <p v-if="order.packagingCents || (order.takeaway && order.serviceType === 'MESA')" class="muted packaging-note">
                 + Empaque para llevar{{ order.packagingCents ? ` (${formatPrice(order.packagingCents)})` : "" }}
               </p>
+              <p v-if="order.redemption" class="muted discount-note">
+                Canje de sellos · {{ order.redemption.name }}: − {{ formatPrice(order.redemption.amountCents) }}
+              </p>
               <p v-if="order.discount" class="muted discount-note">
                 Descuento · {{ discountLabel(order.discount) }}: − {{ formatPrice(order.discount.amountCents) }}
               </p>
               <!-- Como en el ticket de tomar pedido: que no se olvide el producto gratis antes de cobrar. -->
-              <div v-if="order.customer?.rewardAvailable && !order.paidAt && order.discount?.reason !== 'CANJE'" class="reward-alert" role="status">
+              <div v-if="order.customer?.rewardAvailable && !order.paidAt && !order.redemption" class="reward-alert" role="status">
                 <Stamp :size="18" :stroke-width="1.8" aria-hidden="true" />
-                <span>
-                  Tiene un <strong>canje de sellos</strong> disponible<template v-if="order.discount">: para canjearlo, cambia el descuento</template>.
-                </span>
-                <button class="link-button" type="button" :disabled="busyOrderId === order.id" @click="openDiscount(order)">
-                  {{ order.discount ? "Cambiar descuento" : "Aplicar canje" }}
+                <span>Tiene un <strong>canje de sellos</strong> disponible.</span>
+                <button class="link-button" type="button" :disabled="busyOrderId === order.id" @click="openDiscount(order, true)">
+                  Aplicar canje
                 </button>
               </div>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
@@ -206,7 +207,7 @@
               <div class="pay-extra">
                 <button class="button secondary" type="button" :disabled="busyOrderId === order.id" @click="openDiscount(order)">
                   <Percent :size="16" :stroke-width="1.8" aria-hidden="true" />
-                  {{ order.discount ? "Cambiar descuento" : "Descuento" }}
+                  {{ order.discount || order.redemption ? "Cambiar descuento" : "Descuento" }}
                 </button>
                 <button class="button secondary" type="button" @click="payingId = ''">Volver</button>
               </div>
@@ -274,6 +275,11 @@
             <p class="muted">
               {{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}{{
                 order.paidAt ? ` · Cobrado con ${paymentLabel(order.paymentMethod)}` : ""
+              }}
+            </p>
+            <p v-if="order.redemption" class="muted discount-note">
+              Canje de sellos · {{ order.redemption.name }}: − {{ formatPrice(order.redemption.amountCents) }}{{
+                order.redemption.staffName ? ` · ${order.redemption.staffName}` : ""
               }}
             </p>
             <p v-if="order.discount" class="muted discount-note">
@@ -345,7 +351,11 @@
     />
     <DiscountDialog
       ref="discountDialog"
-      :gross-cents="discountOrder ? discountOrder.totalCents + (discountOrder.discount?.amountCents ?? 0) : 0"
+      :gross-cents="
+        discountOrder
+          ? discountOrder.totalCents + (discountOrder.discount?.amountCents ?? 0) + (discountOrder.redemption?.amountCents ?? 0)
+          : 0
+      "
       :lines="discountOrder?.items ?? []"
       :customer="discountOrder?.customer ?? null"
       :busy="!!discountOrder && busyOrderId === discountOrder.id"
@@ -364,7 +374,7 @@ import {
   discountLabel,
   useStaffOrders,
   type CustomerMatch,
-  type DiscountInput,
+  type OrderDiscounts,
   type HistoryFilter,
   type PaymentMethod,
 } from "~/composables/useStaffOrders";
@@ -425,7 +435,7 @@ const {
   cancelOrder,
   assignCustomer,
   markPaid,
-  setDiscount,
+  setDiscounts,
   busyOrderId,
   actionError,
   nextStatus,
@@ -494,14 +504,14 @@ async function payCash() {
 const discountDialog = ref<InstanceType<typeof DiscountDialog> | null>(null);
 const discountOrder = ref<any>(null);
 const discountError = ref<string | null>(null);
-function openDiscount(order: any) {
+function openDiscount(order: any, withRedeem = false) {
   discountOrder.value = order;
   discountError.value = null;
-  discountDialog.value?.open(order.discount);
+  discountDialog.value?.open({ redemption: order.redemption, discount: order.discount }, withRedeem);
 }
-async function applyDiscount(discount: DiscountInput | null) {
+async function applyDiscount(value: OrderDiscounts) {
   if (!discountOrder.value) return;
-  discountError.value = await setDiscount(discountOrder.value, discount);
+  discountError.value = await setDiscounts(discountOrder.value, value);
   if (!discountError.value) discountDialog.value?.close();
 }
 function paymentLabel(method: PaymentMethod | null) {

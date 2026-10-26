@@ -10,7 +10,7 @@ import { DISCOUNT_REASON_LABELS, isTakeaway, type OrderDoc } from "./model";
 export async function buildClosedPayload<S extends OrderClosedPayload["status"]>(
   order: Pick<
     OrderDoc,
-    "_id" | "code" | "customerId" | "items" | "totalCents" | "packagingCents" | "discount" | "takeaway" | "pickupSlot" | "source" | "serviceType" | "table" | "paidAt" | "paymentMethod"
+    "_id" | "code" | "customerId" | "items" | "totalCents" | "packagingCents" | "discount" | "redemption" | "takeaway" | "pickupSlot" | "source" | "serviceType" | "table" | "paidAt" | "paymentMethod"
   >,
   status: S,
   closedAt: Date | null
@@ -24,11 +24,14 @@ export async function buildClosedPayload<S extends OrderClosedPayload["status"]>
     customerId: order.customerId?.toString() ?? null,
     totalCents: order.totalCents,
     packagingCents: order.packagingCents ?? 0,
-    discountCents: order.discount?.amountCents ?? 0,
-    // "Otro: cumpleaños de Ana": el motivo tal cual se ve en el panel.
-    discountReason: order.discount
-      ? `${DISCOUNT_REASON_LABELS[order.discount.reason]}${order.discount.note ? `: ${order.discount.note}` : ""}`
-      : "",
+    // Canje de sellos y descuento juntos ("Canje de sellos: Latte · Otro: cumpleaños de Ana").
+    discountCents: (order.redemption?.amountCents ?? 0) + (order.discount?.amountCents ?? 0),
+    discountReason: [
+      order.redemption ? `${DISCOUNT_REASON_LABELS.CANJE}: ${order.redemption.name}` : "",
+      order.discount ? `${DISCOUNT_REASON_LABELS[order.discount.reason]}${order.discount.note ? `: ${order.discount.note}` : ""}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · "),
     takeaway: isTakeaway(order),
     code: order.code,
     customerName: customer?.name ?? "",

@@ -68,7 +68,8 @@ export function requiresPayment(order: Pick<OrderDoc, "serviceType">) {
 }
 
 /** Por que se rebaja un pedido: se pide siempre, para que el cierre de caja explique cada descuento. */
-// CANJE: la recompensa de los sellos, un producto del pedido gratis (ver discount.ts).
+// CANJE: el canje de sellos. No es un motivo que se elija (va aparte, en order.redemption), pero
+// cuenta como tal en el cierre de caja y en los pedidos de antes de separarlo (backfillRedemptions).
 export type DiscountReason = "CANJE" | "INVITACION" | "PERSONAL" | "ERROR" | "HABITUAL" | "OTRO";
 export const DISCOUNT_REASONS: DiscountReason[] = ["CANJE", "INVITACION", "PERSONAL", "ERROR", "HABITUAL", "OTRO"];
 export const DISCOUNT_REASON_LABELS: Record<DiscountReason, string> = {
@@ -89,8 +90,20 @@ export interface OrderDiscountDoc {
   amountCents: number;
   reason: DiscountReason;
   note?: string;
-  // Solo en el canje de sellos: la linea (posicion en items) del producto que sale gratis.
+  // Solo en los canjes de antes de backfillRedemptions.
   lineIndex?: number | null;
+  staffId: Types.ObjectId;
+  at: Date;
+}
+
+/**
+ * Canje de sellos: una unidad de la linea lineIndex sale gratis (amountCents, su precio). Va aparte
+ * del descuento para poder llevar los dos; el descuento se calcula sobre lo que queda tras el canje.
+ */
+export interface OrderRedemptionDoc {
+  lineIndex: number;
+  name: string;
+  amountCents: number;
   staffId: Types.ObjectId;
   at: Date;
 }
@@ -115,8 +128,9 @@ export interface OrderDoc {
   createdByStaffId?: Types.ObjectId;
   items: OrderLineDoc[];
   // Lo que se cobra: productos + recargo por empaque (packagingCents, solo en pedidos para
-  // llevar) - descuento (discount.amountCents).
+  // llevar) - canje de sellos (redemption.amountCents) - descuento (discount.amountCents).
   totalCents: number;
+  redemption?: OrderRedemptionDoc | null;
   discount?: OrderDiscountDoc | null;
   packagingCents?: number;
   // Va empaquetado. Sin valor (pedidos anteriores): para llevar o web de recogida (ver isTakeaway).
@@ -161,6 +175,17 @@ const orderDiscountSchema = new Schema<OrderDiscountDoc>(
   { _id: false }
 );
 
+const orderRedemptionSchema = new Schema<OrderRedemptionDoc>(
+  {
+    lineIndex: { type: Number, required: true, min: 0 },
+    name: { type: String, required: true },
+    amountCents: { type: Number, required: true, min: 1 },
+    staffId: { type: Schema.Types.ObjectId, ref: "StaffUser", required: true },
+    at: { type: Date, required: true },
+  },
+  { _id: false }
+);
+
 const orderStatusChangeSchema = new Schema<OrderStatusChangeDoc>(
   {
     status: { type: String, enum: ["NUEVO", "EN_PREPARACION", "LISTO", "ENTREGADO", "CANCELADO"], required: true },
@@ -193,6 +218,7 @@ const orderSchema = new Schema<OrderDoc>({
   items: { type: [orderLineSchema], required: true, validate: (v: unknown[]) => v.length > 0 },
   totalCents: { type: Number, required: true, min: 0 },
   packagingCents: { type: Number, default: 0, min: 0 },
+  redemption: { type: orderRedemptionSchema, default: undefined },
   discount: { type: orderDiscountSchema, default: undefined },
   takeaway: { type: Boolean },
   pickupSlot: { type: Date, required: true },
@@ -290,6 +316,28 @@ export async function backfillStatusHistory() {
     },
   ]);
   if (result.modifiedCount) console.log(`[orders] historial de estados reconstruido en ${result.modifiedCount} pedidos`);
+}
+
+/**
+ * Los canjes de sellos guardados como descuento (motivo CANJE, antes de que el canje fuera aparte)
+ * pasan a order.redemption. El total no cambia: el importe es el mismo. Idempotente.
+ */
+export async function backfillRedemptions() {
+  const result = await Order.updateMany({ "discount.reason": "CANJE" }, [
+    {
+      $set: {
+        redemption: {
+          lineIndex: { $ifNull: ["$discount.lineIndex", 0] },
+          name: { $ifNull: ["$discount.note", "Canje de sellos"] },
+          amountCents: "$discount.amountCents",
+          staffId: "$discount.staffId",
+          at: "$discount.at",
+        },
+      },
+    },
+    { $unset: "discount" },
+  ]);
+  if (result.modifiedCount) console.log(`[orders] ${result.modifiedCount} canjes de sellos pasados a su propio campo`);
 }
 
 /** Va empaquetado: lo marcado al crearlo o, en pedidos anteriores, "para llevar" o web sin mesa. */

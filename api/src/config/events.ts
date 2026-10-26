@@ -39,7 +39,7 @@ export interface OrderClosedPayload {
   customerId: string | null; // null: pedido del personal sin cliente registrado
   totalCents: number;
   packagingCents?: number;
-  // Rebaja ya restada de totalCents, y su motivo en texto ("" sin descuento).
+  // Rebaja ya restada de totalCents (canje de sellos + descuento), y sus motivos en texto ("" sin ninguno).
   discountCents?: number;
   discountReason?: string;
   // Va empaquetado (vasos, tapas... en el inventario).

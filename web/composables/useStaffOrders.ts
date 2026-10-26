@@ -26,15 +26,24 @@ export const BARRA_MAX_DISCOUNT_PERCENT = 20;
 
 /**
  * Descuento en porcentaje o en pesos (uno de los dos), con su motivo. "Otro" pide una nota.
- * El canje de sellos (CANJE) no lleva ni porcentaje ni pesos: sale gratis una unidad de la linea
- * lineIndex del pedido, y la API resta los sellos al cliente.
+ * Se calcula sobre lo que queda tras el canje de sellos. El motivo nunca es CANJE: el canje va aparte.
  */
 export interface DiscountInput {
   percent: number | null;
   amountCents: number | null;
   reason: DiscountReason;
   note: string | null;
-  lineIndex?: number | null;
+}
+
+/** Canje de sellos: sale gratis una unidad de la linea lineIndex; la API resta los sellos al cliente. */
+export interface RedemptionInput {
+  lineIndex: number | null;
+}
+
+/** Lo que se fija de una vez en un pedido: canje y descuento (null: sin el). */
+export interface OrderDiscounts {
+  redemption: RedemptionInput | null;
+  discount: DiscountInput | null;
 }
 
 /** Linea de un pedido, para elegir el producto del canje (priceCents: por unidad, con suplementos). */
@@ -44,14 +53,21 @@ export interface DiscountLine {
   quantity: number;
 }
 
-/** Lo que se resta de un pedido de `grossCents` (productos + empaque), redondeado como en la API. */
-export function discountAmount(
-  d: Pick<DiscountInput, "percent" | "amountCents"> & Partial<Pick<DiscountInput, "reason" | "lineIndex">>,
-  grossCents: number,
-  lines: DiscountLine[] = []
-) {
-  if (d.reason === "CANJE") return lines[d.lineIndex ?? -1]?.priceCents ?? 0;
-  return d.percent !== null ? Math.round((grossCents * d.percent) / 100) : d.amountCents ?? 0;
+/** Lo que se resta de un pedido de `baseCents` (productos + empaque - canje), redondeado como en la API. */
+export function discountAmount(d: Pick<DiscountInput, "percent" | "amountCents">, baseCents: number) {
+  return d.percent !== null ? Math.round((baseCents * d.percent) / 100) : d.amountCents ?? 0;
+}
+
+/** Lo que resta el canje: el precio de una unidad de esa linea, con sus suplementos. */
+export function redemptionAmount(r: RedemptionInput, lines: DiscountLine[]) {
+  return lines[r.lineIndex ?? -1]?.priceCents ?? 0;
+}
+
+/** Por que no se puede aplicar ese canje (o null). Que el cliente tenga sellos lo mira la API. */
+export function redemptionProblem(r: RedemptionInput, lines: DiscountLine[]) {
+  if (!lines[r.lineIndex ?? -1]) return "Elige el producto que se canjea";
+  if (redemptionAmount(r, lines) < 1) return "Ese producto ya es gratis: elige otro";
+  return null;
 }
 
 /** La linea que la API canjea si no se elige: la mas barata que se cobre. -1 si no hay ninguna. */
@@ -64,12 +80,7 @@ export function cheapestLineIndex(lines: DiscountLine[]) {
 }
 
 /** Por que no se puede aplicar ese descuento (o null): las mismas reglas que la API. */
-export function discountProblem(d: DiscountInput, grossCents: number, role: string | undefined, lines: DiscountLine[] = []) {
-  if (d.reason === "CANJE") {
-    if (!lines[d.lineIndex ?? -1]) return "Elige el producto que se canjea";
-    if (discountAmount(d, grossCents, lines) < 1) return "Ese producto ya es gratis: elige otro";
-    return null;
-  }
+export function discountProblem(d: DiscountInput, grossCents: number, role: string | undefined) {
   const amount = discountAmount(d, grossCents);
   if (amount < 1) return "Indica cuánto se descuenta";
   if (amount > grossCents) return "El descuento no puede ser mayor que el pedido";
@@ -80,14 +91,9 @@ export function discountProblem(d: DiscountInput, grossCents: number, role: stri
   return null;
 }
 
-/** "Invitación de la casa", "Otro: cumpleaños" o "Canje de sellos: Latte", para el ticket, la cola y el historial. */
+/** "Invitación de la casa" u "Otro: cumpleaños", para el ticket, la cola y el historial. */
 export function discountLabel(d: { reason: DiscountReason; note?: string | null; percent?: number | null }) {
-  const reason =
-    d.reason === "OTRO" && d.note
-      ? d.note
-      : d.reason === "CANJE" && d.note
-        ? `${DISCOUNT_REASON_LABELS.CANJE}: ${d.note}`
-        : DISCOUNT_REASON_LABELS[d.reason];
+  const reason = d.reason === "OTRO" && d.note ? d.note : DISCOUNT_REASON_LABELS[d.reason];
   return d.percent ? `${reason} (${d.percent} %)` : reason;
 }
 
@@ -116,12 +122,17 @@ const ORDER_FIELDS = `
   status
   totalCents
   packagingCents
+  redemption {
+    lineIndex
+    name
+    amountCents
+    staffName
+  }
   discount {
     percent
     amountCents
     reason
     note
-    lineIndex
     staffName
   }
   takeaway
@@ -187,17 +198,22 @@ const MARK_PAID = gql`
   }
 `;
 
-const SET_DISCOUNT = gql`
-  mutation SetOrderDiscount($id: ID!, $discount: OrderDiscountInput) {
-    setOrderDiscount(id: $id, discount: $discount) {
+const SET_DISCOUNTS = gql`
+  mutation SetOrderDiscounts($id: ID!, $redemption: OrderRedemptionInput, $discount: OrderDiscountInput) {
+    setOrderDiscounts(id: $id, redemption: $redemption, discount: $discount) {
       id
       totalCents
+      redemption {
+        lineIndex
+        name
+        amountCents
+        staffName
+      }
       discount {
         percent
         amountCents
         reason
         note
-        lineIndex
         staffName
       }
     }
@@ -434,14 +450,14 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     }
   }
 
-  // Descuento de un pedido aun sin cobrar (null lo quita). Devuelve el error para mostrarlo en el
-  // propio modal, que sigue abierto; la cola se actualiza con la suscripcion.
-  const { mutate: setDiscountMutation } = useMutation(SET_DISCOUNT);
-  async function setDiscount(order: any, discount: DiscountInput | null): Promise<string | null> {
+  // Canje y descuento de un pedido aun sin cobrar (null: sin el). Devuelve el error para mostrarlo
+  // en el propio modal, que sigue abierto; la cola se actualiza con la suscripcion.
+  const { mutate: setDiscountsMutation } = useMutation(SET_DISCOUNTS);
+  async function setDiscounts(order: any, value: OrderDiscounts): Promise<string | null> {
     if (busyOrderId.value) return "Espera a que termine la acción en curso";
     busyOrderId.value = order.id;
     try {
-      await setDiscountMutation({ id: order.id, discount });
+      await setDiscountsMutation({ id: order.id, redemption: value.redemption, discount: value.discount });
       return null;
     } catch (err: any) {
       await refetchQueue()?.catch(() => {});
@@ -497,7 +513,7 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     cancelOrder,
     assignCustomer,
     markPaid,
-    setDiscount,
+    setDiscounts,
     busyOrderId,
     actionError,
     nextStatus,

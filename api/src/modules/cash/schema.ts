@@ -18,7 +18,7 @@ export const cashTypeDefs = /* GraphQL */ `
     transferCents: Int!
     """Pedidos para llevar o web entregados sin indicar el metodo (anteriores a pedirlo al entregar)."""
     unknownMethodCents: Int!
-    """Descuentos de los pedidos cobrados (ya restados del total): cuantos, cuanto y por motivo."""
+    """Descuentos y canjes de sellos de los pedidos cobrados (ya restados del total): en cuantos pedidos, cuanto y por motivo."""
     discountsCount: Int!
     discountsCents: Int!
     discountsByReason: [DiscountTotal!]!
@@ -53,7 +53,7 @@ export const cashTypeDefs = /* GraphQL */ `
     cardCents: Int!
     transferCents: Int!
     unknownMethodCents: Int!
-    """Descuentos de los pedidos cobrados (ya restados del total): cuantos, cuanto y por motivo."""
+    """Descuentos y canjes de sellos de los pedidos cobrados (ya restados del total): en cuantos pedidos, cuanto y por motivo."""
     discountsCount: Int!
     discountsCents: Int!
     discountsByReason: [DiscountTotal!]!

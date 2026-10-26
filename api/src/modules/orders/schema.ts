@@ -46,7 +46,7 @@ export const ordersTypeDefs = /* GraphQL */ `
 
   """Por que se rebaja un pedido."""
   enum DiscountReason {
-    """Canje de los sellos del cliente: una unidad de un producto del pedido, gratis."""
+    """Canje de sellos: no se elige como motivo (va en Order.redemption); sale asi en el cierre de caja."""
     CANJE
     INVITACION
     PERSONAL
@@ -64,24 +64,34 @@ export const ordersTypeDefs = /* GraphQL */ `
     """Lo que se resta del pedido, en pesos."""
     amountCents: Int!
     reason: DiscountReason!
-    """En el canje de sellos, el nombre del producto canjeado."""
     note: String
-    """Solo en el canje de sellos: posicion en items del producto canjeado."""
-    lineIndex: Int
     """Quien lo aplico (en una cuenta compartida, la persona elegida)."""
     staffName: String
   }
 
-  """Descuento en porcentaje (1-100) o en pesos (uno de los dos). Barra, hasta el 20 % del pedido.
-  Con el motivo CANJE, ni porcentaje ni pesos: sale gratis una unidad de la linea lineIndex (o de la
-  mas barata), el pedido debe tener cliente con la recompensa disponible y se le restan los sellos."""
+  """Canje de sellos: una unidad de un producto del pedido, gratis."""
+  type OrderRedemption {
+    """Posicion en items del producto canjeado."""
+    lineIndex: Int!
+    name: String!
+    """Lo que se resta del pedido: el precio de esa unidad, con sus suplementos."""
+    amountCents: Int!
+    staffName: String
+  }
+
+  """Descuento en porcentaje (1-100) o en pesos (uno de los dos), sobre lo que queda tras el canje
+  de sellos. Barra, hasta el 20 %. El motivo no puede ser CANJE (el canje va en OrderRedemptionInput)."""
   input OrderDiscountInput {
     percent: Int
     amountCents: Int
     reason: DiscountReason!
     """Obligatoria con el motivo OTRO."""
     note: String
-    """Solo con CANJE: posicion en items del producto que se canjea."""
+  }
+
+  """Canje de sellos: el pedido debe tener cliente con la recompensa disponible, y se le restan los sellos."""
+  input OrderRedemptionInput {
+    """Posicion en items del producto gratis; sin ella, el mas barato."""
     lineIndex: Int
   }
 
@@ -107,8 +117,9 @@ export const ordersTypeDefs = /* GraphQL */ `
     table: String
     note: String
     items: [OrderLine!]!
-    """Lo que se cobra: productos + empaque - descuento."""
+    """Lo que se cobra: productos + empaque - canje de sellos - descuento."""
     totalCents: Int!
+    redemption: OrderRedemption
     discount: OrderDiscount
     """Recargo por empaque de este pedido (el vigente al crearlo; 0 en mesa o barra)."""
     packagingCents: Int!
@@ -149,6 +160,8 @@ export const ordersTypeDefs = /* GraphQL */ `
     """Guardar y pagar: ya se entrego y se cobra en el acto con este metodo. El pedido nace
     entregado y cobrado (cerrado), sin pasar por la cola."""
     paymentMethod: PaymentMethod
+    """Canje de sellos (ver OrderRedemptionInput)."""
+    redemption: OrderRedemptionInput
     """Descuento con su motivo (ver OrderDiscountInput)."""
     discount: OrderDiscountInput
   }
@@ -182,8 +195,9 @@ export const ordersTypeDefs = /* GraphQL */ `
     markOrderPaid(id: ID!, method: PaymentMethod!): Order!
     """Personal: pedido tomado en el local (mesero o barra). La recogida es ahora."""
     createStaffOrder(input: StaffOrderInput!): Order!
-    """Personal: pone, cambia o quita (discount null) el descuento de un pedido aun sin cobrar."""
-    setOrderDiscount(id: ID!, discount: OrderDiscountInput): Order!
+    """Personal: fija el canje de sellos y el descuento de un pedido aun sin cobrar (null: sin el).
+    Se devuelven los sellos si se quita el canje."""
+    setOrderDiscounts(id: ID!, redemption: OrderRedemptionInput, discount: OrderDiscountInput): Order!
     """Personal: asocia un cliente a un pedido activo que no tenia."""
     assignOrderCustomer(orderId: ID!, customerId: ID!): Order!
   }

@@ -15,7 +15,7 @@ import { buildHttpContext, buildWsContext, GraphQLContext } from "./graphql/cont
 import { registerLoyaltyListeners } from "./modules/loyalty/listeners";
 import { registerInventoryListeners } from "./modules/inventory/listeners";
 import { registerSheetsListeners } from "./modules/sheets/listeners";
-import { backfillCompletedOrders, backfillOrderCodes, backfillStatusHistory } from "./modules/orders/model";
+import { backfillCompletedOrders, backfillOrderCodes, backfillRedemptions, backfillStatusHistory } from "./modules/orders/model";
 import { markInterruptedCampaigns } from "./modules/newsletter/model";
 import { seedHeroSlidesOnce } from "./modules/hero/model";
 import { ensureCoffeeProcesses } from "./modules/coffee/model";
@@ -26,6 +26,7 @@ async function main() {
   await backfillOrderCodes();
   await backfillCompletedOrders();
   await backfillStatusHistory();
+  await backfillRedemptions();
   await markInterruptedCampaigns();
   await seedHeroSlidesOnce();
   await ensureCoffeeProcesses();

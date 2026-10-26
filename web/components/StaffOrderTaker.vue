@@ -94,20 +94,10 @@
         <UserAvatar :avatar="customer.avatar" :name="customer.name" :size="56" />
         <strong>{{ customer.name }}</strong>
         <!-- Que no se olvide ofrecerle el producto gratis: hasta que se aplique el canje. -->
-        <div v-if="customer.rewardAvailable && discount?.reason !== 'CANJE'" class="reward-alert" role="status">
+        <div v-if="customer.rewardAvailable && !redeeming" class="reward-alert" role="status">
           <Stamp :size="18" :stroke-width="1.8" aria-hidden="true" />
-          <span>
-            Tiene un <strong>canje de sellos</strong> disponible: un producto gratis.
-            <template v-if="discount">Para canjearlo, cambia el descuento del ticket.</template>
-          </span>
-          <button
-            v-if="lines.length"
-            type="button"
-            class="link-button"
-            @click="discountDialog?.open(discountForApi)"
-          >
-            {{ discount ? "Cambiar descuento" : "Aplicar canje" }}
-          </button>
+          <span>Tiene un <strong>canje de sellos</strong> disponible: un producto gratis.</span>
+          <button v-if="lines.length" type="button" class="link-button" @click="openDiscounts(true)">Aplicar canje</button>
         </div>
       </div>
       <h3>Ticket</h3>
@@ -130,16 +120,22 @@
           />
         </li>
         <li v-if="packagingCents" class="ticket-packaging muted"><span>Empaque (para llevar)</span><span>{{ formatPrice(packagingCents) }}</span></li>
+        <li v-if="redeeming" class="ticket-discount">
+          <button type="button" class="link-button" title="Cambiar o quitar el canje" @click="openDiscounts()">
+            Canje de sellos · {{ redeemLine?.name ?? "elige el producto" }}
+          </button>
+          <span>− {{ formatPrice(redemptionCents) }}</span>
+        </li>
         <li v-if="discount" class="ticket-discount">
-          <button type="button" class="link-button" title="Cambiar o quitar el descuento" @click="discountDialog?.open(discountForApi)">
-            Descuento · {{ discountLabel(discountForApi!) }}
+          <button type="button" class="link-button" title="Cambiar o quitar el descuento" @click="openDiscounts()">
+            Descuento · {{ discountLabel(discount) }}
           </button>
           <span>− {{ formatPrice(discountCents) }}</span>
         </li>
         <li class="ticket-total"><span>Total</span><span>{{ formatPrice(finalCents) }}</span></li>
       </ul>
       <p v-if="discountIssue" class="muted" style="color: var(--danger)">{{ discountIssue }}</p>
-      <button v-if="lines.length && !discount" type="button" class="link-button add-discount" @click="discountDialog?.open(null)">
+      <button v-if="lines.length && !discount && !redeeming" type="button" class="link-button add-discount" @click="openDiscounts()">
         <Percent :size="15" :stroke-width="1.8" aria-hidden="true" />
         Aplicar descuento
       </button>
@@ -241,8 +237,12 @@ import {
   discountAmount,
   discountLabel,
   discountProblem,
+  redemptionAmount,
+  redemptionProblem,
   type CustomerMatch,
   type DiscountInput,
+  type OrderDiscounts,
+  type RedemptionInput,
   type PaymentMethod,
 } from "~/composables/useStaffOrders";
 import { BAR_TABLE, TABLES } from "~/composables/useTables";
@@ -348,31 +348,43 @@ const packagingCents = computed(() => (isTakeaway.value ? packagingFee.value : 0
 const customer = ref<CustomerMatch | null>(null);
 const note = ref("");
 
-// Descuento del ticket: se recalcula si cambian los productos (un 10 % sigue siendo un 10 %) y,
-// si deja de valer (p. ej. un importe fijo mayor que lo que queda), no deja enviar el pedido.
+// Canje de sellos y descuento del ticket. El canje sigue al producto (su linea, por key) aunque
+// cambie el orden del ticket; si se quita ese producto, no deja enviar hasta que se elija otro.
+// El descuento va sobre lo que queda tras el canje y se recalcula si cambian los productos (un 10 %
+// sigue siendo un 10 %); si deja de valer (p. ej. un importe fijo mayor), tampoco deja enviar.
 const { staff } = useStaffAuth();
-// El canje de sellos sigue al producto (su linea, por key) aunque cambie el orden del ticket; si
-// se quita del ticket, el descuento deja de valer hasta que se elija otro.
-const discount = ref<DiscountInput | null>(null);
+const redeeming = ref(false);
 const redeemLineKey = ref<string | null>(null);
+const discount = ref<DiscountInput | null>(null);
 const discountDialog = ref<InstanceType<typeof DiscountDialog> | null>(null);
 const grossCents = computed(() => totalCents.value + packagingCents.value);
-const discountForApi = computed<DiscountInput | null>(() => {
-  if (!discount.value || discount.value.reason !== "CANJE") return discount.value;
+const redemption = computed<RedemptionInput | null>(() => {
+  if (!redeeming.value) return null;
   const lineIndex = lines.value.findIndex((l) => l.key === redeemLineKey.value);
-  return { ...discount.value, lineIndex: lineIndex === -1 ? null : lineIndex, note: lines.value[lineIndex]?.name ?? null };
+  return { lineIndex: lineIndex === -1 ? null : lineIndex };
 });
-const discountCents = computed(() => (discountForApi.value ? discountAmount(discountForApi.value, grossCents.value, lines.value) : 0));
-const finalCents = computed(() => Math.max(grossCents.value - discountCents.value, 0));
+const redeemLine = computed(() => lines.value.find((l) => l.key === redeemLineKey.value) ?? null);
+const redemptionCents = computed(() => (redemption.value ? redemptionAmount(redemption.value, lines.value) : 0));
+const baseCents = computed(() => Math.max(grossCents.value - redemptionCents.value, 0));
+const discountCents = computed(() => (discount.value ? discountAmount(discount.value, baseCents.value) : 0));
+const finalCents = computed(() => Math.max(baseCents.value - discountCents.value, 0));
 const discountIssue = computed(() => {
-  const d = discountForApi.value;
-  if (!d || !lines.value.length) return null;
-  if (d.reason === "CANJE" && !customer.value) return "Para canjear sellos, identifica al cliente";
-  return discountProblem(d, grossCents.value, staff.value?.role, lines.value);
+  if (!lines.value.length) return null;
+  if (redemption.value) {
+    if (!customer.value) return "Para canjear sellos, identifica al cliente";
+    if (!redeemLine.value) return "El producto del canje ya no está en el ticket: elige otro";
+    const problem = redemptionProblem(redemption.value, lines.value);
+    if (problem) return problem;
+  }
+  return discount.value ? discountProblem(discount.value, baseCents.value, staff.value?.role) : null;
 });
-function onDiscount(value: DiscountInput | null) {
-  discount.value = value;
-  redeemLineKey.value = value?.reason === "CANJE" ? lines.value[value.lineIndex ?? -1]?.key ?? null : null;
+function openDiscounts(withRedeem = false) {
+  discountDialog.value?.open({ redemption: redemption.value, discount: discount.value }, withRedeem);
+}
+function onDiscount(value: OrderDiscounts) {
+  redeeming.value = !!value.redemption;
+  redeemLineKey.value = value.redemption ? lines.value[value.redemption.lineIndex ?? -1]?.key ?? null : null;
+  discount.value = value.discount;
   discountDialog.value?.close();
 }
 const ticketEl = ref<HTMLElement | null>(null);
@@ -394,6 +406,7 @@ function reset() {
   customer.value = null;
   note.value = "";
   discount.value = null;
+  redeeming.value = false;
   redeemLineKey.value = null;
   search.value = "";
   choosingPayment.value = false;
@@ -422,7 +435,8 @@ async function submit(paymentMethod: PaymentMethod | null = null) {
         customerId: customer.value?.id ?? null,
         note: note.value.trim() || null,
         paymentMethod,
-        discount: discountForApi.value && { ...discountForApi.value, note: discountForApi.value.reason === "CANJE" ? null : discountForApi.value.note },
+        redemption: redemption.value,
+        discount: discount.value,
       },
     });
     lastCode.value = res?.data?.createStaffOrder.code ?? "";

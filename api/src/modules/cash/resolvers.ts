@@ -40,7 +40,7 @@ async function summarize(start: Date, end: Date) {
       { paidAt: { $exists: false }, serviceType: { $ne: "MESA" }, status: "ENTREGADO", deliveredAt: { $gte: start, $lt: end } },
     ],
   })
-    .select("totalCents paymentMethod paidAt discount")
+    .select("totalCents paymentMethod paidAt discount redemption")
     .lean();
 
   const sum = { cashCents: 0, cardCents: 0, transferCents: 0, unknownMethodCents: 0 };
@@ -55,19 +55,30 @@ async function summarize(start: Date, end: Date) {
   return { ordersCount: orders.length, totalCents, ...sum, ...summarizeDiscounts(orders), ...(await summarizeExpenses(end)) };
 }
 
-/** Descuentos de esos pedidos, por motivo (en el orden de los motivos, solo los que hay). */
-function summarizeDiscounts(orders: { discount?: { reason: string; amountCents: number } | null }[]) {
+/**
+ * Descuentos de esos pedidos, por motivo (en el orden de los motivos, solo los que hay). El canje
+ * de sellos cuenta como motivo CANJE; un pedido con canje y descuento suma en los dos motivos,
+ * pero es un solo pedido en discountsCount.
+ */
+function summarizeDiscounts(
+  orders: { discount?: { reason: string; amountCents: number } | null; redemption?: { amountCents: number } | null }[]
+) {
   const byReason = new Map<string, { count: number; amountCents: number }>();
-  for (const o of orders) {
-    if (!o.discount) continue;
-    const row = byReason.get(o.discount.reason) ?? { count: 0, amountCents: 0 };
+  const add = (reason: string, amountCents: number) => {
+    const row = byReason.get(reason) ?? { count: 0, amountCents: 0 };
     row.count += 1;
-    row.amountCents += o.discount.amountCents;
-    byReason.set(o.discount.reason, row);
+    row.amountCents += amountCents;
+    byReason.set(reason, row);
+  };
+  let discountsCount = 0;
+  for (const o of orders) {
+    if (o.redemption) add("CANJE", o.redemption.amountCents);
+    if (o.discount) add(o.discount.reason, o.discount.amountCents);
+    if (o.redemption || o.discount) discountsCount += 1;
   }
   const discountsByReason = DISCOUNT_REASONS.filter((r) => byReason.has(r)).map((reason) => ({ reason, ...byReason.get(reason)! }));
   return {
-    discountsCount: discountsByReason.reduce((n, r) => n + r.count, 0),
+    discountsCount,
     discountsCents: discountsByReason.reduce((n, r) => n + r.amountCents, 0),
     discountsByReason,
   };
