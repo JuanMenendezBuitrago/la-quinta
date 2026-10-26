@@ -162,8 +162,10 @@
       </button>
       <DiscountDialog ref="discountDialog" :gross-cents="grossCents" :lines="lines" :customer="customer" @apply="onDiscount" />
 
+      <!-- Compacto, para que el ticket quepa sin scroll en la tablet: las mesas solo con su numero en
+           una fila; debajo barra, para llevar y, en mesa o barra, la casilla "para llevar". -->
       <div class="field">
-        <span class="muted">¿Dónde?</span>
+        <span class="muted">¿Dónde? (mesas 1–6)</span>
         <div class="places" role="radiogroup" aria-label="Mesa, barra o para llevar">
           <button
             v-for="p in PLACES"
@@ -171,32 +173,40 @@
             type="button"
             role="radio"
             :aria-checked="place === p.id"
+            :aria-label="p.label"
             :class="{ active: place === p.id, wide: p.id === 'LLEVAR' || p.id === BAR }"
             @click="place = p.id"
           >
-            {{ p.label }}
+            {{ p.id === "LLEVAR" || p.id === BAR ? p.label : p.id }}
           </button>
+          <!-- En mesa o barra, pero piden algo para llevar: se empaqueta y lleva el recargo -->
+          <label v-if="place && place !== 'LLEVAR'" class="takeaway-check" title="Se lo llevan: va empaquetado y lleva el recargo por empaque">
+            <input v-model="takeaway" type="checkbox" />
+            <span>Empaquetar</span>
+          </label>
         </div>
-        <!-- En mesa o barra, pero piden algo para llevar: se empaqueta y lleva el recargo -->
-        <label v-if="place && place !== 'LLEVAR'" class="takeaway-check">
-          <input v-model="takeaway" type="checkbox" />
-          <span>Para llevar</span>
-        </label>
       </div>
 
-      <div class="field">
-        <span class="muted">Cliente (opcional: para sumar sus sellos)</span>
-        <div v-if="customer" class="customer-chip">
+      <!-- Cliente y nota son opcionales: plegados tras un enlace hasta que se usan -->
+      <div v-if="customer" class="field">
+        <span class="muted">Cliente</span>
+        <div class="customer-chip">
           <span><strong>{{ customer.name }}</strong> · <span class="code">{{ customer.customerCode }}</span></span>
           <button class="button secondary" type="button" @click="customer = null">Quitar</button>
         </div>
-        <CustomerLookup v-else @found="customer = $event" />
       </div>
-
-      <label class="field">
-        <span class="muted">Nota (opcional)</span>
-        <input v-model="note" type="text" maxlength="200" placeholder="Ej. sin azúcar, bien caliente" />
+      <div v-else-if="showCustomer" class="field">
+        <span class="muted">Cliente (para sumar sus sellos)</span>
+        <CustomerLookup @found="customer = $event" />
+      </div>
+      <label v-if="showNote || note" class="field">
+        <span class="muted">Nota</span>
+        <input ref="noteInput" v-model="note" type="text" maxlength="200" placeholder="Ej. sin azúcar, bien caliente" />
       </label>
+      <div v-if="!customer && !showCustomer || !(showNote || note)" class="optional-links">
+        <button v-if="!customer && !showCustomer" type="button" class="link-button" @click="showCustomer = true">+ Cliente (sellos)</button>
+        <button v-if="!(showNote || note)" type="button" class="link-button" @click="openNote">+ Nota</button>
+      </div>
 
       <p v-if="missingChoice" class="muted" style="color: var(--danger)">Elige la opción marcada en rojo: la de siempre está agotada.</p>
       <p v-if="submitError" class="muted" style="color: var(--danger)">{{ submitError }}</p>
@@ -415,6 +425,15 @@ const isTakeaway = computed(() => place.value === "LLEVAR" || (!!place.value && 
 const packagingCents = computed(() => (isTakeaway.value ? packagingFee.value : 0));
 const customer = ref<CustomerMatch | null>(null);
 const note = ref("");
+// Plegados hasta que se pulsa su enlace (o ya tienen algo): ver el ticket en la plantilla.
+const showCustomer = ref(false);
+const showNote = ref(false);
+const noteInput = ref<HTMLInputElement | null>(null);
+async function openNote() {
+  showNote.value = true;
+  await nextTick();
+  noteInput.value?.focus();
+}
 
 // Canje de sellos y descuento del ticket. El canje sigue al producto (su linea, por key) aunque
 // cambie el orden del ticket; si se quita ese producto, no deja enviar hasta que se elija otro.
@@ -480,6 +499,8 @@ function reset() {
   takeaway.value = false;
   customer.value = null;
   note.value = "";
+  showCustomer.value = false;
+  showNote.value = false;
   discount.value = null;
   redeeming.value = false;
   redeemLineKey.value = null;
@@ -749,11 +770,11 @@ input {
 .add-discount { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; }
 .ticket-total { border-top: 1px solid var(--border); padding-top: 6px; font-weight: 700; }
 .field { display: flex; flex-direction: column; gap: 6px; }
-/* Botones grandes: 3 mesas por fila en movil; barra y para llevar ocupan media fila cada uno */
-.places { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+/* Dos filas: las 6 mesas (solo el numero) y debajo barra, para llevar y la casilla "para llevar" */
+.places { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 .places button {
-  grid-column: span 2;
-  min-height: 48px;
+  grid-column: span 1;
+  min-height: 42px;
   border: 1px solid var(--accent);
   border-radius: 8px;
   background: transparent;
@@ -762,7 +783,7 @@ input {
   font-weight: 600;
   cursor: pointer;
 }
-.places button.wide { grid-column: span 3; }
+.places button.wide { grid-column: span 2; }
 .places button.active { background: var(--accent); color: var(--bg); }
 .ticket-customer { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 .ticket-customer strong { font-size: 17px; overflow-wrap: anywhere; }
@@ -783,7 +804,8 @@ input {
 }
 .reward-alert strong { font-size: inherit; }
 .reward-alert svg { flex-shrink: 0; color: var(--accent); }
-.takeaway-check { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 15px; font-weight: 600; cursor: pointer; align-self: flex-start; }
+.takeaway-check { grid-column: span 2; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.optional-links { display: flex; gap: 16px; flex-wrap: wrap; }
 .takeaway-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
 .customer-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ticket-actions { display: flex; gap: 8px; flex-wrap: wrap; }
