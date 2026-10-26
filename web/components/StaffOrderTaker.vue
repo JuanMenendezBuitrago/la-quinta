@@ -68,7 +68,7 @@
         class="chip"
         :class="{ active: activeCategoryId === category.id }"
         :data-cat-id="category.id"
-        @click="chosenCategoryId = category.id"
+        @click="chooseCategory(category.id)"
       >
         {{ category.name }}
       </button>
@@ -81,7 +81,13 @@
 
     <!-- Cuadricula: un toque en la tarjeta suma una unidad; "−" resta. Deslizar a izquierda o
          derecha pasa a la categoria siguiente o anterior. -->
-    <ul class="product-grid" @touchstart.passive="onGridTouchStart" @touchend.passive="onGridTouchEnd">
+    <Transition :name="slideDirection === -1 ? 'grid-prev' : 'grid-next'" mode="out-in">
+    <ul
+      :key="search.trim() ? 'busqueda' : activeCategoryId ?? ''"
+      class="product-grid"
+      @touchstart.passive="onGridTouchStart"
+      @touchend.passive="onGridTouchEnd"
+    >
       <li v-for="item in visibleItems" :key="item.id" class="tile" :class="{ selected: quantityOf(item.id) }">
         <button type="button" class="tile-add" :aria-label="`Añadir ${item.name}`" @click="addItem(item)">
           <span class="tile-head">
@@ -97,6 +103,7 @@
         </template>
       </li>
     </ul>
+    </Transition>
 
     <!-- Ticket -->
     </div>
@@ -323,7 +330,18 @@ function onGridTouchEnd(event: TouchEvent) {
   if (Math.abs(deltaX) < SWIPE_THRESHOLD || Math.abs(deltaX) < Math.abs(deltaY)) return;
   const index = menu.value.findIndex((c) => c.id === activeCategoryId.value);
   const next = menu.value[index + (deltaX < 0 ? 1 : -1)];
-  if (next) chosenCategoryId.value = next.id;
+  if (next) chooseCategory(next.id);
+}
+
+// Hacia donde se mueve la cuadricula al cambiar de categoria: a una posterior (swipe a la
+// izquierda o chip a la derecha), los productos salen por la izquierda y entran por la derecha.
+const slideDirection = ref<1 | -1>(1);
+function chooseCategory(id: string) {
+  const from = menu.value.findIndex((c) => c.id === activeCategoryId.value);
+  const to = menu.value.findIndex((c) => c.id === id);
+  if (to === from) return;
+  slideDirection.value = to > from ? 1 : -1;
+  chosenCategoryId.value = id;
 }
 
 // La categoria elegida (con un toque o con un swipe), visible en la fila de categorias.
@@ -512,7 +530,9 @@ function formatPrice(priceCents: number) {
 
 <style scoped>
 .order-taker { max-width: 720px; padding-bottom: 72px; }
-.order-taker .wide-main { gap: 0; }
+/* overflow-x: clip, sin crear zona de scroll: la cuadricula que entra o sale de lado (cambio de
+   categoria) no saca una barra horizontal momentanea. */
+.order-taker .wide-main { gap: 0; overflow-x: clip; }
 @media (min-width: 1000px) and (orientation: landscape) {
   .order-taker { max-width: none; padding-bottom: 0; }
 }
@@ -610,6 +630,16 @@ input {
 }
 .chip.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
+/* Cambio de categoria: la cuadricula saliente y la entrante se mueven en el sentido del gesto,
+   como en la ficha de la carta (ImageLightbox.vue), pero mas rapido: se cambia a menudo. */
+.grid-next-enter-active, .grid-next-leave-active,
+.grid-prev-enter-active, .grid-prev-leave-active { transition: transform 0.16s ease, opacity 0.16s ease; }
+.grid-next-enter-from, .grid-prev-leave-to { transform: translateX(60px); opacity: 0; }
+.grid-next-leave-to, .grid-prev-enter-from { transform: translateX(-60px); opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .grid-next-enter-active, .grid-next-leave-active,
+  .grid-prev-enter-active, .grid-prev-leave-active { transition: none; }
+}
 .product-grid {
   list-style: none;
   padding: 0;
