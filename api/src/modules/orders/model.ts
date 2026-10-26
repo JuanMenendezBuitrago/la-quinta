@@ -63,6 +63,22 @@ export const BAR_TABLE = "Barra";
 /** Donde puede sentarse un cliente que pide desde el local: las 6 mesas y la barra. */
 export const CUSTOMER_TABLES = ["1", "2", "3", "4", "5", "6", BAR_TABLE];
 
+/** Tope de lo recibido en efectivo: evita un cero de mas al teclearlo. */
+export const MAX_CASH_RECEIVED_CENTS = 10_000_000;
+
+/**
+ * Lo recibido en efectivo, si se indica: solo con EFECTIVO, en pesos enteros y sin pasar del tope.
+ * Que cubra el total se comprueba al guardar (el total puede cambiar hasta ese momento).
+ */
+export function checkCashReceived(method: PaymentMethod | null | undefined, cashReceivedCents: number | null | undefined) {
+  if (cashReceivedCents === null || cashReceivedCents === undefined) return null;
+  if (method !== "EFECTIVO") throw new Error("Lo recibido solo se indica al cobrar en efectivo");
+  if (!Number.isInteger(cashReceivedCents) || cashReceivedCents < 0 || cashReceivedCents > MAX_CASH_RECEIVED_CENTS) {
+    throw new Error("La cantidad recibida no es valida");
+  }
+  return cashReceivedCents;
+}
+
 export function requiresPayment(order: Pick<OrderDoc, "serviceType">) {
   return order.serviceType === "MESA";
 }
@@ -142,6 +158,9 @@ export interface OrderDoc {
   deliveredAt?: Date;
   paidAt?: Date;
   paymentMethod?: PaymentMethod;
+  // Solo en efectivo, si se anoto en el modal de cobro: lo que entrego el cliente (el cambio es la
+  // diferencia con totalCents). Para el tiquet y para reimprimirlo con las mismas cifras.
+  cashReceivedCents?: number;
   paidByStaffId?: Types.ObjectId;
   // Cierre: entregado y, si es de mesa, cobrado. Es lo que suma sellos y escribe la fila en la hoja.
   completedAt?: Date;
@@ -231,6 +250,7 @@ const orderSchema = new Schema<OrderDoc>({
   deliveredAt: { type: Date },
   paidAt: { type: Date },
   paymentMethod: { type: String, enum: PAYMENT_METHODS },
+  cashReceivedCents: { type: Number, min: 0 },
   paidByStaffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
   completedAt: { type: Date },
   createdAt: { type: Date, default: () => new Date() },

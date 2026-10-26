@@ -1,7 +1,7 @@
 import { withFilter } from "graphql-subscriptions";
 import { Types } from "mongoose";
 import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
-import { ALLOWED_FROM, AWAITING_PAYMENT, CUSTOMER_TABLES, OPEN_ORDER, isTakeaway, Order, OrderDiscountDoc, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
+import { ALLOWED_FROM, AWAITING_PAYMENT, CUSTOMER_TABLES, OPEN_ORDER, checkCashReceived, isTakeaway, Order, OrderDiscountDoc, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
 import { tryComplete } from "./complete";
 import { buildOrderLines, createWithUniqueCode, type OrderLineRequest } from "./create";
 import { buildDiscount, buildRedemption, rebaseDiscount, type OrderDiscountInput, type OrderRedemptionInput } from "./discount";
@@ -123,6 +123,8 @@ export const ordersResolvers = {
     discount: (doc: any) => doc.discount ?? null,
     paidAt: (doc: any) => iso(doc.paidAt),
     paymentMethod: (doc: any) => doc.paymentMethod ?? null,
+    cashReceivedCents: (doc: any) => doc.cashReceivedCents ?? null,
+    changeCents: (doc: any) => (doc.cashReceivedCents != null ? doc.cashReceivedCents - doc.totalCents : null),
     awaitingPayment: (doc: any) =>
       doc.serviceType === "MESA" && !doc.paidAt && !doc.completedAt && doc.status !== "CANCELADO",
   },
@@ -207,6 +209,7 @@ export const ordersResolvers = {
           note?: string | null;
           takeaway?: boolean | null;
           paymentMethod?: PaymentMethod | null;
+          cashReceivedCents?: number | null;
           redemption?: OrderRedemptionInput | null;
           discount?: OrderDiscountInput | null;
         };
@@ -221,6 +224,7 @@ export const ordersResolvers = {
       // Guardar y pagar: se sirvio sin pasar por la cola y se cobra ahora.
       const paidNow = !!input.paymentMethod;
       if (paidNow && !PAYMENT_METHODS.includes(input.paymentMethod!)) throw new Error("Metodo de pago no valido");
+      const cashReceivedCents = checkCashReceived(input.paymentMethod, input.cashReceivedCents);
       if (!paidNow && !(await orderQueueEnabled())) {
         throw new Error("La cola de pedidos esta desactivada: usa \"Guardar y pagar\"");
       }
@@ -235,6 +239,10 @@ export const ordersResolvers = {
       const redemption = input.redemption ? buildRedemption(input.redemption, lines, staff, now) : null;
       const baseCents = totalCents + packagingCents - (redemption?.amountCents ?? 0);
       const discount = input.discount ? buildDiscount(input.discount, baseCents, staff, now) : null;
+      const finalCents = baseCents - (discount?.amountCents ?? 0);
+      if (cashReceivedCents !== null && cashReceivedCents < finalCents) {
+        throw new Error("Lo recibido no cubre el total del pedido");
+      }
       const redeems = !!redemption;
       if (redeems) {
         if (!input.customerId) throw new Error("Para canjear sellos, identifica antes al cliente");
@@ -248,7 +256,7 @@ export const ordersResolvers = {
         note: input.note?.trim() || undefined,
         createdByStaffId: staff.id as any,
         items: lines,
-        totalCents: baseCents - (discount?.amountCents ?? 0),
+        totalCents: finalCents,
         packagingCents,
         ...(redemption ? { redemption } : {}),
         ...(discount ? { discount } : {}),
@@ -258,7 +266,13 @@ export const ordersResolvers = {
         createdAt: now,
         status: paidNow ? "ENTREGADO" : "NUEVO",
         ...(paidNow
-          ? { deliveredAt: now, paidAt: now, paymentMethod: input.paymentMethod!, paidByStaffId: staff.id as any }
+          ? {
+              deliveredAt: now,
+              paidAt: now,
+              paymentMethod: input.paymentMethod!,
+              paidByStaffId: staff.id as any,
+              ...(cashReceivedCents !== null ? { cashReceivedCents } : {}),
+            }
           : {}),
       });
 
@@ -379,25 +393,42 @@ export const ordersResolvers = {
 
     markOrderPaid: async (
       _: unknown,
-      args: { id: string; method: PaymentMethod },
+      args: { id: string; method: PaymentMethod; cashReceivedCents?: number | null },
       ctx: GraphQLContext
     ) => {
       const staff = requireStaff(ctx, ["barra", "gestion"]);
       if (!PAYMENT_METHODS.includes(args.method)) throw new Error("Metodo de pago no valido");
+      const cashReceivedCents = checkCashReceived(args.method, args.cashReceivedCents);
 
-      // Atomico, como setOrderStatus: si dos personas cobran a la vez, solo una lo consigue.
+      // Atomico, como setOrderStatus: si dos personas cobran a la vez, solo una lo consigue. Lo
+      // recibido tiene que cubrir el total en ese mismo instante (por si entretanto cambio el descuento).
       const now = new Date();
       const order = await Order.findOneAndUpdate(
-        { _id: args.id, serviceType: "MESA", paidAt: { $exists: false }, status: { $ne: "CANCELADO" } },
-        { $set: { paidAt: now, paymentMethod: args.method, paidByStaffId: staff.id, updatedAt: now } },
+        {
+          _id: args.id,
+          serviceType: "MESA",
+          paidAt: { $exists: false },
+          status: { $ne: "CANCELADO" },
+          ...(cashReceivedCents !== null ? { totalCents: { $lte: cashReceivedCents } } : {}),
+        },
+        {
+          $set: {
+            paidAt: now,
+            paymentMethod: args.method,
+            paidByStaffId: staff.id,
+            updatedAt: now,
+            ...(cashReceivedCents !== null ? { cashReceivedCents } : {}),
+          },
+        },
         { new: true }
       );
       if (!order) {
-        const current = await Order.findById(args.id).select("code serviceType paidAt status").lean();
+        const current = await Order.findById(args.id).select("code serviceType paidAt status totalCents").lean();
         if (!current) throw new Error("Pedido no encontrado");
         if (current.serviceType !== "MESA") throw new Error("Solo los pedidos de mesa o barra se cobran aparte");
         if (current.paidAt) throw new Error(`El pedido ${current.code} ya esta cobrado`);
-        throw new Error(`El pedido ${current.code} esta cancelado`);
+        if (current.status === "CANCELADO") throw new Error(`El pedido ${current.code} esta cancelado`);
+        throw new Error("Lo recibido no cubre el total del pedido");
       }
 
       await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
@@ -407,7 +438,7 @@ export const ordersResolvers = {
 
     setOrderStatus: async (
       _: unknown,
-      args: { id: string; status: OrderStatus; paymentMethod?: PaymentMethod | null },
+      args: { id: string; status: OrderStatus; paymentMethod?: PaymentMethod | null; cashReceivedCents?: number | null },
       ctx: GraphQLContext
     ) => {
       const staff = requireStaff(ctx, ["barra", "gestion"]);
@@ -416,6 +447,7 @@ export const ordersResolvers = {
       if (paidOnDelivery && (args.status !== "ENTREGADO" || !PAYMENT_METHODS.includes(args.paymentMethod!))) {
         throw new Error("El metodo de pago solo se indica al entregar un pedido que no es de mesa");
       }
+      const cashReceivedCents = checkCashReceived(args.paymentMethod, args.cashReceivedCents);
 
       // La comprobacion del estado de origen va dentro del propio update: si dos personas
       // actuan a la vez sobre el mismo pedido, solo una lo consigue (y solo se emite un evento,
@@ -429,6 +461,7 @@ export const ordersResolvers = {
       }
       // Los de mesa se cobran aparte (markOrderPaid), antes o despues de entregar.
       if (paidOnDelivery) filter.serviceType = { $ne: "MESA" };
+      if (cashReceivedCents !== null) filter.totalCents = { $lte: cashReceivedCents };
       const order = await Order.findOneAndUpdate(
         filter,
         // findOneAndUpdate no pasa por el hook pre("save"): updatedAt se fija aqui a mano.
@@ -438,16 +471,20 @@ export const ordersResolvers = {
             updatedAt: now,
             ...(args.status === "ENTREGADO" ? { deliveredAt: now } : {}),
             ...(paidOnDelivery ? { paidAt: now, paymentMethod: args.paymentMethod, paidByStaffId: staff.id } : {}),
+            ...(cashReceivedCents !== null ? { cashReceivedCents } : {}),
           },
           $push: { statusHistory: { status: args.status, at: now, staffId: staff.id } },
         },
         { new: true }
       );
       if (!order) {
-        const current = await Order.findById(args.id).select("status code serviceType").lean();
+        const current = await Order.findById(args.id).select("status code serviceType totalCents").lean();
         if (!current) throw new Error("Pedido no encontrado");
         if (paidOnDelivery && current.serviceType === "MESA") {
           throw new Error(`El pedido ${current.code} es de mesa: se cobra aparte`);
+        }
+        if (cashReceivedCents !== null && current.totalCents > cashReceivedCents && ALLOWED_FROM[args.status].includes(current.status)) {
+          throw new Error("Lo recibido no cubre el total del pedido");
         }
         throw new Error(
           `El pedido ${current.code} esta "${STATUS_LABELS[current.status]}" y no puede pasar a "${STATUS_LABELS[args.status]}"`

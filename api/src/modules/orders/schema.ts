@@ -133,6 +133,10 @@ export const ordersTypeDefs = /* GraphQL */ `
     """Solo pedidos de mesa y barra, que se cobran aparte (antes o despues de entregar)."""
     paidAt: String
     paymentMethod: PaymentMethod
+    """Solo en efectivo, si se anoto al cobrar: lo que entrego el cliente."""
+    cashReceivedCents: Int
+    """El cambio que se devolvio (cashReceivedCents - totalCents); null si no se anoto lo recibido."""
+    changeCents: Int
     """De mesa o barra, sin cobrar y no cancelado."""
     awaitingPayment: Boolean!
     createdAt: String!
@@ -160,6 +164,8 @@ export const ordersTypeDefs = /* GraphQL */ `
     """Guardar y pagar: ya se entrego y se cobra en el acto con este metodo. El pedido nace
     entregado y cobrado (cerrado), sin pasar por la cola."""
     paymentMethod: PaymentMethod
+    """Solo con paymentMethod EFECTIVO: lo que entrega el cliente (debe cubrir el total)."""
+    cashReceivedCents: Int
     """Canje de sellos (ver OrderRedemptionInput)."""
     redemption: OrderRedemptionInput
     """Descuento con su motivo (ver OrderDiscountInput)."""
@@ -190,9 +196,9 @@ export const ordersTypeDefs = /* GraphQL */ `
     createOrder(items: [OrderLineInput!]!, pickupSlot: String, table: String): Order!
     """paymentMethod: solo al pasar a ENTREGADO un pedido que no es de mesa (se cobra al entregarlo):
     queda cobrado con ese metodo, para el cierre de caja."""
-    setOrderStatus(id: ID!, status: OrderStatus!, paymentMethod: PaymentMethod): Order!
+    setOrderStatus(id: ID!, status: OrderStatus!, paymentMethod: PaymentMethod, cashReceivedCents: Int): Order!
     """Personal: cobra un pedido de mesa o barra (antes o despues de entregarlo)."""
-    markOrderPaid(id: ID!, method: PaymentMethod!): Order!
+    markOrderPaid(id: ID!, method: PaymentMethod!, cashReceivedCents: Int): Order!
     """Personal: pedido tomado en el local (mesero o barra). La recogida es ahora."""
     createStaffOrder(input: StaffOrderInput!): Order!
     """Personal: fija el canje de sellos y el descuento de un pedido aun sin cobrar (null: sin el).

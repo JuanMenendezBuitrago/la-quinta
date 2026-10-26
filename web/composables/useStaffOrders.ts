@@ -91,6 +91,14 @@ export function discountProblem(d: DiscountInput, grossCents: number, role: stri
   return null;
 }
 
+/** "Efectivo · recibido $100.000, cambio $23.500" (o solo el metodo si no se anoto lo recibido). */
+export function paymentDetail(order: { paymentMethod?: PaymentMethod | null; cashReceivedCents?: number | null; changeCents?: number | null }) {
+  const method = order.paymentMethod ? PAYMENT_LABELS[order.paymentMethod] : "sin método";
+  if (order.cashReceivedCents == null) return method;
+  const fmt = (n: number) => n.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+  return `${method} · recibido ${fmt(order.cashReceivedCents)}, cambio ${fmt(order.changeCents ?? 0)}`;
+}
+
 /** "Invitación de la casa" u "Otro: cumpleaños", para el ticket, la cola y el historial. */
 export function discountLabel(d: { reason: DiscountReason; note?: string | null; percent?: number | null }) {
   const reason = d.reason === "OTRO" && d.note ? d.note : DISCOUNT_REASON_LABELS[d.reason];
@@ -140,6 +148,8 @@ const ORDER_FIELDS = `
   updatedAt
   paidAt
   paymentMethod
+  cashReceivedCents
+  changeCents
   awaitingPayment
   customer {
     name
@@ -175,24 +185,28 @@ export interface HistoryFilter {
 }
 
 const SET_STATUS = gql`
-  mutation SetOrderStatus($id: ID!, $status: OrderStatus!, $paymentMethod: PaymentMethod) {
-    setOrderStatus(id: $id, status: $status, paymentMethod: $paymentMethod) {
+  mutation SetOrderStatus($id: ID!, $status: OrderStatus!, $paymentMethod: PaymentMethod, $cashReceivedCents: Int) {
+    setOrderStatus(id: $id, status: $status, paymentMethod: $paymentMethod, cashReceivedCents: $cashReceivedCents) {
       id
       status
       awaitingPayment
       paidAt
       paymentMethod
+      cashReceivedCents
+      changeCents
     }
   }
 `;
 
 const MARK_PAID = gql`
-  mutation MarkOrderPaid($id: ID!, $method: PaymentMethod!) {
-    markOrderPaid(id: $id, method: $method) {
+  mutation MarkOrderPaid($id: ID!, $method: PaymentMethod!, $cashReceivedCents: Int) {
+    markOrderPaid(id: $id, method: $method, cashReceivedCents: $cashReceivedCents) {
       id
       status
       paidAt
       paymentMethod
+      cashReceivedCents
+      changeCents
       awaitingPayment
     }
   }
@@ -392,12 +406,13 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
    * La API rechaza las transiciones no validas (p. ej. si otra persona ya movio el pedido):
    * se muestra el motivo y se recarga la cola para ver el estado real. Devuelve si se aplico.
    */
-  async function changeStatus(order: any, status: string, paymentMethod?: PaymentMethod) {
+  // cashReceivedCents: solo al entregar y cobrar en efectivo, lo que entrego el cliente (si se anoto).
+  async function changeStatus(order: any, status: string, paymentMethod?: PaymentMethod, cashReceivedCents?: number | null) {
     if (busyOrderId.value) return false;
     busyOrderId.value = order.id;
     actionError.value = "";
     try {
-      await setStatus({ id: order.id, status, paymentMethod: paymentMethod ?? null });
+      await setStatus({ id: order.id, status, paymentMethod: paymentMethod ?? null, cashReceivedCents: cashReceivedCents ?? null });
       return true;
     } catch (err: any) {
       actionError.value = err?.message ?? "No se pudo cambiar el estado del pedido";
@@ -416,8 +431,8 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
   function paysOnDelivery(order: any) {
     return order.status === "LISTO" && order.serviceType !== "MESA";
   }
-  async function deliverAndPay(order: any, method: PaymentMethod) {
-    return changeStatus(order, "ENTREGADO", method);
+  async function deliverAndPay(order: any, method: PaymentMethod, cashReceivedCents: number | null = null) {
+    return changeStatus(order, "ENTREGADO", method, cashReceivedCents);
   }
   async function goBack(order: any) {
     const status = PREV_STATUS[order.status];
@@ -469,12 +484,12 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
 
   // Cobro de pedidos de mesa o barra (antes o despues de entregar).
   const { mutate: markPaidMutation } = useMutation(MARK_PAID);
-  async function markPaid(order: any, method: PaymentMethod) {
+  async function markPaid(order: any, method: PaymentMethod, cashReceivedCents: number | null = null) {
     if (busyOrderId.value) return false;
     busyOrderId.value = order.id;
     actionError.value = "";
     try {
-      await markPaidMutation({ id: order.id, method });
+      await markPaidMutation({ id: order.id, method, cashReceivedCents });
       return true;
     } catch (err: any) {
       actionError.value = err?.message ?? "No se pudo cobrar el pedido";

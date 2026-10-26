@@ -414,13 +414,14 @@ function reset() {
 
 // Efectivo: antes, el modal calcula el cambio; al confirmar se guarda y se cierra (si falla, el error sale en el ticket).
 const cashDialog = ref<InstanceType<typeof CashChangeDialog> | null>(null);
-async function payCash() {
-  await submit("EFECTIVO");
+async function payCash(cashReceivedCents: number | null) {
+  await submit("EFECTIVO", cashReceivedCents);
   cashDialog.value?.close();
 }
 
 // Con metodo de pago: guardar y pagar (nace entregado y cobrado).
-async function submit(paymentMethod: PaymentMethod | null = null) {
+// cashReceivedCents: en efectivo, lo que entrego el cliente (si se anoto en el modal).
+async function submit(paymentMethod: PaymentMethod | null = null, cashReceivedCents: number | null = null) {
   if (!canSubmit.value) return;
   submitting.value = true;
   submitError.value = "";
@@ -435,6 +436,7 @@ async function submit(paymentMethod: PaymentMethod | null = null) {
         customerId: customer.value?.id ?? null,
         note: note.value.trim() || null,
         paymentMethod,
+        cashReceivedCents,
         redemption: redemption.value,
         discount: discount.value,
       },

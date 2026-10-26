@@ -159,7 +159,7 @@
                 </button>
               </div>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
-              <p v-if="order.paidAt" class="paid-badge">Cobrado · {{ paymentLabel(order.paymentMethod) }}</p>
+              <p v-if="order.paidAt" class="paid-badge">Cobrado · {{ paymentDetail(order) }}</p>
             </div>
 
             <div v-if="assigningId === order.id" class="assign-box">
@@ -274,7 +274,7 @@
             <OrderItems :items="order.items" list />
             <p class="muted">
               {{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}{{
-                order.paidAt ? ` · Cobrado con ${paymentLabel(order.paymentMethod)}` : ""
+                order.paidAt ? ` · Cobrado con ${paymentDetail(order)}` : ""
               }}
             </p>
             <p v-if="order.redemption" class="muted discount-note">
@@ -372,6 +372,7 @@ import { useStaffAuth } from "~/composables/useAuth";
 import {
   PAYMENT_LABELS,
   discountLabel,
+  paymentDetail,
   useStaffOrders,
   type CustomerMatch,
   type OrderDiscounts,
@@ -484,9 +485,11 @@ watch(stockAlert, (alert) => {
 
 const pendingCancelId = ref("");
 const payingId = ref("");
-async function doPay(order: any, method: PaymentMethod) {
+async function doPay(order: any, method: PaymentMethod, cashReceivedCents: number | null = null) {
   // Mesa: se cobra aparte. Para llevar o web: se entrega y se cobra a la vez (cuenta en el cierre de caja).
-  const done = order.awaitingPayment ? await markPaid(order, method) : await deliverAndPay(order, method);
+  const done = order.awaitingPayment
+    ? await markPaid(order, method, cashReceivedCents)
+    : await deliverAndPay(order, method, cashReceivedCents);
   if (done) payingId.value = "";
 }
 // Efectivo: el modal calcula el cambio antes de registrar el cobro.
@@ -496,8 +499,8 @@ function openCash(order: any) {
   cashOrder.value = order;
   cashDialog.value?.open();
 }
-async function payCash() {
-  if (cashOrder.value) await doPay(cashOrder.value, "EFECTIVO");
+async function payCash(cashReceivedCents: number | null) {
+  if (cashOrder.value) await doPay(cashOrder.value, "EFECTIVO", cashReceivedCents);
   cashDialog.value?.close();
 }
 // Descuento al cobrar: se guarda en el pedido (con motivo) y el importe a cobrar baja al momento.

@@ -1,6 +1,7 @@
 <template>
   <!-- Cobro en efectivo: con cuanto paga el cliente y cuanto hay que devolverle. Se abre con open();
-       "Cobrar" emite confirm y quien lo usa registra el pago (y cierra con close()). -->
+       "Cobrar" emite confirm(lo recibido, o null si no se anoto) y quien lo usa registra el pago,
+       que guarda lo recibido en el pedido para el tiquet (y cierra con close()). -->
   <dialog ref="dialog" class="cash-dialog" aria-labelledby="cash-dialog-title" @click.self="close">
     <form class="cash-dialog-body" @submit.prevent="confirm">
       <div class="cash-dialog-head">
@@ -46,7 +47,7 @@
 
 <script setup lang="ts">
 const props = defineProps<{ totalCents: number; busy?: boolean }>();
-const emit = defineEmits<{ confirm: [] }>();
+const emit = defineEmits<{ confirm: [cashReceivedCents: number | null] }>();
 
 const dialog = ref<HTMLDialogElement | null>(null);
 const input = ref<HTMLInputElement | null>(null);
@@ -80,7 +81,7 @@ function close() {
 }
 function confirm() {
   if (props.busy || (paid.value !== null && paid.value < props.totalCents)) return;
-  emit("confirm");
+  emit("confirm", paid.value);
 }
 
 defineExpose({ open, close });
