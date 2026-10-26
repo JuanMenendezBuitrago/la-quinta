@@ -68,3 +68,15 @@ export function goToSection(id: StaffSectionId) {
 export function useStaffBadges() {
   return useState<Partial<Record<StaffSectionId, number>>>("lq-staff-badges", () => ({}));
 }
+
+/**
+ * Los contadores para pintarlos en los menus: vacios hasta montar. La cabecera y la barra inferior
+ * se pintan antes que la pagina, que los calcula con datos que en el SSR aun no han llegado; si se
+ * pintaran ya al hidratar, el navegador los mostraria y el servidor no (aviso de hidratacion).
+ */
+export function useShownStaffBadges() {
+  const badges = useStaffBadges();
+  const mounted = ref(false);
+  onMounted(() => (mounted.value = true));
+  return computed<Partial<Record<StaffSectionId, number>>>(() => (mounted.value ? badges.value : {}));
+}

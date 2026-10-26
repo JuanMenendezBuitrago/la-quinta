@@ -134,7 +134,7 @@ import {
   goToSection,
   STAFF_GROUPS,
   STAFF_SECTIONS,
-  useStaffBadges,
+  useShownStaffBadges,
   useStaffSection,
   useVisibleSections,
   type StaffSectionId,
@@ -171,7 +171,7 @@ const { staff, logout } = useStaffAuth();
 const person = computed(() => staff.value?.actingAs ?? staff.value);
 const section = useStaffSection();
 const visibleSections = useVisibleSections();
-const badges = useStaffBadges();
+const badges = useShownStaffBadges();
 
 const roleLabel = computed(() => (staff.value?.role === "gestion" ? "Gestión" : "Barra"));
 

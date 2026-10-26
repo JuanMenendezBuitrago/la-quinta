@@ -6,21 +6,23 @@ export function useOrderNotifications() {
   const supported = import.meta.client && typeof window !== "undefined" && "Notification" in window;
 
   // Se expone como estado reactivo para que el boton del panel refleje "concedido / denegado /
-  // sin pedir" sin tener que recargar la pagina.
-  const permission = ref<NotificationPermission | "unsupported">(
-    supported ? Notification.permission : "unsupported"
-  );
+  // sin pedir" sin tener que recargar la pagina. Empieza como en el servidor (que no tiene
+  // Notification) y se lee al montar: si no, el boton del panel no coincide al hidratar.
+  const permission = ref<NotificationPermission | "unsupported">("unsupported");
 
   // El permiso del navegador no se puede retirar desde la pagina: para "desactivarlas" se
   // silencian aqui, por dispositivo (localStorage), sin tocar el permiso.
   const MUTED_KEY = "lq-order-notifications-muted";
   const muted = ref(false);
   if (supported) {
-    try {
-      muted.value = localStorage.getItem(MUTED_KEY) === "1";
-    } catch {
-      // almacenamiento bloqueado (modo privado, etc.): quedan activas
-    }
+    onMounted(() => {
+      permission.value = Notification.permission;
+      try {
+        muted.value = localStorage.getItem(MUTED_KEY) === "1";
+      } catch {
+        // almacenamiento bloqueado (modo privado, etc.): quedan activas
+      }
+    });
   }
   function toggleMuted() {
     muted.value = !muted.value;

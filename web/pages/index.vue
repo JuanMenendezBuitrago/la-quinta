@@ -13,7 +13,7 @@
         :key="category.id"
         type="button"
         class="pill"
-        :class="{ active: activeCategoryId === category.id }"
+        :class="{ active: shownCategoryId === category.id }"
         :data-cat-id="category.id"
         @click="selectCategory(category.id)"
       >
@@ -100,15 +100,22 @@ const canOrder = useCustomerOrdering();
 const { customer } = useAuth();
 const { isFavorite, toggleFavorite } = useFavorites();
 
-// Con favoritos, una categoria "Favoritos" al principio (con su pildora) que los reune.
+// Con favoritos, una categoria "Favoritos" al principio (con su pildora) que los reune. Los
+// favoritos solo se cargan en el navegador: hasta montar no se añade, para que el primer pintado
+// coincida con el del servidor al hidratar.
 const FAVORITES_ID = "favoritos";
+const mounted = ref(false);
+onMounted(() => (mounted.value = true));
 const sections = computed(() => {
   const categories = menu.value.map((c) => ({ id: c.id, name: c.name, entries: menuEntries(c.items) }));
-  const favorites = categories.flatMap((c) => c.entries.filter((e) => isFavorite(e)));
+  const favorites = mounted.value ? categories.flatMap((c) => c.entries.filter((e) => isFavorite(e))) : [];
   return favorites.length ? [{ id: FAVORITES_ID, name: "Favoritos", entries: favorites }, ...categories] : categories;
 });
 
 const activeCategoryId = ref<string | null>(null);
+// En el SSR los watch no vuelven a correr cuando llega la carta, asi que activeCategoryId sigue a
+// null: sin elegida, la primera. Servidor y navegador pintan asi la misma pildora activa.
+const shownCategoryId = computed(() => activeCategoryId.value ?? sections.value[0]?.id ?? null);
 const pillsNav = ref<HTMLElement | null>(null);
 watch(
   sections,

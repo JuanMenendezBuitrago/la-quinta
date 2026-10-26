@@ -28,7 +28,7 @@
 <script setup lang="ts">
 import type { Component } from "vue";
 import { Calculator, ClipboardList, History, Package, SquarePen, Users } from "lucide-vue-next";
-import { goToSection, useStaffBadges, useStaffSection, useVisibleSections, type StaffSectionId } from "~/composables/useStaffSections";
+import { goToSection, useShownStaffBadges, useStaffSection, useVisibleSections, type StaffSectionId } from "~/composables/useStaffSections";
 
 interface QuickAction {
   id: string;
@@ -43,7 +43,7 @@ interface QuickAction {
 
 const visibleSections = useVisibleSections();
 const section = useStaffSection();
-const badges = useStaffBadges();
+const badges = useShownStaffBadges();
 
 // Cambiar de seccion solo cambia la query (?s=...): sin esto se quedaria el scroll de la anterior,
 // p. ej. al fondo de la cola.
