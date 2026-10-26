@@ -1,7 +1,8 @@
 <template>
   <!-- Cobro en efectivo: con cuanto paga el cliente y cuanto hay que devolverle. Se abre con open();
-       "Cobrar" emite confirm(lo recibido, o null si no se anoto) y quien lo usa registra el pago,
-       que guarda lo recibido en el pedido para el tiquet (y cierra con close()). -->
+       "Cobrar" (activo solo con una cantidad que cubra el total, o "Exacto") emite confirm(lo
+       recibido) y quien lo usa registra el pago, que guarda lo recibido en el pedido para el
+       tiquet (y cierra con close()). -->
   <dialog ref="dialog" class="cash-dialog" aria-labelledby="cash-dialog-title" @click.self="close">
     <form class="cash-dialog-body" @submit.prevent="confirm">
       <div class="cash-dialog-head">
@@ -36,7 +37,7 @@
       </p>
 
       <div class="actions">
-        <button class="button" type="submit" :disabled="busy || (paid !== null && paid < totalCents)">
+        <button class="button" type="submit" :disabled="busy || !canCharge">
           {{ busy ? "Cobrando…" : "Cobrar" }}
         </button>
         <button class="button secondary" type="button" :disabled="busy" @click="close">Volver</button>
@@ -47,7 +48,7 @@
 
 <script setup lang="ts">
 const props = defineProps<{ totalCents: number; busy?: boolean }>();
-const emit = defineEmits<{ confirm: [cashReceivedCents: number | null] }>();
+const emit = defineEmits<{ confirm: [cashReceivedCents: number] }>();
 
 const dialog = ref<HTMLDialogElement | null>(null);
 const input = ref<HTMLInputElement | null>(null);
@@ -79,8 +80,10 @@ async function open() {
 function close() {
   dialog.value?.close();
 }
+// Hay que indicar lo que entrega (o "Exacto"): asi el tiquet siempre lleva lo recibido y el cambio.
+const canCharge = computed(() => paid.value !== null && paid.value >= props.totalCents);
 function confirm() {
-  if (props.busy || (paid.value !== null && paid.value < props.totalCents)) return;
+  if (props.busy || paid.value === null || !canCharge.value) return;
   emit("confirm", paid.value);
 }
 

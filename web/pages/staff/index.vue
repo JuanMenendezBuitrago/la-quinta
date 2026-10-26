@@ -525,7 +525,7 @@ function openCash(order: any) {
   cashOrder.value = order;
   cashDialog.value?.open();
 }
-async function payCash(cashReceivedCents: number | null) {
+async function payCash(cashReceivedCents: number) {
   if (cashOrder.value) await doPay(cashOrder.value, "EFECTIVO", cashReceivedCents);
   cashDialog.value?.close();
 }

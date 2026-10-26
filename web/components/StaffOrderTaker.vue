@@ -434,7 +434,7 @@ function reset() {
 
 // Efectivo: antes, el modal calcula el cambio; al confirmar se guarda y se cierra (si falla, el error sale en el ticket).
 const cashDialog = ref<InstanceType<typeof CashChangeDialog> | null>(null);
-async function payCash(cashReceivedCents: number | null) {
+async function payCash(cashReceivedCents: number) {
   await submit("EFECTIVO", cashReceivedCents);
   cashDialog.value?.close();
 }
