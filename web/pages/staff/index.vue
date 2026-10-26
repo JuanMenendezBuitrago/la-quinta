@@ -200,14 +200,14 @@
               <span class="muted">{{ order.awaitingPayment ? "Cobrar" : "Entregar y cobrar" }} {{ formatPrice(order.totalCents) }} con:</span>
               <div class="pay-methods">
                 <button
-                  v-for="(label, method) in PAYMENT_LABELS"
+                  v-for="method in PAYMENT_OPTIONS"
                   :key="method"
                   class="button"
                   type="button"
                   :disabled="busyOrderId === order.id"
                   @click="method === 'EFECTIVO' ? openCash(order) : doPay(order, method)"
                 >
-                  {{ label }}
+                  {{ PAYMENT_LABELS[method] }}
                 </button>
               </div>
               <div class="pay-extra">
@@ -396,6 +396,7 @@ import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, 
 import { useStaffAuth } from "~/composables/useAuth";
 import {
   PAYMENT_LABELS,
+  PAYMENT_OPTIONS,
   discountLabel,
   paymentDetail,
   useStaffOrders,

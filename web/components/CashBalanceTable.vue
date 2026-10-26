@@ -43,7 +43,7 @@ const props = defineProps<{ balances: MethodBalance[]; format: (cents: number) =
 const LABELS: Record<string, string> = {
   EFECTIVO: "Efectivo (cajón)",
   TARJETA: "Tarjeta",
-  TRANSFERENCIA: "Transferencia/Nequi",
+  TRANSFERENCIA: "Transferencia",
   OTRO: "Otro / sin método",
 };
 

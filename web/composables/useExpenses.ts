@@ -21,7 +21,7 @@ export const EXPENSE_FIELDS = `id amountCents method category description suppli
 export const EXPENSE_METHOD_LABELS: Record<ExpenseMethod, string> = {
   CAJA: "Efectivo de la caja",
   TARJETA: "Tarjeta",
-  TRANSFERENCIA: "Transferencia/Nequi",
+  TRANSFERENCIA: "Transferencia",
   OTRO: "Otro",
 };
 

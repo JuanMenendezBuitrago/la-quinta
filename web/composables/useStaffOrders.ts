@@ -8,8 +8,11 @@ export type PaymentMethod = "EFECTIVO" | "TARJETA" | "TRANSFERENCIA";
 export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
   EFECTIVO: "Efectivo",
   TARJETA: "Tarjeta",
-  TRANSFERENCIA: "Transferencia/Nequi",
+  TRANSFERENCIA: "Transferencia",
 };
+/** Metodos con los que se puede cobrar ahora (de momento sin tarjeta). Las etiquetas siguen
+ * todas: los pedidos ya cobrados con tarjeta se muestran igual en la cola, el historial y la caja. */
+export const PAYMENT_OPTIONS: PaymentMethod[] = ["EFECTIVO", "TRANSFERENCIA"];
 
 /** Motivo de un descuento: siempre se pide, para que el cierre de caja explique cada rebaja. */
 export type DiscountReason = "CANJE" | "INVITACION" | "PERSONAL" | "ERROR" | "HABITUAL" | "OTRO";

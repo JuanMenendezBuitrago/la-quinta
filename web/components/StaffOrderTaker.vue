@@ -200,30 +200,35 @@
 
       <p v-if="missingChoice" class="muted" style="color: var(--danger)">Elige la opción marcada en rojo: la de siempre está agotada.</p>
       <p v-if="submitError" class="muted" style="color: var(--danger)">{{ submitError }}</p>
-      <!-- Guardar y pagar: ya se sirvio y se cobra en el acto; el pedido no pasa por la cola -->
-      <div v-if="choosingPayment" class="pay-box">
-        <span class="muted">Guardar y cobrar {{ formatPrice(finalCents) }} con:</span>
-        <div class="pay-methods">
-          <button
-            v-for="(label, method) in PAYMENT_LABELS"
-            :key="method"
-            class="button"
-            type="button"
-            :disabled="!canSubmit"
-            @click="method === 'EFECTIVO' ? cashDialog?.open() : submit(method)"
-          >
-            {{ submitting ? "Guardando…" : label }}
-          </button>
-        </div>
-        <CashChangeDialog ref="cashDialog" :total-cents="finalCents" :busy="submitting" @confirm="payCash" />
-        <button class="button secondary" type="button" :disabled="submitting" @click="choosingPayment = false">Volver</button>
-      </div>
-      <div v-else class="ticket-actions">
-        <!-- Lo mas habitual: se sirve y se cobra en el acto; por eso va destacado y primero -->
-        <button class="button" type="button" :disabled="!canSubmit" @click="choosingPayment = true">
-          <Banknote :size="16" :stroke-width="1.8" aria-hidden="true" />
-          Guardar y pagar
-        </button>
+      <!-- Pagar (guardar y cobrar en el acto, sin pasar por la cola): en la cabecera de la seccion, a
+           la derecha del titulo. Primero "Pagar"; al pulsarlo, en su lugar, las formas de pago.
+           Solo en cliente: Teleport fuera de #teleports no se renderiza en SSR. -->
+      <ClientOnly>
+        <Teleport to="#staff-hero-actions">
+          <div class="hero-pay">
+            <template v-if="choosingPayment">
+              <span class="muted hero-pay-label">Cobrar {{ formatPrice(finalCents) }} con:</span>
+              <button
+                v-for="method in PAYMENT_OPTIONS"
+                :key="method"
+                class="button"
+                type="button"
+                :disabled="!canSubmit"
+                @click="method === 'EFECTIVO' ? cashDialog?.open() : submit(method)"
+              >
+                {{ submitting ? "Guardando…" : PAYMENT_LABELS[method] }}
+              </button>
+              <button class="button secondary" type="button" :disabled="submitting" @click="choosingPayment = false">Volver</button>
+            </template>
+            <button v-else class="button" type="button" :disabled="!canSubmit" @click="choosingPayment = true">
+              <Banknote :size="16" :stroke-width="1.8" aria-hidden="true" />
+              Pagar
+            </button>
+          </div>
+        </Teleport>
+      </ClientOnly>
+      <CashChangeDialog ref="cashDialog" :total-cents="finalCents" :busy="submitting" @confirm="payCash" />
+      <div v-if="queueEnabled || lines.length" class="ticket-actions">
         <!-- Sin cola nadie lo prepararia: solo se registran pedidos ya servidos y cobrados -->
         <button v-if="queueEnabled" class="button secondary" type="button" :disabled="!canSubmit" @click="submit()">
           {{ submitting ? "Haciendo pedido…" : "Hacer pedido" }}
@@ -257,6 +262,7 @@ import { useOrderQueueEnabled, usePackagingFee } from "~/composables/useSiteSett
 import {
   ORDER_FIELDS,
   PAYMENT_LABELS,
+  PAYMENT_OPTIONS,
   discountAmount,
   discountLabel,
   discountProblem,
@@ -781,9 +787,10 @@ input {
 .takeaway-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
 .customer-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ticket-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.pay-box { display: flex; flex-direction: column; gap: 8px; }
-.pay-methods { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
-.pay-methods .button { min-height: 44px; }
+/* Cabecera de la seccion (#staff-hero-actions): "Pagar" o, tras pulsarlo, las formas de pago */
+.hero-pay { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.hero-pay .button { min-height: 44px; }
+.hero-pay-label { font-size: 14px; }
 
 .sticky-bar {
   position: fixed;
