@@ -2,16 +2,23 @@
   <!-- Pantallas anchas apaisadas: productos a la izquierda; ticket a la derecha, fijo al hacer scroll -->
   <section class="order-taker wide-layout">
     <div class="wide-main">
-    <p v-if="lastCode" class="card sent-notice" role="status">
-      Pedido <strong class="code">{{ lastCode }}</strong>
-      {{ lastPaidWith ? `guardado y cobrado (${PAYMENT_LABELS[lastPaidWith].toLowerCase()}).` : "enviado a la cola." }}
-      <button v-if="ticketPrintingEnabled && lastOrder" class="button" type="button" @click="printLastTicket">
-        <Printer :size="16" :stroke-width="1.8" aria-hidden="true" />
-        Imprimir ticket
-      </button>
-      <button class="button secondary" type="button" @click="lastCode = ''">Cerrar</button>
-      <span v-if="printNotice" class="print-notice" role="alert">{{ printNotice }}</span>
-    </p>
+    <!-- El texto a la izquierda; los botones, en columna a la derecha -->
+    <div v-if="lastCode" class="card sent-notice" role="status">
+      <div class="sent-text">
+        <p>
+          Pedido <strong class="code">{{ lastCode }}</strong>
+          {{ lastPaidWith ? `guardado y cobrado (${PAYMENT_LABELS[lastPaidWith].toLowerCase()}).` : "enviado a la cola." }}
+        </p>
+        <p v-if="printNotice" class="print-notice" role="alert">{{ printNotice }}</p>
+      </div>
+      <div class="sent-actions">
+        <button v-if="ticketPrintingEnabled && lastOrder" class="button" type="button" @click="printLastTicket">
+          <Printer :size="16" :stroke-width="1.8" aria-hidden="true" />
+          Imprimir ticket
+        </button>
+        <button class="button secondary" type="button" @click="lastCode = ''">Cerrar</button>
+      </div>
+    </div>
 
     <!-- Carta: mismos datos que la carta publica, en formato compacto para teclear rapido -->
     <!-- En movil el buscador va plegado: se abre con la lupa de la fila de categorias -->
@@ -489,8 +496,12 @@ input {
 }
 .code { font-family: ui-monospace, monospace; font-weight: 700; letter-spacing: 0.06em; color: var(--accent); }
 
-.sent-notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; border-color: var(--accent); }
-.print-notice { flex-basis: 100%; color: var(--danger); font-size: 14px; }
+.sent-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; border-color: var(--accent); }
+.sent-text { min-width: 0; }
+.sent-text p { margin: 0; }
+.print-notice { margin-top: 6px !important; color: var(--danger); font-size: 14px; }
+/* Botones uno debajo de otro, del mismo ancho, pegados al borde derecho */
+.sent-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; flex-shrink: 0; }
 
 .search { display: none; margin-bottom: 10px; }
 .shortcuts { display: flex; gap: 6px; overflow-x: auto; padding: 6px 6px 8px 0; margin-bottom: 4px; }
