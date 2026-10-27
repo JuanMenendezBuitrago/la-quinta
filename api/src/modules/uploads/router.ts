@@ -125,6 +125,12 @@ uploadsRouter.post("/avatar", (req, res) => {
     res.status(401).json({ error: "No autorizado" });
     return;
   }
+  // Cuenta compartida con alguien elegido (sin contraseña): no toca avatares del personal, ni el
+  // propio. Para eso se entra con la cuenta de cada cual.
+  if (payload.kind === "staff" && payload.actor) {
+    res.status(403).json({ error: "Para cambiar avatares del personal entra con tu propia cuenta" });
+    return;
+  }
   const targetStaffId = typeof req.query.staffId === "string" ? req.query.staffId : null;
   if (targetStaffId && (payload.kind !== "staff" || payload.role !== "gestion" || !Types.ObjectId.isValid(targetStaffId))) {
     res.status(403).json({ error: "Solo gestion puede cambiar el avatar de otra persona" });
@@ -152,8 +158,7 @@ uploadsRouter.post("/avatar", (req, res) => {
       // Devuelve el documento anterior: hace falta su avatar para borrar la foto vieja.
       const previous =
         payload.kind === "staff"
-          ? // En una cuenta compartida, "mi avatar" es el de la persona que la esta usando
-            await StaffUser.findByIdAndUpdate(targetStaffId ?? payload.actor ?? payload.sub, { avatar }).lean()
+          ? await StaffUser.findByIdAndUpdate(targetStaffId ?? payload.sub, { avatar }).lean()
           : await User.findOneAndUpdate({ _id: payload.sub, deletedAt: { $exists: false } }, { avatar }).lean();
       if (!previous) {
         await removeAvatarFile(avatar, UPLOAD_DIR);

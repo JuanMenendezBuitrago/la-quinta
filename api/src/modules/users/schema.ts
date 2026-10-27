@@ -118,6 +118,11 @@ export const usersTypeDefs = /* GraphQL */ `
     staffLogin(email: String!, password: String!): StaffAuthPayload!
     """Login del equipo eligiendo la cuenta en staffLoginOptions: solo pide la contraseña."""
     staffLoginById(id: ID!, password: String!): StaffAuthPayload!
+    """Contraseña olvidada: envia un codigo al email de la cuenta (por su id en staffLoginOptions o
+    por su email). Devuelve el email enmascarado ("k***@gmail.com"), o null si no hay tal cuenta."""
+    requestStaffPasswordReset(id: ID, email: String): String
+    """Con el codigo de requestStaffPasswordReset, pone la contraseña nueva y abre sesion."""
+    resetStaffPassword(id: ID, email: String, code: String!, newPassword: String!): StaffAuthPayload!
     """Cuenta compartida: elige quien la esta usando. Devuelve un token nuevo con esa persona (sin
     pedir su contraseña: solo cambia a nombre de quien queda lo que se hace, no los permisos)."""
     setActingStaff(staffId: ID!): StaffAuthPayload!

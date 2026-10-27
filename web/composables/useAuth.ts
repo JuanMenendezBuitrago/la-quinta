@@ -80,6 +80,29 @@ const STAFF_LOGIN_BY_ID = gql`
   }
 `;
 
+// Contraseña olvidada: codigo al email de la cuenta (por su id en la lista o por su email).
+const REQUEST_STAFF_PASSWORD_RESET = gql`
+  mutation RequestStaffPasswordReset($id: ID, $email: String) {
+    requestStaffPasswordReset(id: $id, email: $email)
+  }
+`;
+
+const RESET_STAFF_PASSWORD = gql`
+  mutation ResetStaffPassword($id: ID, $email: String, $code: String!, $newPassword: String!) {
+    resetStaffPassword(id: $id, email: $email, code: $code, newPassword: $newPassword) {
+      token
+      staff {
+        id
+        name
+        email
+        role
+        avatar
+        shared
+      }
+    }
+  }
+`;
+
 const SESSION_QUERY = gql`
   query Session {
     me {
@@ -214,6 +237,8 @@ export function useStaffAuth() {
   const { mutate: staffLogin } = useMutation(STAFF_LOGIN);
   const { mutate: staffLoginById } = useMutation(STAFF_LOGIN_BY_ID);
   const { mutate: setActing } = useMutation(SET_ACTING_STAFF);
+  const { mutate: requestReset } = useMutation(REQUEST_STAFF_PASSWORD_RESET);
+  const { mutate: resetPassword } = useMutation(RESET_STAFF_PASSWORD);
 
   async function startSession(payload: { token: string; staff: any } | undefined) {
     if (!payload) throw new Error("Credenciales invalidas");
@@ -233,6 +258,21 @@ export function useStaffAuth() {
     return startSession(result?.data?.staffLoginById);
   }
 
+  /**
+   * Contraseña olvidada: envia el codigo. Devuelve el email (enmascarado) al que llega, o null si
+   * la cuenta no tiene donde recibirlo.
+   */
+  async function requestPasswordReset(target: { id?: string; email?: string }) {
+    const result = await requestReset(target);
+    return (result?.data?.requestStaffPasswordReset as string | null | undefined) ?? null;
+  }
+
+  /** Con el codigo: contraseña nueva y, de paso, sesion abierta. */
+  async function resetPasswordWithCode(target: { id?: string; email?: string }, code: string, newPassword: string) {
+    const result = await resetPassword({ ...target, code, newPassword });
+    return startSession(result?.data?.resetStaffPassword);
+  }
+
   /** Cuenta compartida: elige quien la usa. El token nuevo lleva a esa persona (ver la API). */
   async function setActingStaff(person: StaffPerson) {
     const result = await setActing({ staffId: person.id });
@@ -249,5 +289,5 @@ export function useStaffAuth() {
     staff.value = null;
   }
 
-  return { staff, login, loginById, logout, setActingStaff };
+  return { staff, login, loginById, logout, setActingStaff, requestPasswordReset, resetPasswordWithCode };
 }

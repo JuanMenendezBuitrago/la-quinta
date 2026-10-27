@@ -39,12 +39,17 @@ export function sectionsFor(role: string | undefined) {
   return STAFF_SECTIONS.filter((s) => (s.roles as readonly string[]).includes(role ?? ""));
 }
 
-/** Secciones que ve el personal con sesion: las de su rol, sin "Cola" si esta desactivada. */
+/**
+ * Secciones que ve el personal con sesion: las de su rol, sin "Cola" si esta desactivada. En una
+ * cuenta compartida con alguien elegido, sin "Personal": las cuentas solo se tocan entrando con la propia.
+ */
 export function useVisibleSections() {
   const queueEnabled = useOrderQueueEnabled();
   return computed(() => {
-    const role = useState<{ role: string } | null>("lq-staff").value?.role;
-    return sectionsFor(role).filter((s) => queueEnabled.value || s.id !== "cola");
+    const staff = useState<{ role: string; actingAs?: unknown } | null>("lq-staff").value;
+    return sectionsFor(staff?.role).filter(
+      (s) => (queueEnabled.value || s.id !== "cola") && !(staff?.actingAs && s.id === "personal")
+    );
   });
 }
 

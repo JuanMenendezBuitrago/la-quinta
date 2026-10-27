@@ -91,3 +91,15 @@ export function requireStaff(ctx: GraphQLContext, roles?: StaffRole[]) {
   }
   return ctx.staff;
 }
+
+/**
+ * Para tocar cuentas del personal (la propia incluida): no vale una cuenta compartida usada por
+ * alguien elegido sin contraseña. Esa persona tiene que entrar directamente con su cuenta.
+ */
+export function requireOwnStaffSession(ctx: GraphQLContext, roles?: StaffRole[]) {
+  const staff = requireStaff(ctx, roles);
+  if (staff.id !== staff.accountId) {
+    throw new GraphQLError("Para editar cuentas del personal entra con tu propia cuenta", { extensions: { code: "FORBIDDEN" } });
+  }
+  return staff;
+}

@@ -183,3 +183,114 @@ export async function loginStaffById(id: string, password: string) {
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, 10);
 }
+
+/**
+ * Contraseña olvidada: codigo de un solo uso al email de la cuenta, y con el una contraseña nueva.
+ * La respuesta es la misma exista o no la cuenta (no se dice que emails son del personal).
+ */
+const STAFF_RESET_TTL_SECONDS = 15 * 60;
+const STAFF_RESET_RESEND_SECONDS = 60;
+const STAFF_RESET_MAX_ATTEMPTS = 5;
+export const STAFF_PASSWORD_MIN_LENGTH = 8;
+
+function staffResetKey(staffId: string) {
+  return `staff-reset:${staffId}`;
+}
+
+/** La cuenta por su id (elegida en la lista) o por su email, solo si esta activa. */
+async function findStaffForReset(target: { id?: string | null; email?: string | null }) {
+  if (target.id) {
+    if (!Types.ObjectId.isValid(target.id)) return null;
+    return StaffUser.findOne({ _id: target.id, active: { $ne: false } });
+  }
+  const email = target.email?.trim().toLowerCase();
+  return email ? StaffUser.findOne({ email, active: { $ne: false } }) : null;
+}
+
+/** "kate@gmail.com" -> "k***@gmail.com": para saber en que buzon mirar sin mostrarlo entero. */
+function maskEmail(email: string) {
+  const [local, domain] = email.split("@");
+  return `${local.slice(0, 1)}***@${domain}`;
+}
+
+/**
+ * Envia el codigo y devuelve a que email (enmascarado). Por id (la lista de acceso ya muestra las
+ * cuentas) dice null si la cuenta no tiene un email valido; por email responde siempre igual,
+ * exista o no, para no desvelar que emails son del personal.
+ */
+export async function requestStaffPasswordReset(target: { id?: string | null; email?: string | null }) {
+  const byEmail = !target.id;
+  const typed = target.email?.trim().toLowerCase() ?? "";
+  if (byEmail && !EMAIL_RE.test(typed)) throw new Error("Introduce un email valido");
+  const answer = byEmail ? maskEmail(typed) : null;
+
+  const staff = await findStaffForReset(target);
+  if (!staff || !EMAIL_RE.test(staff.email)) return answer;
+  const key = staffResetKey(staff._id.toString());
+
+  // Un codigo por minuto como mucho: reenviar sin parar llenaria el buzon.
+  const ttl = await redisClient.ttl(key);
+  if (ttl > STAFF_RESET_TTL_SECONDS - STAFF_RESET_RESEND_SECONDS) {
+    if (byEmail) return answer;
+    throw new Error("Ya te hemos enviado un código hace un momento. Espera un minuto para pedir otro.");
+  }
+
+  const code = String(randomInt(100000, 999999));
+  await redisClient.set(key, JSON.stringify({ code, attempts: 0 }), "EX", STAFF_RESET_TTL_SECONDS);
+  if (env.nodeEnv !== "production") {
+    // eslint-disable-next-line no-console
+    console.log(`[staff-reset] codigo para ${staff.email}: ${code}`);
+  }
+
+  const mailer = getTransporter();
+  if (mailer) {
+    const minutes = Math.round(STAFF_RESET_TTL_SECONDS / 60);
+    try {
+      await mailer.sendMail({
+        from: env.smtpFrom,
+        to: staff.email,
+        subject: `Cambiar tu contraseña de La Quinta: ${code}`,
+        text: `Hola, ${staff.name}. Tu codigo para poner una contraseña nueva en el panel de La Quinta es ${code}. Caduca en ${minutes} minutos. Si no lo has pedido tu, ignora este correo: tu contraseña no cambia.`,
+        html: `<p>Hola, ${escapeHtml(staff.name)}.</p><p>Tu codigo para poner una contraseña nueva en el panel de <strong>La Quinta</strong> es:</p><p style="font-size:28px;font-weight:700;letter-spacing:4px;">${code}</p><p>Caduca en ${minutes} minutos. Si no lo has pedido tu, ignora este correo: tu contraseña no cambia.</p>`,
+      });
+    } catch {
+      await redisClient.del(key);
+      throw new Error("No se pudo enviar el correo con el codigo. Intentalo de nuevo en unos minutos.");
+    }
+  }
+  return answer ?? maskEmail(staff.email);
+}
+
+/** Comprueba el codigo, guarda la contraseña nueva y abre sesion con la cuenta. */
+export async function resetStaffPassword(
+  target: { id?: string | null; email?: string | null },
+  code: string,
+  newPassword: string
+) {
+  if (newPassword.length < STAFF_PASSWORD_MIN_LENGTH) {
+    throw new Error(`La contraseña tiene que tener al menos ${STAFF_PASSWORD_MIN_LENGTH} caracteres`);
+  }
+  const staff = await findStaffForReset(target);
+  const key = staff ? staffResetKey(staff._id.toString()) : null;
+  const stored = key ? await redisClient.get(key) : null;
+  if (!staff || !key || !stored) throw new Error("Codigo invalido o caducado");
+
+  const pending = JSON.parse(stored) as { code: string; attempts: number };
+  if (pending.code !== code.trim()) {
+    // Pocos intentos por codigo: con 6 cifras no se puede ir probando.
+    if (pending.attempts + 1 >= STAFF_RESET_MAX_ATTEMPTS) await redisClient.del(key);
+    else await redisClient.set(key, JSON.stringify({ ...pending, attempts: pending.attempts + 1 }), "KEEPTTL");
+    throw new Error("Codigo invalido o caducado");
+  }
+
+  await redisClient.del(key);
+  staff.passwordHash = await hashPassword(newPassword);
+  await staff.save();
+  // Si se habia bloqueado por fallos al entrar, el cambio lo desbloquea.
+  await redisClient.del(staffLoginFailsKey(staff._id.toString()));
+  return { token: signStaffToken(staff), staff };
+}
+
+function escapeHtml(text: string) {
+  return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}

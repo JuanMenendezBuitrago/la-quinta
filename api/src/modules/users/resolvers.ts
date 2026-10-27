@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
-import { GraphQLContext, isActingCandidate, requireCustomer, requireStaff } from "../../graphql/context";
+import { GraphQLContext, isActingCandidate, requireCustomer, requireOwnStaffSession, requireStaff } from "../../graphql/context";
 import { User, StaffUser, hasCurrentConsent } from "./model";
-import { requestOtp, verifyOtpAndIssueToken, loginStaff, loginStaffById, hashPassword, findExistingCustomer, signStaffToken } from "./auth";
+import { requestOtp, verifyOtpAndIssueToken, loginStaff, loginStaffById, hashPassword, findExistingCustomer, signStaffToken, requestStaffPasswordReset, resetStaffPassword } from "./auth";
 import { presetAvatarValue, removeAvatarFile } from "./avatar";
 import { UPLOAD_DIR } from "../uploads/router";
 import { MenuItem } from "../menu/model";
@@ -107,7 +107,7 @@ export const usersResolvers = {
       return staff.map((s) => ({ id: s._id.toString(), name: s.name, avatar: s.avatar ?? null }));
     },
     staffUsers: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["gestion"]);
+      requireOwnStaffSession(ctx, ["gestion"]);
       return StaffUser.find().sort({ name: 1 }).exec();
     },
     loginRequirements: async (_: unknown, args: { identifier: string }) => {
@@ -176,7 +176,7 @@ export const usersResolvers = {
       return (user?.favoriteMenuItemIds ?? []).map((id) => id.toString());
     },
     setStaffAvatar: async (_: unknown, args: { id: string; preset?: string | null }, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["gestion"]);
+      requireOwnStaffSession(ctx, ["gestion"]);
       if (!Types.ObjectId.isValid(args.id)) throw new Error("Usuario no encontrado");
       const avatar = presetAvatarValue(args.preset);
       const update = avatar ? { $set: { avatar } } : { $unset: { avatar: 1 } };
@@ -186,7 +186,7 @@ export const usersResolvers = {
       return StaffUser.findById(args.id).exec();
     },
     setMyStaffAvatar: async (_: unknown, args: { preset?: string | null }, ctx: GraphQLContext) => {
-      const staff = requireStaff(ctx, ["barra", "gestion"]);
+      const staff = requireOwnStaffSession(ctx, ["barra", "gestion"]);
       const avatar = presetAvatarValue(args.preset);
       const update = avatar ? { $set: { avatar } } : { $unset: { avatar: 1 } };
       const previous = await StaffUser.findByIdAndUpdate(staff.id, update).lean();
@@ -202,6 +202,12 @@ export const usersResolvers = {
       const { token, staff } = await loginStaffById(args.id, args.password);
       return { token, staff };
     },
+    requestStaffPasswordReset: (_: unknown, args: { id?: string | null; email?: string | null }) =>
+      requestStaffPasswordReset(args),
+    resetStaffPassword: async (
+      _: unknown,
+      args: { id?: string | null; email?: string | null; code: string; newPassword: string }
+    ) => resetStaffPassword(args, args.code, args.newPassword),
     setActingStaff: async (_: unknown, args: { staffId: string }, ctx: GraphQLContext) => {
       const session = requireStaff(ctx);
       const account = await StaffUser.findById(session.accountId);
@@ -214,7 +220,7 @@ export const usersResolvers = {
       args: { name: string; email: string; password: string; role: "barra" | "gestion"; shared?: boolean | null },
       ctx: GraphQLContext
     ) => {
-      requireStaff(ctx, ["gestion"]);
+      requireOwnStaffSession(ctx, ["gestion"]);
       const email = args.email.toLowerCase().trim();
       const existing = await StaffUser.findOne({ email });
       if (existing) throw new Error("Ya existe un usuario con ese email");
@@ -231,9 +237,8 @@ export const usersResolvers = {
       args: { id: string; name?: string; role?: "barra" | "gestion"; password?: string; active?: boolean; shared?: boolean | null },
       ctx: GraphQLContext
     ) => {
-      const staff = requireStaff(ctx, ["gestion"]);
-      // Propia: la de la sesion y, en una compartida, tambien la de quien la esta usando.
-      const own = args.id === staff.id || args.id === staff.accountId;
+      const staff = requireOwnStaffSession(ctx, ["gestion"]);
+      const own = args.id === staff.id;
       if (own && args.role && args.role !== "gestion") {
         throw new Error("No puedes quitarte a ti mismo el rol de gestion");
       }
@@ -251,9 +256,9 @@ export const usersResolvers = {
       return updated;
     },
     deleteStaffUser: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
-      const staff = requireStaff(ctx, ["gestion"]);
+      const staff = requireOwnStaffSession(ctx, ["gestion"]);
       if (!Types.ObjectId.isValid(args.id)) throw new Error("Usuario no encontrado");
-      if (args.id === staff.id || args.id === staff.accountId) throw new Error("No puedes borrar tu propia cuenta");
+      if (args.id === staff.id) throw new Error("No puedes borrar tu propia cuenta");
       const records = await staffRecords(args.id);
       if (records.length) {
         throw new Error(`Esta cuenta tiene ${records.join(", ")} a su nombre: no se puede borrar, desactívala`);
