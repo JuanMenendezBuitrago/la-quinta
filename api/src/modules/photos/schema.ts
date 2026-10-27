@@ -39,7 +39,8 @@ export const photosTypeDefs = /* GraphQL */ `
     rejectReason: String
     """Si dio el sello de foto aprobada (uno por producto y pedido)."""
     stampAwarded: Boolean!
-    """Si se uso como foto principal del producto."""
+    """Si es la foto principal del producto ahora mismo: deja de serlo si gestion cambia la imagen
+    en Carta o elige otra (gana el ultimo cambio)."""
     usedAsMain: Boolean!
     reviewedByName: String
     reviewedAt: String

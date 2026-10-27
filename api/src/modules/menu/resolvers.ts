@@ -1,6 +1,7 @@
 import { GraphQLContext, requireStaff } from "../../graphql/context";
 import { Types } from "mongoose";
 import { MenuCategory, MenuItem, ModifierGroup, ModifierGroupDoc } from "./model";
+import { removeImageIfUnused } from "../uploads/cleanup";
 
 const MAX_PRICE_DELTA_CENTS = 1_000_000;
 
@@ -151,13 +152,18 @@ export const menuResolvers = {
       ctx: GraphQLContext
     ) => {
       requireStaff(ctx, ["gestion"]);
-      const item = await MenuItem.findByIdAndUpdate(args.id, await menuItemData(args.input), { new: true });
+      const previous = await MenuItem.findByIdAndUpdate(args.id, await menuItemData(args.input)).select("imageUrl").lean();
+      if (!previous) throw new Error("Producto no encontrado");
+      const item = await MenuItem.findById(args.id);
       if (!item) throw new Error("Producto no encontrado");
+      // Imagen reemplazada o quitada: fuera el archivo si ya no lo usa nadie.
+      if (previous.imageUrl !== item.imageUrl) await removeImageIfUnused(previous.imageUrl);
       return item;
     },
     deleteMenuItem: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
       requireStaff(ctx, ["gestion"]);
       const result = await MenuItem.findByIdAndDelete(args.id);
+      await removeImageIfUnused(result?.imageUrl);
       return !!result;
     },
     setMenuItemAvailability: async (

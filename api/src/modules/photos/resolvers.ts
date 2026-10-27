@@ -8,6 +8,7 @@ import { MenuItem } from "../menu/model";
 import { Order } from "../orders/model";
 import { StaffUser, User } from "../users/model";
 import { awardPhotoStamp } from "../loyalty/redemption";
+import { removeImageIfUnused } from "../uploads/cleanup";
 import { CustomerPhoto, CustomerPhotoDoc, PHOTO_REJECT_REASON_MAX, PhotoStatus, removePhotoFile } from "./model";
 
 /** "Ana Torres" -> "Ana T."; un solo nombre, tal cual. Lo que se publica bajo la foto. */
@@ -17,20 +18,22 @@ export function authorLabel(name: string) {
   return last ? `${first} ${last[0].toUpperCase()}.` : first;
 }
 
-/** Clientes, pedidos y personal de una lista de fotos, con una consulta por coleccion. */
+/** Clientes, pedidos, personal e imagen actual de los productos de una lista de fotos, con una consulta por coleccion. */
 async function loadRefs(photos: CustomerPhotoDoc[]) {
-  const ids = (key: "customerId" | "orderId" | "reviewedByStaffId") => [
+  const ids = (key: "customerId" | "orderId" | "reviewedByStaffId" | "menuItemId") => [
     ...new Set(photos.map((p) => p[key]?.toString()).filter((x): x is string => !!x)),
   ];
-  const [users, orders, staff] = await Promise.all([
+  const [users, orders, staff, items] = await Promise.all([
     User.find({ _id: { $in: ids("customerId") } }).select("name customerCode deletedAt").lean(),
     Order.find({ _id: { $in: ids("orderId") } }).select("code").lean(),
     StaffUser.find({ _id: { $in: ids("reviewedByStaffId") } }).select("name").lean(),
+    MenuItem.find({ _id: { $in: ids("menuItemId") } }).select("imageUrl").lean(),
   ]);
   return {
     user: new Map(users.map((u) => [u._id.toString(), u])),
     orderCode: new Map(orders.map((o) => [o._id.toString(), o.code])),
     staffName: new Map(staff.map((s) => [s._id.toString(), s.name])),
+    itemImage: new Map(items.map((i) => [i._id.toString(), i.imageUrl ?? null])),
   };
 }
 
@@ -47,7 +50,8 @@ function toStaffPhoto(p: CustomerPhotoDoc, refs: Awaited<ReturnType<typeof loadR
     status: p.status,
     rejectReason: p.rejectReason ?? null,
     stampAwarded: !!p.stampAwarded,
-    usedAsMain: !!p.usedAsMain,
+    // Es la principal solo si el producto sigue teniendo su copia (gana el ultimo cambio de imagen).
+    usedAsMain: !!p.mainCopyUrl && refs.itemImage.get(p.menuItemId.toString()) === p.mainCopyUrl,
     reviewedByName: p.reviewedByStaffId ? refs.staffName.get(p.reviewedByStaffId.toString()) ?? null : null,
     reviewedAt: p.reviewedAt ? new Date(p.reviewedAt).toISOString() : null,
     createdAt: new Date(p.createdAt).toISOString(),
@@ -171,17 +175,19 @@ export const photosResolvers = {
         }
 
         // Foto principal: una copia en /uploads/ (como las que sube gestion en Carta), para que
-        // retirar o rechazar la foto del cliente no deje la carta sin imagen.
+        // retirar o rechazar la foto del cliente no deje la carta sin imagen. Reemplaza la que
+        // hubiera (la ultima en cambiarse es la que vale) y borra su archivo si nadie mas lo usa.
         if (args.setAsMain) {
           const ext = path.extname(photo.url);
-          const filename = `${crypto.randomUUID()}${ext}`;
-          await fs.copyFile(path.join(UPLOAD_DIR, "photos", path.basename(photo.url)), path.join(UPLOAD_DIR, filename));
-          const updated = await MenuItem.updateOne({ _id: photo.menuItemId }, { $set: { imageUrl: `/uploads/${filename}` } });
-          if (!updated.matchedCount) {
-            await fs.unlink(path.join(UPLOAD_DIR, filename)).catch(() => {});
+          const copyUrl = `/uploads/${crypto.randomUUID()}${ext}`;
+          await fs.copyFile(path.join(UPLOAD_DIR, "photos", path.basename(photo.url)), path.join(UPLOAD_DIR, path.basename(copyUrl)));
+          const previous = await MenuItem.findOneAndUpdate({ _id: photo.menuItemId }, { $set: { imageUrl: copyUrl } }).select("imageUrl").lean();
+          if (!previous) {
+            await fs.unlink(path.join(UPLOAD_DIR, path.basename(copyUrl))).catch(() => {});
             throw new Error("El producto ya no existe en la carta");
           }
-          photo.usedAsMain = true;
+          photo.mainCopyUrl = copyUrl;
+          await removeImageIfUnused(previous.imageUrl);
         }
         await photo.save();
       }

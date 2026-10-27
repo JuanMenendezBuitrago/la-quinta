@@ -26,8 +26,10 @@ export interface CustomerPhotoDoc {
   reviewedAt?: Date;
   // Si esta foto dio el sello de "foto aprobada" (uno por producto y pedido).
   stampAwarded: boolean;
-  // Se uso como foto principal del producto (copiada a /uploads/: ver moderateProductPhoto).
-  usedAsMain: boolean;
+  // Copia en /uploads/ hecha al elegirla como foto principal del producto (ver moderateProductPhoto).
+  // Sigue siendo la principal mientras el producto tenga esa misma imagen: si gestion la cambia en
+  // Carta o elige otra, deja de serlo sin tocar nada aqui.
+  mainCopyUrl?: string;
   createdAt: Date;
 }
 
@@ -53,7 +55,7 @@ const customerPhotoSchema = new Schema<CustomerPhotoDoc>({
   reviewedByStaffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
   reviewedAt: { type: Date },
   stampAwarded: { type: Boolean, default: false },
-  usedAsMain: { type: Boolean, default: false },
+  mainCopyUrl: { type: String },
   createdAt: { type: Date, default: () => new Date() },
 });
 

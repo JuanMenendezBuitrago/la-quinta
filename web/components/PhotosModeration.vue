@@ -18,6 +18,7 @@
     <p class="muted intro">
       Al aprobar una foto sale en la ficha del producto con el nombre e inicial del cliente («Foto de Ana T.»), y el cliente
       suma un sello (uno por producto y pedido). Rechazarla la borra. No publiques fotos en las que se reconozca a otras personas.
+      «Usar como principal» reemplaza la imagen del producto en la carta; si después se cambia en Carta, vale la última.
     </p>
 
     <p v-if="message" class="muted notice" :class="{ error: messageIsError }" role="status">{{ message }}</p>
