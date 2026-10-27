@@ -148,6 +148,9 @@
                 />
               </div>
               <p class="stamps-label">{{ loyalty.balance }} de {{ loyalty.rewardThreshold }} sellos</p>
+              <p v-if="stampsRuleText" class="stamps-rule">
+                {{ stampsRuleText }} Con {{ loyalty.rewardThreshold }}, un producto gratis.
+              </p>
               <!-- El canje se hace en el local, como descuento del pedido (asi el producto gratis
                    queda ligado al ticket y los sellos vuelven si se cancela). -->
               <p v-if="loyalty.rewardAvailable" class="reward-hint">
@@ -176,6 +179,7 @@
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import { useAuth } from "~/composables/useAuth";
+import { useStampsRuleText } from "~/composables/useSiteSettings";
 import { useLightbox } from "~/composables/useLightbox";
 import ImageLightbox from "~/components/ImageLightbox.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
@@ -231,6 +235,7 @@ const STATUS_SUBSCRIPTION = gql`
 `;
 
 const { customer, logout } = useAuth();
+const stampsRuleText = useStampsRuleText();
 const accountDeleted = ref(false);
 
 const { result: loyaltyResult, refetch: refetchLoyalty } = useQuery(LOYALTY_QUERY, null, () => ({
@@ -405,6 +410,7 @@ function statusLabel(status: string) {
 .stamp.filled { opacity: 1; }
 .stamps-label { color: var(--text-muted); font-size: 13px; margin: 0; }
 .reward-hint { margin: 0; font-weight: 600; text-align: center; }
+.stamps-rule { margin: -6px 0 0; max-width: 280px; font-size: 13px; color: var(--text-muted); }
 
 .order-row {
   display: flex;

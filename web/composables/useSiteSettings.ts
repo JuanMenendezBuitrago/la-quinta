@@ -156,3 +156,20 @@ export function usePackagingFee() {
   const { result } = useQuery<{ siteSettings: SiteSettings }>(SITE_SETTINGS_QUERY);
   return computed(() => result.value?.siteSettings.packagingFeeCents ?? 0);
 }
+
+/**
+ * Como se ganan los sellos, en una frase para el cliente ("Ganas 1 sello por cada producto").
+ * Misma consulta, desde la cache de Apollo; vacio mientras no carga.
+ */
+export function useStampsRuleText() {
+  const { result } = useQuery<{ siteSettings: SiteSettings }>(SITE_SETTINGS_QUERY);
+  return computed(() => {
+    const s = result.value?.siteSettings;
+    if (!s) return "";
+    const stamps = (n: number) => `${n} ${n === 1 ? "sello" : "sellos"}`;
+    if (s.stampsMode === "PEDIDO") return `Ganas ${stamps(s.stampsPerOrder)} por cada pedido.`;
+    if (s.stampsMode === "PRODUCTO") return `Ganas ${stamps(s.stampsPerItem)} por cada producto que pides.`;
+    const amount = s.stampsAmountCents.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+    return `Ganas 1 sello por cada ${amount} de consumo.`;
+  });
+}
