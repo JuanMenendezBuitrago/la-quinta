@@ -13,6 +13,17 @@ const openingHoursSchema = new Schema<OpeningHoursDoc>(
 export const DEFAULT_PACKAGING_FEE_CENTS = 1000;
 export const DEFAULT_REWARD_THRESHOLD_STAMPS = 10;
 
+// Como se ganan los sellos al cerrar un pedido: unos fijos por pedido, unos por cada producto,
+// o uno por cada tantos pesos pagados en productos (sin el recargo por empaque).
+export const STAMPS_MODES = ["PEDIDO", "PRODUCTO", "IMPORTE"] as const;
+export type StampsMode = (typeof STAMPS_MODES)[number];
+export const DEFAULT_STAMPS_RULE = {
+  stampsMode: "PRODUCTO" as StampsMode,
+  stampsPerOrder: 1,
+  stampsPerItem: 1,
+  stampsAmountCents: 10_000,
+};
+
 export interface SiteSettingsDoc {
   address?: string;
   addressMapUrl?: string;
@@ -41,6 +52,13 @@ export interface SiteSettingsDoc {
   ticketPrintingEnabled: boolean;
   // Sellos que hacen falta para canjear la recompensa (y los que se restan al canjearla).
   rewardThresholdStamps: number;
+  // Como se ganan (ver STAMPS_MODES). Solo cuenta el valor del modo elegido; los otros se guardan
+  // para no perderlos al cambiar de modo.
+  stampsMode: StampsMode;
+  stampsPerOrder: number;
+  stampsPerItem: number;
+  // Pesos pagados en productos por cada sello (modo IMPORTE).
+  stampsAmountCents: number;
 }
 
 // Documento unico (singleton): siempre se lee/escribe con un findOneAndUpdate sin filtro,
@@ -68,6 +86,10 @@ const siteSettingsSchema = new Schema<SiteSettingsDoc>({
   packagingFeeCents: { type: Number, default: DEFAULT_PACKAGING_FEE_CENTS, min: 0 },
   ticketPrintingEnabled: { type: Boolean, default: false },
   rewardThresholdStamps: { type: Number, default: DEFAULT_REWARD_THRESHOLD_STAMPS, min: 1 },
+  stampsMode: { type: String, enum: STAMPS_MODES, default: DEFAULT_STAMPS_RULE.stampsMode },
+  stampsPerOrder: { type: Number, default: DEFAULT_STAMPS_RULE.stampsPerOrder, min: 1 },
+  stampsPerItem: { type: Number, default: DEFAULT_STAMPS_RULE.stampsPerItem, min: 1 },
+  stampsAmountCents: { type: Number, default: DEFAULT_STAMPS_RULE.stampsAmountCents, min: 1 },
 });
 
 export const SiteSettings = model<SiteSettingsDoc>("SiteSettings", siteSettingsSchema);

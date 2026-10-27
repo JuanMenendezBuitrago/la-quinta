@@ -1,5 +1,5 @@
 import { GraphQLContext, requireStaff } from "../../graphql/context";
-import { DEFAULT_PACKAGING_FEE_CENTS, DEFAULT_REWARD_THRESHOLD_STAMPS, SiteSettings } from "./model";
+import { DEFAULT_PACKAGING_FEE_CENTS, DEFAULT_REWARD_THRESHOLD_STAMPS, DEFAULT_STAMPS_RULE, STAMPS_MODES, SiteSettings, StampsMode } from "./model";
 import { OPEN_ORDER, Order } from "../orders/model";
 import { OpeningHoursDoc, scheduleLines, validateOpeningHours } from "./openingHours";
 
@@ -38,6 +38,26 @@ export async function rewardThresholdStamps(): Promise<number> {
   return (await loadSettings()).rewardThresholdStamps ?? DEFAULT_REWARD_THRESHOLD_STAMPS;
 }
 
+/** Como se ganan los sellos. Lo usa "loyalty" al cerrar un pedido. */
+export async function stampsRule() {
+  const doc = await loadSettings();
+  return {
+    mode: (doc.stampsMode ?? DEFAULT_STAMPS_RULE.stampsMode) as StampsMode,
+    perOrder: doc.stampsPerOrder ?? DEFAULT_STAMPS_RULE.stampsPerOrder,
+    perItem: doc.stampsPerItem ?? DEFAULT_STAMPS_RULE.stampsPerItem,
+    amountCents: doc.stampsAmountCents ?? DEFAULT_STAMPS_RULE.stampsAmountCents,
+  };
+}
+
+// Topes de cordura de los sellos que se ganan.
+const MAX_STAMPS_PER_ORDER_OR_ITEM = 10;
+const MIN_STAMPS_AMOUNT_CENTS = 1_000;
+const MAX_STAMPS_AMOUNT_CENTS = 1_000_000;
+
+function isIntBetween(value: unknown, min: number, max: number) {
+  return Number.isInteger(value) && (value as number) >= min && (value as number) <= max;
+}
+
 // Tope de cordura para el recargo (como los importes del cierre de caja).
 const MAX_PACKAGING_FEE_CENTS = 100_000;
 // Y para los sellos del canje: con mas, la tarjeta de la cuenta del cliente no se podria leer.
@@ -57,6 +77,10 @@ export const settingsResolvers = {
     packagingFeeCents: (doc: any) => doc.packagingFeeCents ?? DEFAULT_PACKAGING_FEE_CENTS,
     ticketPrintingEnabled: (doc: any) => !!doc.ticketPrintingEnabled,
     rewardThresholdStamps: (doc: any) => doc.rewardThresholdStamps ?? DEFAULT_REWARD_THRESHOLD_STAMPS,
+    stampsMode: (doc: any) => doc.stampsMode ?? DEFAULT_STAMPS_RULE.stampsMode,
+    stampsPerOrder: (doc: any) => doc.stampsPerOrder ?? DEFAULT_STAMPS_RULE.stampsPerOrder,
+    stampsPerItem: (doc: any) => doc.stampsPerItem ?? DEFAULT_STAMPS_RULE.stampsPerItem,
+    stampsAmountCents: (doc: any) => doc.stampsAmountCents ?? DEFAULT_STAMPS_RULE.stampsAmountCents,
   },
   Mutation: {
     updateSiteSettings: async (_: unknown, args: { input: Record<string, unknown> }, ctx: GraphQLContext) => {
@@ -76,6 +100,20 @@ export const settingsResolvers = {
       ) {
         throw new Error(`Los sellos para canjear tienen que ser un número entre 1 y ${MAX_REWARD_THRESHOLD_STAMPS}`);
       }
+      const { stampsMode, stampsPerOrder, stampsPerItem, stampsAmountCents } = args.input;
+      if (stampsMode != null && !STAMPS_MODES.includes(stampsMode as StampsMode)) {
+        throw new Error("Forma de ganar sellos no valida");
+      }
+      for (const [value, what] of [[stampsPerOrder, "por pedido"], [stampsPerItem, "por producto"]] as const) {
+        if (value != null && !isIntBetween(value, 1, MAX_STAMPS_PER_ORDER_OR_ITEM)) {
+          throw new Error(`Los sellos ${what} tienen que ser un número entre 1 y ${MAX_STAMPS_PER_ORDER_OR_ITEM}`);
+        }
+      }
+      if (stampsAmountCents != null && !isIntBetween(stampsAmountCents, MIN_STAMPS_AMOUNT_CENTS, MAX_STAMPS_AMOUNT_CENTS)) {
+        throw new Error(
+          `El importe por sello tiene que estar entre ${MIN_STAMPS_AMOUNT_CENTS.toLocaleString("es-CO")} y ${MAX_STAMPS_AMOUNT_CENTS.toLocaleString("es-CO")} pesos`
+        );
+      }
       // Apagar la cola con pedidos dentro los dejaria escondidos, sin forma de entregarlos ni cobrarlos.
       if (args.input.orderQueueEnabled === false) {
         const open = await Order.countDocuments(OPEN_ORDER);
@@ -91,7 +129,8 @@ export const settingsResolvers = {
       for (const [key, value] of Object.entries(args.input)) {
         // null en un booleano no significa "borrar": se ignora como si no viniera.
         if (
-          (key === "staffOnlyOrders" || key === "orderQueueEnabled" || key === "showInactiveStaff" || key === "packagingFeeCents" || key === "ticketPrintingEnabled" || key === "rewardThresholdStamps") &&
+          (key === "staffOnlyOrders" || key === "orderQueueEnabled" || key === "showInactiveStaff" || key === "packagingFeeCents" || key === "ticketPrintingEnabled" || key === "rewardThresholdStamps" ||
+            key === "stampsMode" || key === "stampsPerOrder" || key === "stampsPerItem" || key === "stampsAmountCents") &&
           value === null
         ) continue;
         if (value !== undefined) update[key] = value;

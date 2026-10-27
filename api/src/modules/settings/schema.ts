@@ -20,6 +20,16 @@ export const settingsTypeDefs = /* GraphQL */ `
     close: String!
   }
 
+  """Como se ganan los sellos al cerrar un pedido."""
+  enum StampsMode {
+    """stampsPerOrder sellos por pedido."""
+    PEDIDO
+    """stampsPerItem sellos por cada producto (2 cafes = 2 veces)."""
+    PRODUCTO
+    """Un sello por cada stampsAmountCents pesos pagados en productos (sin el recargo por empaque)."""
+    IMPORTE
+  }
+
   """Datos de contacto/redes que muestra el pie de pagina en toda la web."""
   type SiteSettings {
     address: String
@@ -63,6 +73,12 @@ export const settingsTypeDefs = /* GraphQL */ `
     """Sellos que hacen falta para canjear la recompensa (y los que se restan al canjearla).
     Cambiarlo no toca los sellos ya ganados ni los canjes ya hechos."""
     rewardThresholdStamps: Int!
+    """Como se ganan los sellos; de los tres valores siguientes solo cuenta el del modo elegido."""
+    stampsMode: StampsMode!
+    stampsPerOrder: Int!
+    stampsPerItem: Int!
+    """Pesos pagados en productos por cada sello (modo IMPORTE)."""
+    stampsAmountCents: Int!
   }
 
   input SiteSettingsInput {
@@ -86,6 +102,13 @@ export const settingsTypeDefs = /* GraphQL */ `
     ticketPrintingEnabled: Boolean
     """Entre 1 y 50."""
     rewardThresholdStamps: Int
+    stampsMode: StampsMode
+    """Entre 1 y 10."""
+    stampsPerOrder: Int
+    """Entre 1 y 10."""
+    stampsPerItem: Int
+    """Entre 1.000 y 1.000.000."""
+    stampsAmountCents: Int
   }
 
   extend type Query {

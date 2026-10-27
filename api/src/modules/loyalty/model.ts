@@ -33,11 +33,9 @@ export const LoyaltyTransaction = model<LoyaltyTransactionDoc>(
   loyaltyTransactionSchema
 );
 
-// Reglas del programa: la tarjeta de cafeteria clasica. Cada producto de un pedido entregado
-// suma un sello (2 cafes = 2 sellos), sea cual sea su precio. Cambiar la regla solo afecta a
-// los pedidos entregados despues: los sellos ya ganados quedan en el ledger tal cual.
-// Los sellos para canjear la recompensa se editan en Configuracion (settings: rewardThresholdStamps).
+// Como se ganan los sellos con los pedidos y cuantos hacen falta para canjear se editan en
+// Configuracion (settings: stampsMode..., rewardThresholdStamps). Cambiarlo solo afecta a los
+// pedidos cerrados despues: los sellos ya ganados quedan en el ledger tal cual.
 export const LOYALTY_RULES = {
-  stampsPerUnit: 1,
   stampsPerApprovedPhoto: 1, // por foto de cliente aprobada (una vez por producto y pedido)
 };

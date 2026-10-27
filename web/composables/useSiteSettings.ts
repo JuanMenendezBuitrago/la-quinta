@@ -31,6 +31,10 @@ export const SITE_SETTINGS_QUERY = gql`
       packagingFeeCents
       ticketPrintingEnabled
       rewardThresholdStamps
+      stampsMode
+      stampsPerOrder
+      stampsPerItem
+      stampsAmountCents
     }
   }
 `;
@@ -64,6 +68,10 @@ export const UPDATE_SITE_SETTINGS = gql`
       packagingFeeCents
       ticketPrintingEnabled
       rewardThresholdStamps
+      stampsMode
+      stampsPerOrder
+      stampsPerItem
+      stampsAmountCents
     }
   }
 `;
@@ -108,7 +116,15 @@ export interface SiteSettings {
   ticketPrintingEnabled: boolean;
   /** Sellos que hacen falta para canjear la recompensa. */
   rewardThresholdStamps: number;
+  /** Como se ganan los sellos; de los tres valores siguientes solo cuenta el del modo elegido. */
+  stampsMode: StampsMode;
+  stampsPerOrder: number;
+  stampsPerItem: number;
+  /** Pesos pagados en productos por cada sello (modo IMPORTE). */
+  stampsAmountCents: number;
 }
+
+export type StampsMode = "PEDIDO" | "PRODUCTO" | "IMPORTE";
 
 /**
  * Si el cliente puede anadir productos y hacer pedidos desde la web. Mismo query que el pie de

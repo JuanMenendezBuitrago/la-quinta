@@ -63,6 +63,34 @@
           </template>
 
           <template v-else-if="activeSection === 'fidelizacion'">
+            <fieldset class="field">
+              <legend class="field-label">Cómo se ganan los sellos</legend>
+              <span class="muted">Al cerrar un pedido de un cliente identificado (entregado y, en mesa o barra, cobrado). El producto que se lleva gratis con el canje no cuenta.</span>
+              <div class="stamps-modes">
+                <label v-for="mode in STAMPS_MODE_OPTIONS" :key="mode.id" class="stamps-mode" :class="{ active: form.stampsMode === mode.id }">
+                  <input v-model="form.stampsMode" type="radio" name="stamps-mode" :value="mode.id" />
+                  <span class="stamps-mode-text">
+                    <strong>{{ mode.label }}</strong>
+                    <span class="muted">{{ mode.hint }}</span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+            <label v-if="form.stampsMode === 'PEDIDO'" class="field">
+              <span class="field-label">Sellos por pedido</span>
+              <input v-model.number="form.stampsPerOrder" class="short" type="number" min="1" max="10" step="1" inputmode="numeric" required />
+              <span class="muted">Los mismos sellos tenga el pedido un producto o diez.</span>
+            </label>
+            <label v-else-if="form.stampsMode === 'PRODUCTO'" class="field">
+              <span class="field-label">Sellos por producto</span>
+              <input v-model.number="form.stampsPerItem" class="short" type="number" min="1" max="10" step="1" inputmode="numeric" required />
+              <span class="muted">Por cada unidad: dos cafés suman el doble, sea cual sea su precio.</span>
+            </label>
+            <label v-else class="field">
+              <span class="field-label">Pesos por sello (COP)</span>
+              <input v-model.number="form.stampsAmountCents" class="short" type="number" min="1000" max="1000000" step="100" inputmode="numeric" required />
+              <span class="muted">Un sello por cada tantos pesos pagados en productos, ya con el canje y los descuentos restados y sin el recargo por empaque. Lo que sobra no se acumula para el siguiente pedido.</span>
+            </label>
             <label class="field">
               <span class="field-label">Sellos para canjear</span>
               <input v-model.number="form.rewardThresholdStamps" class="short" type="number" min="1" max="50" step="1" inputmode="numeric" required />
@@ -169,6 +197,7 @@ import {
   UPDATE_SITE_SETTINGS,
   type OpeningHours,
   type SiteSettings,
+  type StampsMode,
 } from "~/composables/useSiteSettings";
 
 const SECTIONS = [
@@ -182,6 +211,12 @@ const SECTIONS = [
 type SectionId = (typeof SECTIONS)[number]["id"];
 const activeSection = ref<SectionId>("pedidos");
 const current = computed(() => SECTIONS.find((s) => s.id === activeSection.value) ?? SECTIONS[0]);
+
+const STAMPS_MODE_OPTIONS: { id: StampsMode; label: string; hint: string }[] = [
+  { id: "PEDIDO", label: "Por pedido", hint: "Unos sellos fijos por cada pedido." },
+  { id: "PRODUCTO", label: "Por producto", hint: "Por cada producto del pedido." },
+  { id: "IMPORTE", label: "Por importe", hint: "Uno por cada tantos pesos gastados." },
+];
 
 const WEEKDAY_NAMES = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
@@ -227,6 +262,10 @@ function emptyForm() {
     packagingFeeCents: 0 as number | "",
     ticketPrintingEnabled: false,
     rewardThresholdStamps: 10 as number | "",
+    stampsMode: "PRODUCTO" as StampsMode,
+    stampsPerOrder: 1 as number | "",
+    stampsPerItem: 1 as number | "",
+    stampsAmountCents: 10000 as number | "",
   };
 }
 
@@ -256,6 +295,10 @@ watch(
       packagingFeeCents: val.packagingFeeCents,
       ticketPrintingEnabled: val.ticketPrintingEnabled,
       rewardThresholdStamps: val.rewardThresholdStamps,
+      stampsMode: val.stampsMode,
+      stampsPerOrder: val.stampsPerOrder,
+      stampsPerItem: val.stampsPerItem,
+      stampsAmountCents: val.stampsAmountCents,
     });
   },
   { immediate: true }
@@ -294,6 +337,10 @@ async function submit() {
         packagingFeeCents: Math.round(Number(form.packagingFeeCents) || 0),
         ticketPrintingEnabled: form.ticketPrintingEnabled,
         rewardThresholdStamps: Math.round(Number(form.rewardThresholdStamps) || 0),
+        stampsMode: form.stampsMode,
+        stampsPerOrder: Math.round(Number(form.stampsPerOrder) || 0),
+        stampsPerItem: Math.round(Number(form.stampsPerItem) || 0),
+        stampsAmountCents: Math.round(Number(form.stampsAmountCents) || 0),
       },
     });
     await refetch();
@@ -353,6 +400,23 @@ onBeforeUnmount(() => {
 .toggle-row { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
 .toggle-row input { width: auto; margin: 3px 0 0; flex-shrink: 0; }
 input.short { max-width: 12rem; }
+fieldset.field { margin: 0; padding: 0; border: none; min-width: 0; }
+fieldset.field legend { padding: 0; margin-bottom: 6px; }
+.stamps-modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 4px; }
+.stamps-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.stamps-mode.active { border-color: var(--accent-strong); background: var(--surface-alt); }
+.stamps-mode input { width: auto; margin: 3px 0 0; flex-shrink: 0; accent-color: var(--accent-strong); }
+.stamps-mode-text { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.stamps-mode-text .muted { font-size: 13px; }
 
 .schedule-row, .social-row {
   display: grid;
