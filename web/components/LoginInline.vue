@@ -9,26 +9,7 @@
 
     <template v-else>
       <p class="muted">Te hemos enviado un código a {{ identifier }}.</p>
-      <!-- Una casilla por digito; se avanza al escribir, se retrocede con borrar y se puede pegar el
-           codigo entero (o que el movil lo autocomplete) en cualquiera de ellas. -->
-      <div class="code-boxes" role="group" aria-label="Código de 6 dígitos">
-        <input
-          v-for="(_, i) in digits"
-          :key="i"
-          :ref="(el) => (boxes[i] = el as HTMLInputElement)"
-          :value="digits[i]"
-          type="text"
-          inputmode="numeric"
-          pattern="[0-9]*"
-          maxlength="6"
-          :autocomplete="i === 0 ? 'one-time-code' : 'off'"
-          :aria-label="`Dígito ${i + 1} de ${CODE_LENGTH}`"
-          @input="onDigitInput(i, $event)"
-          @keydown="onDigitKeydown(i, $event)"
-          @paste.prevent="onPaste(i, $event)"
-          @focus="($event.target as HTMLInputElement).select()"
-        />
-      </div>
+      <CodeInput ref="codeInput" v-model="code" :length="CODE_LENGTH" @submit="canVerify && verify()" />
       <input
         v-if="requirements.askName"
         v-model="name"
@@ -70,6 +51,7 @@
 
 <script setup lang="ts">
 import { useAuth, type LoginRequirements } from "~/composables/useAuth";
+import CodeInput from "~/components/CodeInput.vue";
 
 const emit = defineEmits<{ (e: "logged-in"): void }>();
 
@@ -77,9 +59,8 @@ const { requestCode, verifyCode } = useAuth();
 const step = ref<"identifier" | "code">("identifier");
 const identifier = ref("");
 const CODE_LENGTH = 6;
-const digits = ref<string[]>(Array(CODE_LENGTH).fill(""));
-const boxes: HTMLInputElement[] = [];
-const code = computed(() => digits.value.join(""));
+const code = ref("");
+const codeInput = ref<InstanceType<typeof CodeInput> | null>(null);
 const name = ref("");
 const sending = ref(false);
 const verifying = ref(false);
@@ -98,67 +79,15 @@ async function sendCode() {
     requirements.value = await requestCode(identifier.value);
     acceptPrivacy.value = false;
     subscribeNewsletter.value = false;
-    digits.value = Array(CODE_LENGTH).fill("");
+    code.value = "";
     step.value = "code";
     await nextTick();
-    boxes[0]?.focus();
+    codeInput.value?.focus();
   } catch (err: any) {
     error.value = err?.message ?? "No se pudo enviar el código";
   } finally {
     sending.value = false;
   }
-}
-
-// Reparte los digitos de `text` a partir de la casilla `from` y deja el foco en la siguiente libre.
-function fillFrom(from: number, text: string) {
-  const chars = text.replace(/\D/g, "").slice(0, CODE_LENGTH - from).split("");
-  if (!chars.length) return;
-  const next = [...digits.value];
-  chars.forEach((c, k) => (next[from + k] = c));
-  digits.value = next;
-  boxes[Math.min(from + chars.length, CODE_LENGTH - 1)]?.focus();
-}
-
-function onDigitInput(i: number, event: Event) {
-  const input = event.target as HTMLInputElement;
-  const value = input.value.replace(/\D/g, "");
-  if (!value) {
-    digits.value[i] = "";
-    input.value = "";
-    return;
-  }
-  // El codigo entero de golpe (autocompletado del movil): se reparte desde la primera casilla.
-  if (value.length >= CODE_LENGTH) {
-    input.value = digits.value[i];
-    fillFrom(0, value);
-    return;
-  }
-  // Un digito escrito sobre el que ya habia: se queda el nuevo.
-  const typed = value.length > 1 ? value.replace(digits.value[i], "").slice(-1) || value.slice(-1) : value;
-  digits.value[i] = typed;
-  input.value = typed;
-  if (i < CODE_LENGTH - 1) boxes[i + 1]?.focus();
-}
-
-function onDigitKeydown(i: number, event: KeyboardEvent) {
-  if (event.key === "Backspace" && !digits.value[i] && i > 0) {
-    event.preventDefault();
-    digits.value[i - 1] = "";
-    boxes[i - 1]?.focus();
-  } else if (event.key === "ArrowLeft" && i > 0) {
-    event.preventDefault();
-    boxes[i - 1]?.focus();
-  } else if (event.key === "ArrowRight" && i < CODE_LENGTH - 1) {
-    event.preventDefault();
-    boxes[i + 1]?.focus();
-  } else if (event.key === "Enter" && canVerify.value) {
-    verify();
-  }
-}
-
-function onPaste(i: number, event: ClipboardEvent) {
-  const text = event.clipboardData?.getData("text") ?? "";
-  fillFrom(text.replace(/\D/g, "").length >= CODE_LENGTH ? 0 : i, text);
 }
 
 async function verify() {
@@ -183,16 +112,6 @@ async function verify() {
 
 <style scoped>
 .login-inline { display: flex; flex-direction: column; gap: 8px; max-width: 320px; }
-.code-boxes { display: flex; gap: 8px; }
-.code-boxes input {
-  flex: 1 1 0;
-  min-width: 0;
-  height: 52px;
-  padding: 0;
-  text-align: center;
-  font-size: 22px;
-  font-variant-numeric: tabular-nums;
-}
 .consent { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; font-size: 13px; line-height: 1.45; }
 .consent input { margin-top: 3px; flex-shrink: 0; width: auto; display: inline-flex;}
 .consent a { color: inherit; text-decoration: underline; }

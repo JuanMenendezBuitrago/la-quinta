@@ -66,20 +66,11 @@
           {{ selected ? "Te hemos enviado" : "Si es un email del equipo, te hemos enviado" }} un código a
           <strong>{{ sentTo }}</strong>. Caduca en 15 minutos.
         </p>
-        <label class="sr-only" for="staff-reset-code">Código</label>
-        <input
-          id="staff-reset-code"
-          ref="codeInput"
-          v-model="code"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          maxlength="6"
-          placeholder="Código de 6 cifras"
-          required
-        />
+        <CodeInput ref="codeInput" v-model="code" @submit="newPasswordInput?.focus()" />
         <label class="sr-only" for="staff-reset-password">Contraseña nueva</label>
         <PasswordInput
           id="staff-reset-password"
+          ref="newPasswordInput"
           v-model="newPassword"
           placeholder="Contraseña nueva (mín. 8)"
           autocomplete="new-password"
@@ -120,6 +111,7 @@ import { useStaffAuth } from "~/composables/useAuth";
 import { primeAudio } from "~/composables/useOrderChime";
 import UserAvatar from "~/components/UserAvatar.vue";
 import PasswordInput from "~/components/PasswordInput.vue";
+import CodeInput from "~/components/CodeInput.vue";
 
 interface StaffLoginOption {
   id: string;
@@ -158,7 +150,8 @@ const sentTo = ref<string | null>(null);
 const code = ref("");
 const newPassword = ref("");
 const sendingCode = ref(false);
-const codeInput = ref<HTMLInputElement | null>(null);
+const codeInput = ref<InstanceType<typeof CodeInput> | null>(null);
+const newPasswordInput = ref<InstanceType<typeof PasswordInput> | null>(null);
 
 async function pick(option: StaffLoginOption) {
   selected.value = option;
