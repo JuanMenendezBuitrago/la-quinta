@@ -2,7 +2,8 @@ import { Types } from "mongoose";
 import { GraphQLContext, requireStaff } from "../../graphql/context";
 import { User, StaffUser, UserDoc } from "../users/model";
 import { Order } from "../orders/model";
-import { LoyaltyTransaction, LOYALTY_RULES } from "../loyalty/model";
+import { LoyaltyTransaction } from "../loyalty/model";
+import { rewardThresholdStamps } from "../settings/resolvers";
 
 const MAX_PAGE_SIZE = 100;
 
@@ -45,7 +46,7 @@ async function statsFor(customerIds: Types.ObjectId[]) {
   };
 }
 
-function summary(user: UserDoc, stats: Awaited<ReturnType<typeof statsFor>>) {
+function summary(user: UserDoc, stats: Awaited<ReturnType<typeof statsFor>>, threshold: number) {
   const id = user._id.toString();
   const o = stats.orders.get(id);
   const balance = stats.stamps.get(id) ?? 0;
@@ -63,7 +64,7 @@ function summary(user: UserDoc, stats: Awaited<ReturnType<typeof statsFor>>) {
     spentCents: o?.spentCents ?? 0,
     lastOrderAt: o?.lastOrderAt?.toISOString() ?? null,
     stampsBalance: balance,
-    rewardAvailable: balance >= LOYALTY_RULES.rewardThresholdStamps,
+    rewardAvailable: balance >= threshold,
   };
 }
 
@@ -93,7 +94,8 @@ export const customersResolvers = {
         User.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit).lean<UserDoc[]>(),
       ]);
       const stats = await statsFor(users.map((u) => u._id));
-      return { total, items: users.map((u) => summary(u, stats)) };
+      const threshold = await rewardThresholdStamps();
+      return { total, items: users.map((u) => summary(u, stats, threshold)) };
     },
 
     customerDetail: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
@@ -102,10 +104,11 @@ export const customersResolvers = {
       const user = await User.findOne({ _id: args.id, deletedAt: { $exists: false } }).lean<UserDoc>();
       if (!user) throw new Error("Cliente no encontrado");
 
-      const [stats, orders, movements] = await Promise.all([
+      const [stats, orders, movements, threshold] = await Promise.all([
         statsFor([user._id]),
         Order.find({ customerId: user._id }).sort({ createdAt: -1 }).exec(),
         LoyaltyTransaction.find({ customerId: user._id }).sort({ createdAt: -1 }).lean(),
+        rewardThresholdStamps(),
       ]);
       const orderCodes = new Map(orders.map((o) => [o._id.toString(), o.code]));
       const staffIds = [...new Set(movements.flatMap((m) => (m.staffId ? [m.staffId.toString()] : [])))];
@@ -114,8 +117,8 @@ export const customersResolvers = {
       );
 
       return {
-        customer: summary(user, stats),
-        rewardThreshold: LOYALTY_RULES.rewardThresholdStamps,
+        customer: summary(user, stats, threshold),
+        rewardThreshold: threshold,
         orders,
         stamps: movements.map((m) => ({
           id: m._id.toString(),

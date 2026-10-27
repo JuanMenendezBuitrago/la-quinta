@@ -11,6 +11,7 @@ const openingHoursSchema = new Schema<OpeningHoursDoc>(
 );
 
 export const DEFAULT_PACKAGING_FEE_CENTS = 1000;
+export const DEFAULT_REWARD_THRESHOLD_STAMPS = 10;
 
 export interface SiteSettingsDoc {
   address?: string;
@@ -38,6 +39,8 @@ export interface SiteSettingsDoc {
   packagingFeeCents: number;
   // Boton "Imprimir ticket" del panel (impresora termica por RawBT en la tablet Android).
   ticketPrintingEnabled: boolean;
+  // Sellos que hacen falta para canjear la recompensa (y los que se restan al canjearla).
+  rewardThresholdStamps: number;
 }
 
 // Documento unico (singleton): siempre se lee/escribe con un findOneAndUpdate sin filtro,
@@ -64,6 +67,7 @@ const siteSettingsSchema = new Schema<SiteSettingsDoc>({
   showInactiveStaff: { type: Boolean, default: true },
   packagingFeeCents: { type: Number, default: DEFAULT_PACKAGING_FEE_CENTS, min: 0 },
   ticketPrintingEnabled: { type: Boolean, default: false },
+  rewardThresholdStamps: { type: Number, default: DEFAULT_REWARD_THRESHOLD_STAMPS, min: 1 },
 });
 
 export const SiteSettings = model<SiteSettingsDoc>("SiteSettings", siteSettingsSchema);

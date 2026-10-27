@@ -1,138 +1,187 @@
 <template>
-  <!-- Pantallas anchas apaisadas: pedidos, direccion y horario a la izquierda; contacto, redes y
-       datos legales a la derecha -->
+  <!-- Por secciones: en pantalla ancha apaisada, la lista a la izquierda y la seccion elegida a la
+       derecha; en movil y vertical, pestañas fijas arriba. Un solo "Guardar" para todo. -->
   <section class="settings-admin wide-head">
-    <p class="muted">Configuración de la web: pedidos de clientes y datos del pie de página.</p>
+    <p class="muted">Configuración de la web y del panel. Los cambios de todas las secciones se guardan juntos.</p>
 
     <p v-if="loading" class="muted">Cargando…</p>
     <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
 
-    <form v-if="settings" class="card settings-form" @submit.prevent="submit">
-      <div class="settings-columns">
-      <div class="settings-col">
-      <div class="field">
-        <span class="muted">Pedidos</span>
-        <label class="day-toggle">
-          <input v-model="form.staffOnlyOrders" type="checkbox" />
-          <span>Solo el personal puede crear pedidos</span>
-        </label>
-        <span class="muted">Los clientes seguirán viendo la carta y sus pedidos, pero no podrán añadir productos ni pedir desde la web.</span>
-        <label class="day-toggle">
-          <input v-model="form.orderQueueEnabled" type="checkbox" />
-          <span>Cola de pedidos activa</span>
-        </label>
-        <span class="muted">Desactivada, los pedidos se hacen y se pagan en caja en el mismo momento: desaparecen la sección «Cola» y el botón «Hacer pedido» (solo queda «Guardar y pagar»), y los clientes no pueden pedir desde la web. Para desactivarla, la cola tiene que estar vacía.</span>
-      </div>
+    <template v-if="settings">
+      <MobileTabs v-model="activeSection" :tabs="[...SECTIONS]" label="Secciones de la configuración" class="settings-tabs" />
 
-      <div class="field">
-        <span class="muted">Tickets</span>
-        <label class="day-toggle">
-          <input v-model="form.ticketPrintingEnabled" type="checkbox" />
-          <span>Imprimir tickets en la impresora térmica</span>
-        </label>
-        <span class="muted">Añade «Imprimir ticket» a los pedidos de la cola y del historial. Imprime desde la tablet Android con la app RawBT instalada y configurada con la IP de la impresora (puerto 9100).</span>
-      </div>
-
-      <div class="field">
-        <span class="muted">Personal</span>
-        <label class="day-toggle">
-          <input v-model="form.showInactiveStaff" type="checkbox" />
-          <span>Mostrar cuentas de staff desactivadas en el listado</span>
-        </label>
-        <span class="muted">En la sección «Personal». Ocultas, para reactivar una cuenta hay que volver a marcar esta opción.</span>
-      </div>
-
-      <label class="field">
-        <span class="muted">Recargo por empaque (COP)</span>
-        <input v-model.number="form.packagingFeeCents" type="number" min="0" max="100000" step="1" inputmode="numeric" required />
-        <span class="muted">Se suma una vez a cada pedido para llevar: «Para llevar» en el local y recogida desde la web. En mesa o barra, no. 0 = sin recargo.</span>
-      </label>
-
-      <label class="field">
-        <span class="muted">Dirección</span>
-        <textarea v-model="form.address" rows="2" placeholder="Calle 00 # 00-00&#10;Barrio, Ciudad"></textarea>
-      </label>
-
-      <label class="field">
-        <span class="muted">Enlace "Cómo llegar" (Google Maps u otro)</span>
-        <input v-model="form.addressMapUrl" type="url" placeholder="https://maps.google.com/…" />
-        <span class="muted">Vacío = no se muestra ese enlace.</span>
-      </label>
-
-      <div class="field">
-        <span class="muted">Horario</span>
-        <span class="muted">Los clientes solo pueden elegir recogida dentro de este horario. El pie de página lo muestra agrupando los días iguales.</span>
-        <div v-for="day in form.openingHours" :key="day.weekday" class="schedule-row">
-          <label class="day-toggle">
-            <input v-model="day.isOpen" type="checkbox" />
-            <span>{{ WEEKDAY_NAMES[day.weekday] }}</span>
-          </label>
-          <template v-if="day.isOpen">
-            <input v-model="day.open" type="time" required :aria-label="`${WEEKDAY_NAMES[day.weekday]}: abre`" />
-            <input v-model="day.close" type="time" required :aria-label="`${WEEKDAY_NAMES[day.weekday]}: cierra`" />
-          </template>
-          <span v-else class="muted closed-label">Cerrado</span>
-        </div>
-      </div>
-      </div>
-
-      <div class="settings-col">
-
-      <label class="field">
-        <span class="muted">Teléfono</span>
-        <input v-model="form.phone" type="tel" placeholder="+57 300 000 0000" />
-      </label>
-
-      <label class="field">
-        <span class="muted">Email de contacto</span>
-        <input v-model="form.email" type="email" placeholder="hola@laquinta.example" />
-      </label>
-
-      <div class="field">
-        <span class="muted">Redes sociales — vacío = no se muestra ese icono</span>
-        <div v-for="social in SOCIAL_FIELDS" :key="social.key" class="social-row">
-          <span class="social-label">{{ social.label }}</span>
-          <input v-model="form[social.key]" type="url" :placeholder="social.placeholder" />
+      <div class="settings-layout">
+        <nav class="settings-nav" aria-label="Secciones de la configuración">
           <button
-            class="button secondary delete"
+            v-for="section in SECTIONS"
+            :key="section.id"
             type="button"
-            :disabled="!form[social.key]"
-            @click="form[social.key] = ''"
+            class="settings-nav-item"
+            :class="{ active: activeSection === section.id }"
+            :aria-current="activeSection === section.id ? 'true' : undefined"
+            @click="activeSection = section.id"
           >
-            <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
-            Borrar
+            <component :is="section.icon" :size="18" :stroke-width="1.8" aria-hidden="true" />
+            <span>{{ section.label }}</span>
           </button>
-        </div>
-      </div>
+        </nav>
 
-      <div class="field">
-        <span class="muted">Responsable del tratamiento de datos</span>
-        <span class="muted">Aparecen en la política de privacidad. La ley exige identificar al responsable.</span>
-        <input v-model="form.legalName" type="text" placeholder="Razón social o nombre del titular" />
-        <input v-model="form.taxId" type="text" placeholder="NIT o cédula" />
-        <input v-model="form.privacyEmail" type="email" placeholder="Email para solicitudes sobre datos (si vacío, el de contacto)" />
-      </div>
-      </div>
-      </div>
+        <!-- v-if y no v-show: los campos obligatorios de una seccion oculta no deben bloquear el envio -->
+        <form class="card settings-form" @submit.prevent="submit">
+          <header class="section-head">
+            <h2>{{ current.label }}</h2>
+            <p class="muted">{{ current.description }}</p>
+          </header>
 
-      <p v-if="formError" class="muted" style="color: var(--danger)">{{ formError }}</p>
-      <p v-if="saved" class="muted" style="color: var(--accent-strong)">Guardado ✓</p>
+          <template v-if="activeSection === 'pedidos'">
+            <div class="field">
+              <label class="toggle-row">
+                <input v-model="form.staffOnlyOrders" type="checkbox" />
+                <span>Solo el personal puede crear pedidos</span>
+              </label>
+              <span class="muted">Los clientes seguirán viendo la carta y sus pedidos, pero no podrán añadir productos ni pedir desde la web.</span>
+            </div>
+            <div class="field">
+              <label class="toggle-row">
+                <input v-model="form.orderQueueEnabled" type="checkbox" />
+                <span>Cola de pedidos activa</span>
+              </label>
+              <span class="muted">Desactivada, los pedidos se hacen y se pagan en caja en el mismo momento: desaparecen la sección «Cola» y el botón «Hacer pedido» (solo queda «Guardar y pagar»), y los clientes no pueden pedir desde la web. Para desactivarla, la cola tiene que estar vacía.</span>
+            </div>
+            <label class="field">
+              <span class="field-label">Recargo por empaque (COP)</span>
+              <input v-model.number="form.packagingFeeCents" class="short" type="number" min="0" max="100000" step="1" inputmode="numeric" required />
+              <span class="muted">Se suma una vez a cada pedido para llevar: «Para llevar» en el local y recogida desde la web. En mesa o barra, no. 0 = sin recargo.</span>
+            </label>
+            <div class="field">
+              <label class="toggle-row">
+                <input v-model="form.ticketPrintingEnabled" type="checkbox" />
+                <span>Imprimir tickets en la impresora térmica</span>
+              </label>
+              <span class="muted">Añade «Imprimir ticket» a los pedidos de la cola y del historial. Imprime desde la tablet Android con la app RawBT instalada y configurada con la IP de la impresora (puerto 9100).</span>
+            </div>
+          </template>
 
-      <div class="form-actions">
-        <button class="button" type="submit" :disabled="saving">{{ saving ? "Guardando…" : "Guardar cambios" }}</button>
+          <template v-else-if="activeSection === 'fidelizacion'">
+            <label class="field">
+              <span class="field-label">Sellos para canjear</span>
+              <input v-model.number="form.rewardThresholdStamps" class="short" type="number" min="1" max="50" step="1" inputmode="numeric" required />
+              <span class="muted">Los que necesita un cliente para llevarse un producto gratis; al canjearlo se le restan. Cambiarlo no toca los sellos que ya tienen los clientes ni los canjes ya hechos.</span>
+            </label>
+          </template>
+
+          <template v-else-if="activeSection === 'local'">
+            <label class="field">
+              <span class="field-label">Dirección</span>
+              <textarea v-model="form.address" rows="2" placeholder="Calle 00 # 00-00&#10;Barrio, Ciudad"></textarea>
+            </label>
+            <label class="field">
+              <span class="field-label">Enlace «Cómo llegar» (Google Maps u otro)</span>
+              <input v-model="form.addressMapUrl" type="url" placeholder="https://maps.google.com/…" />
+              <span class="muted">Vacío = no se muestra ese enlace.</span>
+            </label>
+            <div class="field">
+              <span class="field-label">Horario</span>
+              <span class="muted">Los clientes solo pueden elegir recogida dentro de este horario. El pie de página lo muestra agrupando los días iguales.</span>
+              <div v-for="day in form.openingHours" :key="day.weekday" class="schedule-row">
+                <label class="day-toggle">
+                  <input v-model="day.isOpen" type="checkbox" />
+                  <span>{{ WEEKDAY_NAMES[day.weekday] }}</span>
+                </label>
+                <template v-if="day.isOpen">
+                  <input v-model="day.open" type="time" required :aria-label="`${WEEKDAY_NAMES[day.weekday]}: abre`" />
+                  <input v-model="day.close" type="time" required :aria-label="`${WEEKDAY_NAMES[day.weekday]}: cierra`" />
+                </template>
+                <span v-else class="muted closed-label">Cerrado</span>
+              </div>
+            </div>
+          </template>
+
+          <template v-else-if="activeSection === 'contacto'">
+            <label class="field">
+              <span class="field-label">Teléfono</span>
+              <input v-model="form.phone" type="tel" placeholder="+57 300 000 0000" />
+            </label>
+            <label class="field">
+              <span class="field-label">Email de contacto</span>
+              <input v-model="form.email" type="email" placeholder="hola@laquinta.example" />
+            </label>
+            <div class="field">
+              <span class="field-label">Redes sociales</span>
+              <span class="muted">Vacío = no se muestra ese icono.</span>
+              <div v-for="social in SOCIAL_FIELDS" :key="social.key" class="social-row">
+                <span class="social-label">{{ social.label }}</span>
+                <input v-model="form[social.key]" type="url" :placeholder="social.placeholder" :aria-label="social.label" />
+                <button
+                  class="button secondary delete"
+                  type="button"
+                  :disabled="!form[social.key]"
+                  @click="form[social.key] = ''"
+                >
+                  <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
+                  Borrar
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <template v-else-if="activeSection === 'privacidad'">
+            <label class="field">
+              <span class="field-label">Razón social o nombre del titular</span>
+              <input v-model="form.legalName" type="text" />
+            </label>
+            <label class="field">
+              <span class="field-label">NIT o cédula</span>
+              <input v-model="form.taxId" type="text" />
+            </label>
+            <label class="field">
+              <span class="field-label">Email para solicitudes sobre datos</span>
+              <input v-model="form.privacyEmail" type="email" placeholder="Si está vacío, el email de contacto" />
+            </label>
+          </template>
+
+          <template v-else-if="activeSection === 'panel'">
+            <div class="field">
+              <label class="toggle-row">
+                <input v-model="form.showInactiveStaff" type="checkbox" />
+                <span>Mostrar cuentas de staff desactivadas en el listado</span>
+              </label>
+              <span class="muted">En la sección «Personal». Ocultas, para reactivar una cuenta hay que volver a marcar esta opción.</span>
+            </div>
+          </template>
+
+          <footer class="form-actions">
+            <button class="button" type="submit" :disabled="saving">{{ saving ? "Guardando…" : "Guardar cambios" }}</button>
+            <span v-if="saved" class="muted saved" role="status">Guardado ✓</span>
+          </footer>
+          <p v-if="formError" class="muted" style="color: var(--danger); margin: 0" role="alert">{{ formError }}</p>
+        </form>
       </div>
-    </form>
+    </template>
   </section>
 </template>
 
 <script setup lang="ts">
-import { Trash2 } from "lucide-vue-next";
+import { ClipboardList, Contact, MapPin, PanelsTopLeft, ShieldCheck, Stamp, Trash2 } from "lucide-vue-next";
+import MobileTabs from "~/components/MobileTabs.vue";
 import {
   SITE_SETTINGS_QUERY,
   UPDATE_SITE_SETTINGS,
   type OpeningHours,
   type SiteSettings,
 } from "~/composables/useSiteSettings";
+
+const SECTIONS = [
+  { id: "pedidos", label: "Pedidos", icon: ClipboardList, description: "Quién puede pedir, la cola, el recargo para llevar y los tickets." },
+  { id: "fidelizacion", label: "Fidelización", icon: Stamp, description: "La tarjeta de sellos de los clientes." },
+  { id: "local", label: "Local", icon: MapPin, description: "Dirección y horario: salen en el pie de página y limitan las horas de recogida." },
+  { id: "contacto", label: "Contacto", icon: Contact, description: "Teléfono, email y redes sociales del pie de página." },
+  { id: "privacidad", label: "Privacidad", icon: ShieldCheck, description: "Responsable del tratamiento de datos: aparece en la política de privacidad, y la ley exige identificarlo." },
+  { id: "panel", label: "Panel", icon: PanelsTopLeft, description: "Opciones del panel del personal." },
+] as const;
+type SectionId = (typeof SECTIONS)[number]["id"];
+const activeSection = ref<SectionId>("pedidos");
+const current = computed(() => SECTIONS.find((s) => s.id === activeSection.value) ?? SECTIONS[0]);
 
 const WEEKDAY_NAMES = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
@@ -177,6 +226,7 @@ function emptyForm() {
     showInactiveStaff: true,
     packagingFeeCents: 0 as number | "",
     ticketPrintingEnabled: false,
+    rewardThresholdStamps: 10 as number | "",
   };
 }
 
@@ -205,6 +255,7 @@ watch(
       showInactiveStaff: val.showInactiveStaff,
       packagingFeeCents: val.packagingFeeCents,
       ticketPrintingEnabled: val.ticketPrintingEnabled,
+      rewardThresholdStamps: val.rewardThresholdStamps,
     });
   },
   { immediate: true }
@@ -242,6 +293,7 @@ async function submit() {
         showInactiveStaff: form.showInactiveStaff,
         packagingFeeCents: Math.round(Number(form.packagingFeeCents) || 0),
         ticketPrintingEnabled: form.ticketPrintingEnabled,
+        rewardThresholdStamps: Math.round(Number(form.rewardThresholdStamps) || 0),
       },
     });
     await refetch();
@@ -261,14 +313,46 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.settings-admin { max-width: 480px; }
-.settings-form { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
-.settings-columns, .settings-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.settings-tabs { margin-bottom: 16px; }
+.settings-layout { display: flex; flex-direction: column; gap: 16px; margin-top: 12px; }
+.settings-nav { display: none; }
+.settings-form { display: flex; flex-direction: column; gap: 18px; max-width: 560px; min-width: 0; }
+
 @media (min-width: 1000px) and (orientation: landscape) {
-  .settings-admin { max-width: none; }
-  .settings-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+  .settings-layout { display: grid; grid-template-columns: 220px minmax(0, 640px); gap: 24px; align-items: start; }
+  .settings-form { max-width: none; }
+  .settings-nav { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 96px; }
 }
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.settings-nav-item:hover { background: var(--surface-alt); color: var(--text); }
+.settings-nav-item.active { background: var(--surface-alt); color: var(--accent-strong); }
+.settings-nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.section-head { display: flex; flex-direction: column; gap: 4px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.section-head h2 { margin: 0; font-family: var(--font-futura-text); font-size: 20px; }
+.section-head p { margin: 0; font-size: 14px; }
+
 .field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: 14px; font-weight: 600; }
+.field .muted { font-size: 13.5px; }
+.toggle-row { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+.toggle-row input { width: auto; margin: 3px 0 0; flex-shrink: 0; }
+input.short { max-width: 12rem; }
 
 .schedule-row, .social-row {
   display: grid;
@@ -283,10 +367,11 @@ onBeforeUnmount(() => {
 .day-toggle { display: flex; align-items: center; justify-content: flex-start; gap: 8px; font-size: 14px; font-weight: 600; }
 .day-toggle input { width: auto; margin: 0; }
 .closed-label { grid-column: span 2; }
-.social-row { grid-template-columns: 90px 1fr auto; }
+.social-row { grid-template-columns: 90px minmax(0, 1fr) auto; }
 .social-label { font-size: 13px; font-weight: 600; color: var(--text); }
 
-.form-actions { margin-top: 4px; }
+.form-actions { display: flex; align-items: center; gap: 12px; padding-top: 14px; border-top: 1px solid var(--border); }
+.saved { color: var(--accent-strong); }
 
 textarea, input[type="text"], input[type="url"], input[type="tel"], input[type="email"], input[type="time"], input[type="number"] {
   width: 100%;

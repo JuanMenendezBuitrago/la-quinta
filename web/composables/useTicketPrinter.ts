@@ -17,8 +17,8 @@ const COLS = 48; // fuente A: 576 puntos / 12
 const COLS_DOUBLE = 24; // doble ancho
 const LOGO_DOTS = 400; // 50 mm a 203 ppp
 const LOGO_URL = "/ticket-logo.svg"; // logo de una tinta, en negro
-// Sellos para la recompensa (LOYALTY_RULES.rewardThresholdStamps en la API).
-const REWARD_THRESHOLD = 10;
+// Sellos para la recompensa si aun no ha cargado la configuracion (rewardThresholdStamps).
+const DEFAULT_REWARD_THRESHOLD = 10;
 const STORE_NAME = "La Quinta · Café de especialidad";
 const RAWBT_PLAY_URL = "https://play.google.com/store/apps/details?id=ru.a402d.rawbtprinter";
 
@@ -246,8 +246,9 @@ export function useTicketPrinter() {
     if (order.customer) {
       p.line(rule());
       p.bold(true).line(`${order.customer.name} · ${order.customer.customerCode}`).bold(false);
-      if (order.redemption) p.line(`Canjeaste ${REWARD_THRESHOLD} sellos: ${order.redemption.name} gratis`.slice(0, COLS));
-      if (order.customer.stampsBalance != null) p.line(`Llevas ${Math.min(order.customer.stampsBalance, REWARD_THRESHOLD)} de ${REWARD_THRESHOLD} sellos`);
+      const threshold = s?.rewardThresholdStamps ?? DEFAULT_REWARD_THRESHOLD;
+      if (order.redemption) p.line(`Canjeaste ${threshold} sellos: ${order.redemption.name} gratis`.slice(0, COLS));
+      if (order.customer.stampsBalance != null) p.line(`Llevas ${Math.min(order.customer.stampsBalance, threshold)} de ${threshold} sellos`);
     }
 
     p.align("center");

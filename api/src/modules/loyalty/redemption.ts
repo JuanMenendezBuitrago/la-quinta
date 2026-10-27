@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { LoyaltyTransaction, LOYALTY_RULES } from "./model";
+import { rewardThresholdStamps } from "../settings/resolvers";
 
 /**
  * Canje de la recompensa como descuento de un pedido ("Canje de sellos"). El descuento vive en
@@ -29,11 +30,9 @@ export async function orderRedeemedStamps(orderId: string) {
 }
 
 export async function assertRewardAvailable(customerId: string) {
-  const balance = await stampsBalance(customerId);
-  if (balance < LOYALTY_RULES.rewardThresholdStamps) {
-    throw new Error(
-      `El cliente tiene ${balance} de ${LOYALTY_RULES.rewardThresholdStamps} sellos: todavia no puede canjear`
-    );
+  const [balance, threshold] = await Promise.all([stampsBalance(customerId), rewardThresholdStamps()]);
+  if (balance < threshold) {
+    throw new Error(`El cliente tiene ${balance} de ${threshold} sellos: todavia no puede canjear`);
   }
 }
 
@@ -42,7 +41,7 @@ export async function redeemForOrder(customerId: string, orderId: string, staffI
   if ((await orderRedeemedStamps(orderId)) > 0) return;
   await LoyaltyTransaction.create({
     customerId,
-    stamps: -LOYALTY_RULES.rewardThresholdStamps,
+    stamps: -(await rewardThresholdStamps()),
     reason: "canje",
     orderId,
     staffId,

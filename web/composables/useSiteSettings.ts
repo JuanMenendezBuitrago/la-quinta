@@ -30,6 +30,7 @@ export const SITE_SETTINGS_QUERY = gql`
       showInactiveStaff
       packagingFeeCents
       ticketPrintingEnabled
+      rewardThresholdStamps
     }
   }
 `;
@@ -62,6 +63,7 @@ export const UPDATE_SITE_SETTINGS = gql`
       showInactiveStaff
       packagingFeeCents
       ticketPrintingEnabled
+      rewardThresholdStamps
     }
   }
 `;
@@ -104,6 +106,8 @@ export interface SiteSettings {
   packagingFeeCents: number;
   /** Boton "Imprimir ticket" del panel (impresora termica por RawBT en la tablet Android). */
   ticketPrintingEnabled: boolean;
+  /** Sellos que hacen falta para canjear la recompensa. */
+  rewardThresholdStamps: number;
 }
 
 /**

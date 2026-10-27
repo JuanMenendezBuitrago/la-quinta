@@ -1,15 +1,17 @@
 import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
 import { User } from "../users/model";
-import { LoyaltyTransaction, LOYALTY_RULES } from "./model";
+import { LoyaltyTransaction } from "./model";
 import { stampsBalance } from "./redemption";
+import { rewardThresholdStamps } from "../settings/resolvers";
 
 async function loadStatus(customerId: string) {
   const history = await LoyaltyTransaction.find({ customerId }).sort({ createdAt: -1 });
   const balance = history.reduce((sum, tx) => sum + tx.stamps, 0);
+  const threshold = await rewardThresholdStamps();
   return {
     balance,
-    rewardThreshold: LOYALTY_RULES.rewardThresholdStamps,
-    rewardAvailable: balance >= LOYALTY_RULES.rewardThresholdStamps,
+    rewardThreshold: threshold,
+    rewardAvailable: balance >= threshold,
     history,
   };
 }
@@ -23,11 +25,11 @@ export const loyaltyResolvers = {
   },
   // Customer llega como documento de User (_id); CustomerMatch, ya con id en texto.
   Customer: {
-    rewardAvailable: async (c: any) => (await stampsBalance(String(c._id))) >= LOYALTY_RULES.rewardThresholdStamps,
+    rewardAvailable: async (c: any) => (await stampsBalance(String(c._id))) >= (await rewardThresholdStamps()),
     stampsBalance: (c: any) => stampsBalance(String(c._id)),
   },
   CustomerMatch: {
-    rewardAvailable: async (c: any) => (await stampsBalance(c.id)) >= LOYALTY_RULES.rewardThresholdStamps,
+    rewardAvailable: async (c: any) => (await stampsBalance(c.id)) >= (await rewardThresholdStamps()),
   },
   LoyaltyTransaction: {
     id: (doc: any) => doc._id.toString(),

@@ -60,6 +60,9 @@ export const settingsTypeDefs = /* GraphQL */ `
     """Boton "Imprimir ticket" en el panel: imprime en la impresora termica a traves de RawBT
     (app Android de la tablet, que tiene configurada la impresora)."""
     ticketPrintingEnabled: Boolean!
+    """Sellos que hacen falta para canjear la recompensa (y los que se restan al canjearla).
+    Cambiarlo no toca los sellos ya ganados ni los canjes ya hechos."""
+    rewardThresholdStamps: Int!
   }
 
   input SiteSettingsInput {
@@ -81,6 +84,8 @@ export const settingsTypeDefs = /* GraphQL */ `
     showInactiveStaff: Boolean
     packagingFeeCents: Int
     ticketPrintingEnabled: Boolean
+    """Entre 1 y 50."""
+    rewardThresholdStamps: Int
   }
 
   extend type Query {
