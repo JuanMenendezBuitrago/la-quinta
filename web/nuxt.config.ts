@@ -63,6 +63,10 @@ export default defineNuxtConfig({
     head: {
       title: "La Quinta",
       meta: [{ name: "description", content: "Café de especialidad — carta, pedidos y fidelización" }],
+      link: [
+        { rel: "icon", type: "image/png", href: "/favicon.png" },
+        { rel: "apple-touch-icon", href: "/favicon.png" },
+      ],
     },
   },
 
