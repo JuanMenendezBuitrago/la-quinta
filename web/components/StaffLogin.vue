@@ -2,15 +2,24 @@
   <div class="staff-login">
     <!-- 1. Elegir cuenta (como la pantalla de acceso de un ordenador compartido) -->
     <template v-if="mode === 'pick'">
-      <p class="muted">¿Quién eres?</p>
-      <ul class="accounts">
-        <li v-for="option in options" :key="option.id">
-          <button type="button" class="account" @click="pick(option)">
-            <UserAvatar :avatar="option.avatar" :name="option.name" :size="72" />
-            <span class="account-name">{{ option.name }}</span>
-          </button>
-        </li>
-      </ul>
+      <!-- Cuentas de cada cual y, aparte, las compartidas (al entrar se elige quien la usa) -->
+      <section v-for="group in groups" :key="group.key" class="account-group" :aria-labelledby="`accounts-${group.key}`">
+        <p :id="`accounts-${group.key}`" class="muted group-title">{{ group.title }}</p>
+        <ul class="accounts">
+          <li v-for="option in group.options" :key="option.id">
+            <button type="button" class="account" :class="{ shared: option.shared }" @click="pick(option)">
+              <span class="account-avatar">
+                <UserAvatar :avatar="option.avatar" :name="option.name" :size="72" />
+                <span v-if="option.shared" class="shared-badge" aria-hidden="true">
+                  <Users :size="14" :stroke-width="2" />
+                </span>
+              </span>
+              <span class="account-name">{{ option.name }}</span>
+              <span v-if="option.shared" class="account-hint muted">Compartida</span>
+            </button>
+          </li>
+        </ul>
+      </section>
       <button type="button" class="link-button" @click="chosenMode = 'email'">Entrar con email</button>
     </template>
 
@@ -18,6 +27,7 @@
     <form v-else-if="mode === 'password' && selected" class="card login-card selected" @submit.prevent="submitPassword">
       <UserAvatar :avatar="selected.avatar" :name="selected.name" :size="96" />
       <strong class="selected-name">{{ selected.name }}</strong>
+      <p v-if="selected.shared" class="muted hint">Cuenta compartida: al entrar eliges quién eres.</p>
       <label class="sr-only" for="staff-login-password">Contraseña</label>
       <PasswordInput
         id="staff-login-password"
@@ -107,6 +117,7 @@
 
 <script setup lang="ts">
 import { gql } from "graphql-tag";
+import { Users } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import { primeAudio } from "~/composables/useOrderChime";
 import UserAvatar from "~/components/UserAvatar.vue";
@@ -117,6 +128,7 @@ interface StaffLoginOption {
   id: string;
   name: string;
   avatar?: string | null;
+  shared: boolean;
 }
 
 const STAFF_LOGIN_OPTIONS = gql`
@@ -125,6 +137,7 @@ const STAFF_LOGIN_OPTIONS = gql`
       id
       name
       avatar
+      shared
     }
   }
 `;
@@ -134,6 +147,16 @@ const { result } = useQuery<{ staffLoginOptions: StaffLoginOption[] }>(STAFF_LOG
   fetchPolicy: "network-only",
 });
 const options = computed(() => result.value?.staffLoginOptions ?? []);
+// Sin compartidas, un solo grupo como antes ("¿Quién eres?").
+const groups = computed(() => {
+  const own = options.value.filter((o) => !o.shared);
+  const shared = options.value.filter((o) => o.shared);
+  if (!shared.length) return [{ key: "own", title: "¿Quién eres?", options: own }];
+  return [
+    ...(own.length ? [{ key: "own", title: "Cuentas personales", options: own }] : []),
+    { key: "shared", title: "Cuentas compartidas", options: shared },
+  ];
+});
 
 const chosenMode = ref<"pick" | "password" | "email" | "forgot-email" | "reset" | null>(null);
 // Mientras no se elige nada: la lista si hay cuentas; si no cargan, directamente email.
@@ -239,6 +262,9 @@ function submitReset() {
 <style scoped>
 /* Todo centrado, como la pantalla de acceso de un ordenador */
 .staff-login { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.account-group { width: 100%; }
+.group-title { margin: 0; }
+.account-group + .account-group { margin-top: 4px; }
 .accounts {
   list-style: none;
   margin: 12px 0 20px;
@@ -266,6 +292,25 @@ function submitReset() {
   transition: border-color 0.15s ease;
 }
 .account:hover { border-color: var(--field-border); }
+/* Compartida: borde discontinuo y un distintivo con el icono de grupo sobre el avatar */
+.account.shared { border: 1px dashed var(--field-border); }
+.account.shared:hover { border-color: var(--accent); }
+.account-avatar { position: relative; display: inline-flex; }
+.shared-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: var(--accent);
+  color: var(--bg);
+}
+.account-hint { font-size: 12px; margin-top: -6px; }
 .account:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .account-name { font-weight: 600; font-size: 14px; text-align: center; overflow-wrap: anywhere; }
 

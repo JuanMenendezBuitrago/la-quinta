@@ -98,13 +98,13 @@ export const usersResolvers = {
       return users.map(toMatch);
     },
     staffLoginOptions: async () => {
-      const staff = await StaffUser.find({ active: { $ne: false } }).select("name avatar").sort({ name: 1 }).lean();
-      return staff.map((s) => ({ id: s._id.toString(), name: s.name, avatar: s.avatar ?? null }));
+      const staff = await StaffUser.find({ active: { $ne: false } }).select("name avatar shared").sort({ name: 1 }).lean();
+      return staff.map((s) => ({ id: s._id.toString(), name: s.name, avatar: s.avatar ?? null, shared: !!s.shared }));
     },
     actingStaffOptions: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireStaff(ctx);
       const staff = await StaffUser.find({ active: { $ne: false }, shared: { $ne: true } }).select("name avatar").sort({ name: 1 }).lean();
-      return staff.map((s) => ({ id: s._id.toString(), name: s.name, avatar: s.avatar ?? null }));
+      return staff.map((s) => ({ id: s._id.toString(), name: s.name, avatar: s.avatar ?? null, shared: false }));
     },
     staffUsers: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireOwnStaffSession(ctx, ["gestion"]);

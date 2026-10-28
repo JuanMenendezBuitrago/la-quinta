@@ -57,6 +57,8 @@ export const usersTypeDefs = /* GraphQL */ `
     id: ID!
     name: String!
     avatar: String
+    """Cuenta compartida: al entrar se elige quien la usa."""
+    shared: Boolean!
   }
 
   type StaffAuthPayload {

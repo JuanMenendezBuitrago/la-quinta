@@ -7,15 +7,10 @@
       <StaffLogin />
     </template>
 
-    <!-- Cuenta compartida: antes de nada, quien la esta usando (luego se cambia desde la cabecera) -->
-    <template v-else-if="staff.shared && !staff.actingAs">
-      <header class="account-hero login-hero">
-        <h1>¿Quién eres?</h1>
-      </header>
-      <StaffActingPicker />
-    </template>
-
     <template v-else>
+      <!-- Cuenta compartida: antes de nada, quien la esta usando, en un modal sobre el panel (luego
+           se cambia desde la cabecera) -->
+      <StaffActingPicker v-if="staff.shared && !staff.actingAs" />
       <!-- En las secciones que usan mas ancho que la pagina (cola, caja), el titulo se alinea con ellas -->
       <header
         class="account-hero staff-hero"
@@ -275,12 +270,15 @@
         <EmptyState v-else-if="!historyOrders.length" :icon="History" title="Todavía no hay pedidos entregados ni cancelados" />
         <div v-for="order in historyOrders" :key="order.id" class="card history-row">
           <div class="order-info">
-            <span class="order-code">{{ order.code }}</span>
-            <span v-if="order.customer" class="order-customer">
-              <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="24" />
-              <strong>{{ order.customer.name }}</strong>
+            <!-- El cliente en la misma linea que el codigo -->
+            <span class="history-head">
+              <span class="order-code">{{ order.code }}</span>
+              <span v-if="order.customer" class="order-customer">
+                <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="24" />
+                <strong>{{ order.customer.name }}</strong>
+              </span>
+              <strong v-else class="muted">Sin cliente</strong>
             </span>
-            <strong v-else class="muted">Sin cliente</strong>
             <OrderItems :items="order.items" list />
             <p class="muted">
               {{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}{{
@@ -307,7 +305,14 @@
               Imprimir ticket
             </button>
           </div>
-          <span class="status-badge" :class="`status-${order.status}`">{{ statusLabel(order.status) }}</span>
+          <!-- Quien lo tomo, junto al estado (los pedidos web no tienen a nadie) -->
+          <span class="history-status">
+            <span v-if="takenBy(order)" class="handled-by" :title="`Tomado por ${takenBy(order)!.staffName}`">
+              <UserAvatar :avatar="takenBy(order)!.staffAvatar" :name="takenBy(order)!.staffName" :size="22" />
+              <span class="sr-only">Tomado por {{ takenBy(order)!.staffName }}</span>
+            </span>
+            <span class="status-badge" :class="`status-${order.status}`">{{ statusLabel(order.status) }}</span>
+          </span>
         </div>
         </div>
       </section>
@@ -505,6 +510,13 @@ function handledBy(order: any): { staffName: string; staffAvatar?: string | null
   const history: any[] = order.statusHistory ?? [];
   for (let i = history.length - 1; i >= 0; i--) if (history[i].staffName) return history[i];
   return null;
+}
+
+/** Quien tomo el pedido: el primer cambio es la creacion (en uno web no hay nadie; "guardar y
+ *  pagar" lo crea ya entregado). */
+function takenBy(order: any): { staffName: string; staffAvatar?: string | null } | null {
+  const created = order.statusHistory?.[0];
+  return created?.staffName ? created : null;
 }
 // En la propia pestaña de inventario el aviso sobra (ya se ve en rojo): no se guarda para despues.
 watch(stockAlert, (alert) => {
@@ -854,6 +866,8 @@ watchEffect(() => {
 .history-list { gap: 10px; }
 /* Estado (entregado/cancelado) en la esquina superior derecha, alineado con el codigo */
 .history-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.history-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+.history-status { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
 .status-badge {
   flex-shrink: 0;
