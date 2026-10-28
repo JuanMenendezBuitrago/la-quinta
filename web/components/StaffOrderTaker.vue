@@ -215,25 +215,29 @@
            Solo en cliente: Teleport fuera de #teleports no se renderiza en SSR. -->
       <ClientOnly>
         <Teleport to="#staff-hero-actions">
+          <!-- Entre "Pagar" y las formas de pago, deslizando: hacia la izquierda al avanzar y hacia
+               la derecha al volver -->
           <div class="hero-pay">
-            <template v-if="choosingPayment">
-              <span class="muted hero-pay-label">Cobrar {{ formatPrice(finalCents) }} con:</span>
-              <button
-                v-for="method in PAYMENT_OPTIONS"
-                :key="method"
-                class="button"
-                type="button"
-                :disabled="!canSubmit"
-                @click="method === 'EFECTIVO' ? cashDialog?.open() : submit(method)"
-              >
-                {{ submitting ? "Guardando…" : PAYMENT_LABELS[method] }}
+            <Transition :name="choosingPayment ? 'pay-forward' : 'pay-back'" mode="out-in">
+              <div v-if="choosingPayment" key="methods" class="hero-pay-step">
+                <span class="muted hero-pay-label">Cobrar {{ formatPrice(finalCents) }} con:</span>
+                <button
+                  v-for="method in PAYMENT_OPTIONS"
+                  :key="method"
+                  class="button"
+                  type="button"
+                  :disabled="!canSubmit"
+                  @click="method === 'EFECTIVO' ? cashDialog?.open() : submit(method)"
+                >
+                  {{ submitting ? "Guardando…" : PAYMENT_LABELS[method] }}
+                </button>
+                <button class="button secondary" type="button" :disabled="submitting" @click="choosingPayment = false">Volver</button>
+              </div>
+              <button v-else key="pay" class="button" type="button" :disabled="!canSubmit" @click="choosingPayment = true">
+                <Banknote :size="16" :stroke-width="1.8" aria-hidden="true" />
+                Pagar
               </button>
-              <button class="button secondary" type="button" :disabled="submitting" @click="choosingPayment = false">Volver</button>
-            </template>
-            <button v-else class="button" type="button" :disabled="!canSubmit" @click="choosingPayment = true">
-              <Banknote :size="16" :stroke-width="1.8" aria-hidden="true" />
-              Pagar
-            </button>
+            </Transition>
           </div>
         </Teleport>
       </ClientOnly>
@@ -809,8 +813,18 @@ input {
 .takeaway-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
 .customer-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ticket-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-/* Cabecera de la seccion (#staff-hero-actions): "Pagar" o, tras pulsarlo, las formas de pago */
+/* Cabecera de la seccion (#staff-hero-actions): "Pagar" o, tras pulsarlo, las formas de pago.
+   Al cambiar, se deslizan como las categorias (.grid-next/.grid-prev), pero menos: es un hueco pequeño. */
 .hero-pay { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.hero-pay-step { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.pay-forward-enter-active, .pay-forward-leave-active, .pay-back-enter-active, .pay-back-leave-active {
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+.pay-forward-leave-to, .pay-back-enter-from { transform: translateX(-24px); opacity: 0; }
+.pay-forward-enter-from, .pay-back-leave-to { transform: translateX(24px); opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .pay-forward-enter-active, .pay-forward-leave-active, .pay-back-enter-active, .pay-back-leave-active { transition: none; }
+}
 .hero-pay .button { min-height: 44px; }
 .hero-pay-label { font-size: 14px; }
 

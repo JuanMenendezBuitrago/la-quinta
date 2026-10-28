@@ -160,6 +160,26 @@ h3 { font-size: 17px; }
 .button.secondary.cancel, .button.secondary.delete { color: var(--danger); border-color: var(--danger); }
 .button.secondary.cancel:hover:not(:disabled), .button.secondary.delete:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--bg); }
 
+/* Ripple de todos los botones (plugins/ripple.client.ts): una capa fija encima del boton, con su
+   forma, y una onda del color de su texto que crece desde donde se toca y se desvanece. */
+.ripple-layer {
+  position: fixed;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2147483647;
+}
+.ripple-wave {
+  position: absolute;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.28;
+  transform: scale(0);
+  animation: ripple-wave ease-out forwards;
+}
+@keyframes ripple-wave {
+  to { transform: scale(1); opacity: 0; }
+}
+
 input, select, textarea {
   width: 100%;
   padding: 10px 12px;

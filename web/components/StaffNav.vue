@@ -320,8 +320,10 @@ onBeforeUnmount(() => {
 /* --- Escritorio: grupos en linea con desplegables --- */
 .menu { display: flex; align-items: center; gap: 22px; }
 .group { position: relative; }
+/* Abre desplegandose hacia abajo y se cierra recogiendose hacia arriba (recorte + desplazamiento).
+   Oculto con visibility y no display: none, que no se puede animar; visibility espera al final de
+   la transicion para que se vea el cierre, como el panel del movil. */
 .dropdown {
-  display: none;
   position: absolute;
   top: calc(100% + 8px);
   left: -12px;
@@ -334,9 +336,24 @@ onBeforeUnmount(() => {
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   z-index: 60;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-6px);
+  clip-path: inset(0 0 100% 0 round 10px);
+  transition: clip-path 0.18s ease, transform 0.18s ease, opacity 0.18s ease, visibility 0s linear 0.18s;
 }
 .dropdown.align-right { left: auto; right: -12px; }
-.dropdown.open { display: block; }
+.dropdown.open {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  /* Un margen por debajo para no recortar la sombra */
+  clip-path: inset(0 -24px -32px -24px round 10px);
+  transition: clip-path 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dropdown, .dropdown.open { transition: none; }
+}
 .entry {
   width: 100%;
   justify-content: space-between;
@@ -478,7 +495,8 @@ onBeforeUnmount(() => {
   .group-btn.single.current { color: var(--accent); font-weight: 600; }
   .entry { padding: 12px; font-size: 15px; }
   .dropdown,
-  .dropdown.align-right {
+  .dropdown.align-right,
+  .dropdown.open {
     display: block;
     position: static;
     min-width: 0;
@@ -486,6 +504,12 @@ onBeforeUnmount(() => {
     border: none;
     box-shadow: none;
     background: transparent;
+    /* En el panel lateral los grupos van siempre desplegados: sin la animacion de escritorio */
+    visibility: visible;
+    opacity: 1;
+    transform: none;
+    clip-path: none;
+    transition: none;
   }
   .account .who { display: none; }
 }
