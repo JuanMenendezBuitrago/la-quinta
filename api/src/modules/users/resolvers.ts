@@ -11,6 +11,7 @@ import { Expense } from "../expenses/model";
 import { LoyaltyTransaction } from "../loyalty/model";
 import { StockMovement } from "../inventory/model";
 import { NewsletterCampaign } from "../newsletter/model";
+import { Shift } from "../shifts/model";
 
 /**
  * Lo que queda a nombre de una cuenta del personal (pedidos que tomo, movio o cobro, cierres,
@@ -267,6 +268,8 @@ export const usersResolvers = {
       const deleted = await StaffUser.findByIdAndDelete(args.id);
       if (!deleted) throw new Error("Usuario no encontrado");
       await removeAvatarFile(deleted.avatar, UPLOAD_DIR);
+      // Sus turnos son planificacion, no un registro de lo hecho: se van con la cuenta.
+      await Shift.deleteMany({ staffId: deleted._id });
       return true;
     },
   },

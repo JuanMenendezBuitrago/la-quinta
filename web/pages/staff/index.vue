@@ -368,6 +368,10 @@
       </section>
 
       <!-- Configuracion: pedidos de clientes y pie de pagina (solo gestion) -->
+      <section v-else-if="activeTab === 'horarios'">
+        <ShiftsAdmin />
+      </section>
+
       <section v-else-if="activeTab === 'pie'">
         <SiteSettingsAdmin />
       </section>
@@ -432,6 +436,7 @@ import CustomerLookup from "~/components/CustomerLookup.vue";
 import OrderItems from "~/components/OrderItems.vue";
 import HistoryFilters from "~/components/HistoryFilters.vue";
 import InventoryAdmin from "~/components/InventoryAdmin.vue";
+import ShiftsAdmin from "~/components/ShiftsAdmin.vue";
 import { formatQty, useInventoryAlerts } from "~/composables/useInventory";
 import { goToSection, STAFF_SECTIONS, usePendingPhotosCount, useStaffBadges, useStaffSection } from "~/composables/useStaffSections";
 
@@ -583,7 +588,7 @@ async function doCancel(order: any) {
 const activeTab = useStaffSection();
 // Secciones con diseño ancho de dos columnas en pantallas apaisadas (.wide-layout en assets/main.css):
 // su titulo se alinea con las columnas.
-const WIDE_SECTIONS: string[] = ["caja", "tomar", "opiniones", "personal", "portada", "cafe", "novedades", "clientes", "carta", "pie", "historial"];
+const WIDE_SECTIONS: string[] = ["caja", "tomar", "opiniones", "personal", "portada", "cafe", "novedades", "clientes", "carta", "pie", "historial", "horarios"];
 const sectionLabel = computed(() => STAFF_SECTIONS.find((s) => s.id === activeTab.value)?.label ?? "");
 const selectTab = goToSection;
 

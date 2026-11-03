@@ -31,6 +31,8 @@ import { photosResolvers } from "../modules/photos/resolvers";
 import { reviewsResolvers } from "../modules/reviews/resolvers";
 import { expensesTypeDefs } from "../modules/expenses/schema";
 import { expensesResolvers } from "../modules/expenses/resolvers";
+import { shiftsTypeDefs } from "../modules/shifts/schema";
+import { shiftsResolvers } from "../modules/shifts/resolvers";
 
 // Tipos raiz: cada modulo los extiende con "extend type Query { ... }" etc.
 const rootTypeDefs = /* GraphQL */ `
@@ -62,6 +64,7 @@ const typeDefs = mergeTypeDefs([
   reviewsTypeDefs,
   photosTypeDefs,
   expensesTypeDefs,
+  shiftsTypeDefs,
 ]);
 
 const resolvers = mergeResolvers([
@@ -81,6 +84,7 @@ const resolvers = mergeResolvers([
   reviewsResolvers,
   photosResolvers,
   expensesResolvers,
+  shiftsResolvers,
 ]);
 
 export const schema = makeExecutableSchema({ typeDefs, resolvers });

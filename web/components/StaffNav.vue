@@ -109,6 +109,7 @@
 <script setup lang="ts">
 import {
   BookOpen,
+  CalendarClock,
   Calculator,
   ChevronDown,
   CircleUserRound,
@@ -156,6 +157,7 @@ const ENTRY_ICONS: Record<Entry["id"], Component> = {
   historial: History,
   inventario: Package,
   caja: Calculator,
+  horarios: CalendarClock,
   opiniones: MessageSquareHeart,
   clientes: Users,
   personal: IdCard,
