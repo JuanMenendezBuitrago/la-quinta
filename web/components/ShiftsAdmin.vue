@@ -251,6 +251,75 @@
       <span><i class="chip-swatch outside" /> Fuera del horario de apertura</span>
     </div>
 
+    <!-- ===================== Resumen por persona (semana que se ve) ===================== -->
+    <section class="card summary" aria-labelledby="summary-title">
+      <div class="summary-head">
+        <h2 id="summary-title">Resumen por persona</h2>
+        <span class="muted">{{ weekLabel }} · comparado con la semana anterior</span>
+      </div>
+      <div class="sum-table" role="table" aria-labelledby="summary-title">
+        <div class="sum-row sum-header" role="row">
+          <span role="columnheader">Persona</span>
+          <span role="columnheader">Días</span>
+          <span role="columnheader" class="num">Turnos</span>
+          <span role="columnheader">Horas</span>
+          <span role="columnheader" class="num">Vs. anterior</span>
+          <span role="columnheader">Franja</span>
+          <span role="columnheader" class="num">Fuera de horario</span>
+        </div>
+        <div
+          v-for="row in summary"
+          :key="row.person.id"
+          class="sum-row"
+          :class="{ me: row.person.id === me?.id, idle: !row.count }"
+          role="row"
+        >
+          <span class="sum-person" role="rowheader">
+            <UserAvatar :avatar="row.person.avatar" :name="row.person.name" :size="28" />
+            <strong>{{ row.person.name }}</strong>
+            <span v-if="row.person.id === me?.id" class="you">Tú</span>
+          </span>
+          <span class="sum-days" role="cell" :aria-label="`Trabaja ${row.days} de 7 días`">
+            <span
+              v-for="(m, i) in row.perDay"
+              :key="i"
+              class="sum-day"
+              :class="{ on: m > 0, closed: !days[i].hours }"
+              :title="`${days[i].longLabel}: ${m ? formatHours(m) : 'libre'}`"
+            >{{ DOW_INITIAL[i] }}</span>
+          </span>
+          <span class="num tabular-nums" role="cell"><span class="sum-label">Turnos</span>{{ row.count || "—" }}</span>
+          <span class="sum-hours" role="cell">
+            <span class="sum-label">Horas</span>
+            <strong class="tabular-nums">{{ row.count ? formatHours(row.minutes) : "Sin turnos" }}</strong>
+            <span class="sum-bar" aria-hidden="true"><span :style="{ width: `${(row.minutes / summaryMax) * 100}%` }" /></span>
+          </span>
+          <span class="num tabular-nums delta" role="cell" :class="{ up: row.delta > 0, down: row.delta < 0 }">
+            <span class="sum-label">Cambio</span>{{ formatDelta(row.delta) }}
+          </span>
+          <span class="tabular-nums muted" role="cell">
+            <span class="sum-label">Franja</span>{{ row.range ?? "—" }}
+          </span>
+          <span class="num tabular-nums" role="cell" :class="{ warn: row.outside }">
+            <span class="sum-label">Fuera hor.</span>{{ row.outside || "—" }}
+          </span>
+        </div>
+        <div class="sum-row sum-total" role="row">
+          <span role="rowheader"><strong>Total</strong></span>
+          <span role="cell" class="muted">{{ summaryTotals.people }} con turnos</span>
+          <span class="num tabular-nums" role="cell"><span class="sum-label">Turnos</span>{{ summaryTotals.count }}</span>
+          <span role="cell"><span class="sum-label">Horas</span><strong class="tabular-nums">{{ formatHours(summaryTotals.minutes) }}</strong></span>
+          <span class="num tabular-nums delta" role="cell" :class="{ up: summaryTotals.delta > 0, down: summaryTotals.delta < 0 }">
+            <span class="sum-label">Cambio</span>{{ formatDelta(summaryTotals.delta) }}
+          </span>
+          <span role="cell" />
+          <span class="num tabular-nums" role="cell" :class="{ warn: summaryTotals.outside }">
+            <span class="sum-label">Fuera hor.</span>{{ summaryTotals.outside || "—" }}
+          </span>
+        </div>
+      </div>
+    </section>
+
     <!-- ===================== Dialogo de turno ===================== -->
     <dialog ref="dialog" class="shift-dialog" aria-labelledby="shift-dialog-title" @click.self="closeDialog" @close="onDialogClosed">
       <form class="shift-dialog-body" @submit.prevent="save">
@@ -465,8 +534,13 @@ const {
   loading,
   error,
   refetch,
-} = useQuery<{ shifts: Shift[] }>(SHIFTS_QUERY, () => ({ from: monday.value, to: sunday.value }), { fetchPolicy: "cache-and-network" });
-const shifts = computed(() => shiftsResult.value?.shifts ?? []);
+} = useQuery<{ shifts: Shift[] }>(SHIFTS_QUERY, () => ({ from: addDays(monday.value, -7), to: sunday.value }), {
+  fetchPolicy: "cache-and-network",
+});
+// Se piden dos semanas (la anterior, para comparar en el resumen); casi todo usa solo la que se ve.
+const allShifts = computed(() => shiftsResult.value?.shifts ?? []);
+const shifts = computed(() => allShifts.value.filter((s) => s.date >= monday.value));
+const prevShifts = computed(() => allShifts.value.filter((s) => s.date < monday.value));
 const loadError = computed(() => (error.value ? "No se pudieron cargar los turnos." : ""));
 
 const days = computed(() =>
@@ -506,9 +580,50 @@ const duration = (s: { start: string; end: string }) => toMin(s.end) - toMin(s.s
 function formatHours(min: number) {
   const h = Math.floor(min / 60);
   const m = min % 60;
+  if (!h && m) return `${m} min`;
   return m ? `${h} h ${m}` : `${h} h`;
 }
 const minutesOf = (staffId: string) => shifts.value.filter((s) => s.staffId === staffId).reduce((sum, s) => sum + duration(s), 0);
+
+// ---------- Resumen por persona ----------
+const DOW_INITIAL = ["L", "M", "X", "J", "V", "S", "D"];
+function formatDelta(min: number) {
+  if (!min) return "=";
+  return `${min > 0 ? "+" : "−"}${formatHours(Math.abs(min))}`;
+}
+const summary = computed(() =>
+  people.value.map((person) => {
+    const mine = shifts.value.filter((s) => s.staffId === person.id);
+    const minutes = mine.reduce((sum, s) => sum + duration(s), 0);
+    const prev = prevShifts.value.filter((s) => s.staffId === person.id).reduce((sum, s) => sum + duration(s), 0);
+    const perDay = days.value.map((d) => mine.filter((s) => s.date === d.date).reduce((sum, s) => sum + duration(s), 0));
+    const starts = mine.map((s) => s.start).sort();
+    const ends = mine.map((s) => s.end).sort();
+    return {
+      person,
+      count: mine.length,
+      minutes,
+      delta: minutes - prev,
+      perDay,
+      days: perDay.filter((m) => m > 0).length,
+      // Primera entrada y ultima salida de la semana
+      range: mine.length ? `${t(starts[0])}–${t(ends[ends.length - 1])}` : null,
+      outside: mine.filter((s) => isOutside(s, days.value.find((d) => d.date === s.date)?.hours ?? null)).length,
+    };
+  })
+);
+const summaryMax = computed(() => Math.max(1, ...summary.value.map((r) => r.minutes)));
+const summaryTotals = computed(() => {
+  const minutes = summary.value.reduce((sum, r) => sum + r.minutes, 0);
+  const prev = prevShifts.value.reduce((sum, s) => sum + duration(s), 0);
+  return {
+    people: summary.value.filter((r) => r.count).length,
+    count: shifts.value.length,
+    minutes,
+    delta: minutes - prev,
+    outside: summary.value.reduce((sum, r) => sum + r.outside, 0),
+  };
+});
 
 const weekLabel = computed(() => {
   const a = monday.value;
@@ -966,6 +1081,65 @@ async function remove() {
 .g-coverage .g-track { height: 12px; background: none; }
 .cov-slot.abs { position: absolute; top: 0; bottom: 0; height: auto; border-radius: 2px; }
 .free { margin: 0; }
+
+/* --- Resumen por persona --- */
+.summary { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; }
+.summary-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.summary-head h2 { margin: 0; }
+.sum-table { display: flex; flex-direction: column; }
+.sum-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.4fr) 150px 60px minmax(140px, 1.2fr) 90px 100px 110px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.sum-row.me { background: color-mix(in srgb, var(--accent-soft) 35%, transparent); border-radius: 8px; }
+.sum-row.idle .sum-person strong, .sum-row.idle .sum-hours strong { color: var(--text-muted); font-weight: 500; }
+.sum-header { padding-top: 0; color: var(--text-muted); font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.sum-total { border-bottom: none; border-top: 1px solid var(--border-strong); }
+.num { text-align: right; }
+.sum-person { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sum-person strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sum-person .you { margin: 0; }
+.sum-days { display: flex; gap: 3px; }
+.sum-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.sum-day.closed { border-style: dashed; opacity: 0.6; }
+.sum-day.on { border-color: var(--accent); background: var(--accent); color: var(--bg); opacity: 1; }
+.sum-hours { display: flex; flex-direction: column; gap: 4px; }
+.sum-bar { display: block; height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.sum-bar span { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.delta.up { color: var(--accent); }
+.delta.down { color: var(--color4); }
+.warn { color: var(--color5); font-weight: 600; }
+.sum-label { display: none; }
+
+/* Estrecho: cada persona es una ficha con sus datos en dos columnas */
+@media (max-width: 900px) {
+  .sum-header { display: none; }
+  .sum-row { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 10px; padding: 12px 6px; }
+  .sum-person, .sum-days, .sum-hours { grid-column: 1 / -1; }
+  /* Arriba lo que ocupa todo el ancho; debajo, las cuatro cifras en una fila */
+  .sum-person { order: -3; }
+  .sum-days { order: -2; }
+  .sum-hours { order: -1; }
+  .sum-total > :nth-child(2), .sum-total > :nth-child(6) { display: none; }
+  .num { text-align: left; }
+  .sum-label { display: block; white-space: nowrap; font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px; }
+  .sum-hours .sum-label { margin-bottom: 0; }
+}
 
 /* --- Leyenda --- */
 .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; }
