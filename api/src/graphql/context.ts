@@ -16,6 +16,8 @@ export interface GraphQLContext {
   staff: { id: string; accountId: string; role: StaffRole } | null;
   /** IP del cliente para los limites por conexion (null si no se sabe, y en websocket). */
   clientIp: string | null;
+  /** Solo en websocket: el token, para volver a comprobar la sesion mientras dura la suscripcion. */
+  wsToken?: string | null;
 }
 
 function extractToken(authHeader?: string | null): string | null {
@@ -38,7 +40,28 @@ export function buildWsContext(connectionParams: Record<string, unknown>): Promi
   const headers = (connectionParams?.headers ?? {}) as Record<string, unknown>;
   const raw =
     connectionParams?.authorization ?? connectionParams?.Authorization ?? headers.Authorization ?? headers.authorization;
-  return buildContextFromToken(extractToken(typeof raw === "string" ? raw : null));
+  const token = extractToken(typeof raw === "string" ? raw : null);
+  return buildContextFromToken(token).then((ctx) => ({ ...ctx, wsToken: token }));
+}
+
+/**
+ * Una suscripcion dura lo que la conexion (horas, en la tablet del local): la sesion se comprobo al
+ * empezar, pero desde entonces la cuenta pudo desactivarse o cambiar de contraseña. Se vuelve a
+ * mirar antes de entregar cada evento, con una cache corta para no ir a la base de datos con cada
+ * pedido: como mucho, unos segundos de retraso en cortar.
+ */
+const WS_RECHECK_MS = 30_000;
+const wsChecks = new Map<string, { at: number; ok: boolean }>();
+
+export async function wsSessionStillValid(ctx: GraphQLContext) {
+  if (!ctx.wsToken) return !ctx.staff && !ctx.customerId;
+  const cached = wsChecks.get(ctx.wsToken);
+  if (cached && Date.now() - cached.at < WS_RECHECK_MS) return cached.ok;
+  const now = await authFromToken(ctx.wsToken);
+  const ok = ctx.staff ? now.staff?.accountId === ctx.staff.accountId : now.customerId === ctx.customerId && !!ctx.customerId;
+  if (wsChecks.size > 1000) wsChecks.clear();
+  wsChecks.set(ctx.wsToken, { at: Date.now(), ok });
+  return ok;
 }
 
 async function buildContextFromToken(token: string | null, clientIp: string | null = null): Promise<GraphQLContext> {

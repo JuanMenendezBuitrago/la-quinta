@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { EVENTS } from "../../config/pubsub";
-import { GraphQLContext, requireStaff } from "../../graphql/context";
+import { withFilter } from "graphql-subscriptions";
+import { GraphQLContext, requireStaff, wsSessionStillValid } from "../../graphql/context";
 import { MenuItem, ModifierGroup } from "../menu/model";
 import { Order } from "../orders/model";
 import { StaffUser } from "../users/model";
@@ -349,10 +350,14 @@ export const inventoryResolvers = {
 
   Subscription: {
     inventoryAlerts: {
-      subscribe: (_: unknown, __: unknown, ctx: GraphQLContext) => {
-        requireStaff(ctx, [...ANY_STAFF]);
-        return ctx.pubsub.asyncIterator(EVENTS.INVENTORY_LOW);
-      },
+      subscribe: withFilter(
+        (_: unknown, __: unknown, ctx: GraphQLContext) => {
+          requireStaff(ctx, [...ANY_STAFF]);
+          return ctx.pubsub.asyncIterator(EVENTS.INVENTORY_LOW);
+        },
+        // Si la sesion dejo de valer (cuenta desactivada, contraseña cambiada), no le llega nada.
+        (_payload, _variables, ctx: GraphQLContext) => wsSessionStillValid(ctx)
+      ),
     },
   },
 

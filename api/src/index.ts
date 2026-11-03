@@ -47,6 +47,14 @@ async function main() {
     next();
   });
 
+  // CORS: en produccion la web llama a la API desde su mismo dominio (/graphql, /uploads), asi que
+  // solo hace falta permitir ese origen (con y sin www). En desarrollo la web (:3000) llama a la
+  // API (:4000) desde otro puerto, o desde la IP de la red local: ahi se permite cualquiera.
+  const siteOrigin = new URL(env.publicSiteUrl);
+  const altHost = siteOrigin.hostname.startsWith("www.") ? siteOrigin.hostname.slice(4) : `www.${siteOrigin.hostname}`;
+  const allowedOrigins = [siteOrigin.origin, `${siteOrigin.protocol}//${altHost}${siteOrigin.port ? `:${siteOrigin.port}` : ""}`];
+  const corsPolicy = cors({ origin: env.nodeEnv === "production" ? allowedOrigins : true });
+
   // --- Subscriptions (websocket) ---
   const wsServer = new WebSocketServer({ server: httpServer, path: "/graphql" });
   const serverCleanup = useServer(
@@ -78,7 +86,7 @@ async function main() {
 
   app.use(
     "/graphql",
-    cors(),
+    corsPolicy,
     bodyParser.json(),
     expressMiddleware(apolloServer, {
       context: async ({ req }: { req: express.Request }) => buildHttpContext(req),
@@ -89,12 +97,12 @@ async function main() {
   // lo que declara el navegador), con esta politica no se ejecutaria nada al abrirlo.
   app.use(
     "/uploads",
-    cors(),
+    corsPolicy,
     express.static(UPLOAD_DIR, {
       setHeaders: (res) => res.setHeader("Content-Security-Policy", "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"),
     })
   );
-  app.use("/uploads", cors(), uploadsRouter);
+  app.use("/uploads", corsPolicy, uploadsRouter);
 
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
 

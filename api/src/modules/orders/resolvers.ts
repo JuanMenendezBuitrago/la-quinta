@@ -1,6 +1,6 @@
 import { withFilter } from "graphql-subscriptions";
 import { Types } from "mongoose";
-import { GraphQLContext, requireCustomer, requireStaff } from "../../graphql/context";
+import { GraphQLContext, requireCustomer, requireStaff, wsSessionStillValid } from "../../graphql/context";
 import { ALLOWED_FROM, AWAITING_PAYMENT, CUSTOMER_TABLES, OPEN_ORDER, checkCashReceived, isTakeaway, Order, OrderDiscountDoc, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
 import { tryComplete } from "./complete";
 import { buildOrderLines, createWithUniqueCode, type OrderLineRequest } from "./create";
@@ -511,10 +511,14 @@ export const ordersResolvers = {
   },
   Subscription: {
     orderQueueUpdated: {
-      subscribe: (_: unknown, __: unknown, ctx: GraphQLContext) => {
-        requireStaff(ctx, ["barra", "gestion"]);
-        return ctx.pubsub.asyncIterator(EVENTS.ORDER_QUEUE_UPDATED);
-      },
+      subscribe: withFilter(
+        (_: unknown, __: unknown, ctx: GraphQLContext) => {
+          requireStaff(ctx, ["barra", "gestion"]);
+          return ctx.pubsub.asyncIterator(EVENTS.ORDER_QUEUE_UPDATED);
+        },
+        // La cola lleva nombres de clientes: si la sesion dejo de valer, deja de recibirla.
+        (_payload, _variables, ctx: GraphQLContext) => wsSessionStillValid(ctx)
+      ),
     },
     orderStatusChanged: {
       subscribe: withFilter(
@@ -524,9 +528,10 @@ export const ordersResolvers = {
         },
         // Solo llegan los pedidos del cliente autenticado (se filtra por el token, no por un
         // argumento que el cliente podria falsear).
-        (payload, _variables, ctx: GraphQLContext) =>
+        async (payload, _variables, ctx: GraphQLContext) =>
           !!payload.orderStatusChanged.customerId &&
-          payload.orderStatusChanged.customerId.toString() === ctx.customerId
+          payload.orderStatusChanged.customerId.toString() === ctx.customerId &&
+          (await wsSessionStillValid(ctx))
       ),
     },
   },
