@@ -7,8 +7,8 @@
         <section>
           <h4>Visítanos</h4>
           <address>
-            {{ settings?.address }}<br v-if="settings?.address && settings?.addressMapUrl" />
-            <a v-if="settings?.addressMapUrl" :href="settings.addressMapUrl" class="link" target="_blank" rel="noopener">
+            {{ settings?.address }}<br v-if="settings?.address && isWebUrl(settings?.addressMapUrl)" />
+            <a v-if="isWebUrl(settings?.addressMapUrl)" :href="settings!.addressMapUrl!" class="link" target="_blank" rel="noopener">
               Cómo llegar
             </a>
           </address>
@@ -68,10 +68,15 @@ const SOCIAL_NAMES: Record<string, string> = {
   socialWhatsapp: "WhatsApp",
 };
 
+function isWebUrl(value: unknown): value is string {
+  return typeof value === "string" && /^https?:\/\//i.test(value.trim());
+}
+
 const socials = computed(() => {
   if (!settings.value) return [];
   return Object.keys(SOCIAL_ICONS)
-    .filter((key) => !!(settings.value as any)[key])
+    // Solo direcciones web (la API ya lo exige al guardar): nunca un "javascript:" en un enlace.
+    .filter((key) => isWebUrl((settings.value as any)[key]))
     .map((key) => ({ name: SOCIAL_NAMES[key], href: (settings.value as any)[key], icon: SOCIAL_ICONS[key] }));
 });
 </script>

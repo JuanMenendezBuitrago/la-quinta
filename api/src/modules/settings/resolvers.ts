@@ -63,6 +63,8 @@ const MAX_PACKAGING_FEE_CENTS = 100_000;
 // Y para los sellos del canje: con mas, la tarjeta de la cuenta del cliente no se podria leer.
 const MAX_REWARD_THRESHOLD_STAMPS = 50;
 
+const URL_SETTINGS = ["addressMapUrl", "socialInstagram", "socialFacebook", "socialTiktok", "socialWhatsapp"] as const;
+
 export const settingsResolvers = {
   Query: {
     siteSettings: () => loadSettings(),
@@ -85,6 +87,14 @@ export const settingsResolvers = {
   Mutation: {
     updateSiteSettings: async (_: unknown, args: { input: Record<string, unknown> }, ctx: GraphQLContext) => {
       requireStaff(ctx, ["gestion"]);
+      // Enlaces del pie de pagina: solo direcciones web. Un "javascript:..." en un href se
+      // ejecutaria al pulsarlo en la pagina de cualquier visitante.
+      for (const key of URL_SETTINGS) {
+        const value = args.input[key];
+        if (value != null && value !== "" && (typeof value !== "string" || !/^https?:\/\/[^\s"'<>]+$/i.test(value.trim()))) {
+          throw new Error("Los enlaces (mapa y redes sociales) tienen que empezar por https://");
+        }
+      }
       if (args.input.openingHours) {
         const problem = validateOpeningHours(args.input.openingHours as OpeningHoursDoc[]);
         if (problem) throw new Error(problem);
