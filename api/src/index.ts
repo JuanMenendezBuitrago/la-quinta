@@ -37,6 +37,16 @@ async function main() {
   const app = express();
   const httpServer = http.createServer(app);
 
+  // Cabeceras de seguridad de todas las respuestas de la API (las de las paginas las pone la web,
+  // web/server/plugins/security-headers.ts). Sin X-Powered-By: no hace falta anunciar que es Express.
+  app.disable("x-powered-by");
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    if (env.nodeEnv === "production") res.setHeader("Strict-Transport-Security", "max-age=31536000");
+    next();
+  });
+
   // --- Subscriptions (websocket) ---
   const wsServer = new WebSocketServer({ server: httpServer, path: "/graphql" });
   const serverCleanup = useServer(
@@ -75,7 +85,15 @@ async function main() {
     })
   );
 
-  app.use("/uploads", cors(), express.static(UPLOAD_DIR));
+  // Archivos subidos: solo se sirven como imagenes. Si alguien colara otra cosa (el tipo se mira por
+  // lo que declara el navegador), con esta politica no se ejecutaria nada al abrirlo.
+  app.use(
+    "/uploads",
+    cors(),
+    express.static(UPLOAD_DIR, {
+      setHeaders: (res) => res.setHeader("Content-Security-Policy", "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"),
+    })
+  );
   app.use("/uploads", cors(), uploadsRouter);
 
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
