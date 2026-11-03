@@ -1,7 +1,8 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+# npm ci: exactamente lo que dice package-lock.json
+RUN npm ci
 
 FROM base AS dev
 ENV NODE_ENV=development
@@ -23,5 +24,7 @@ FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/.output ./.output
+# Sin root: la web solo lee sus archivos (no tiene volumenes en los que escribir)
+USER node
 EXPOSE 3000
 CMD ["node", ".output/server/index.mjs"]

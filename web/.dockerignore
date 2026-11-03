@@ -1,0 +1,10 @@
+# Fuera de la imagen: lo instala/compila el propio Dockerfile, o son secretos locales
+node_modules
+.nuxt
+.output
+.nitro
+.cache
+.env
+.env.*
+!.env.example
+*.log

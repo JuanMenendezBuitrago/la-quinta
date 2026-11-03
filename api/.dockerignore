@@ -1,0 +1,10 @@
+# Fuera de la imagen: lo instala/compila el propio Dockerfile, o son datos y secretos locales
+node_modules
+dist
+uploads
+generated-images
+.projects
+.env
+.env.*
+!.env.example
+*.log
