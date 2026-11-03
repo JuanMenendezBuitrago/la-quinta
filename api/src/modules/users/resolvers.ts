@@ -127,20 +127,22 @@ export const usersResolvers = {
     },
   },
   Mutation: {
-    requestOtp: async (_: unknown, args: { identifier: string }) => {
-      await requestOtp(args.identifier);
+    requestOtp: async (_: unknown, args: { identifier: string }, ctx: GraphQLContext) => {
+      await requestOtp(args.identifier, ctx.clientIp);
       return true;
     },
     verifyOtp: async (
       _: unknown,
-      args: { identifier: string; code: string; name?: string; acceptPrivacyPolicy?: boolean; subscribeNewsletter?: boolean }
+      args: { identifier: string; code: string; name?: string; acceptPrivacyPolicy?: boolean; subscribeNewsletter?: boolean },
+      ctx: GraphQLContext
     ) => {
       const { token, user } = await verifyOtpAndIssueToken(
         args.identifier,
         args.code,
         args.name,
         args.acceptPrivacyPolicy === true,
-        args.subscribeNewsletter === true
+        args.subscribeNewsletter === true,
+        ctx.clientIp
       );
       return { token, customer: user };
     },

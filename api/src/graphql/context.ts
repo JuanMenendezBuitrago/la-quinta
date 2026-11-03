@@ -4,6 +4,7 @@ import { Types } from "mongoose";
 import { verifyToken } from "../modules/users/auth";
 import { StaffRole, StaffUser, User } from "../modules/users/model";
 import { pubsub } from "../config/pubsub";
+import { clientIpOf } from "../config/rateLimit";
 
 export interface GraphQLContext {
   pubsub: typeof pubsub;
@@ -13,6 +14,8 @@ export interface GraphQLContext {
    * accountId: la cuenta con la que se inicio sesion, que es la que da los permisos (role).
    */
   staff: { id: string; accountId: string; role: StaffRole } | null;
+  /** IP del cliente para los limites por conexion (null si no se sabe, y en websocket). */
+  clientIp: string | null;
 }
 
 function extractToken(authHeader?: string | null): string | null {
@@ -25,7 +28,7 @@ function extractToken(authHeader?: string | null): string | null {
 /** Contexto para peticiones HTTP normales (query/mutation). */
 export function buildHttpContext(req: IncomingMessage): Promise<GraphQLContext> {
   const token = extractToken(req.headers.authorization);
-  return buildContextFromToken(token);
+  return buildContextFromToken(token, clientIpOf(req));
 }
 
 /** Contexto para conexiones websocket (subscriptions): el token viaja en connectionParams. */
@@ -38,7 +41,7 @@ export function buildWsContext(connectionParams: Record<string, unknown>): Promi
   return buildContextFromToken(extractToken(typeof raw === "string" ? raw : null));
 }
 
-async function buildContextFromToken(token: string | null): Promise<GraphQLContext> {
+async function buildContextFromToken(token: string | null, clientIp: string | null = null): Promise<GraphQLContext> {
   const payload = token ? verifyToken(token) : null;
 
   // Un token de cliente sigue siendo valido tras suprimir su cuenta (dura hasta 30 dias):
@@ -60,7 +63,7 @@ async function buildContextFromToken(token: string | null): Promise<GraphQLConte
     }
   }
 
-  return { pubsub, customerId, staff };
+  return { pubsub, customerId, staff, clientIp };
 }
 
 /** Puede usar una cuenta compartida: cuenta propia activa y no compartida. */

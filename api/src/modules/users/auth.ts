@@ -4,6 +4,7 @@ import { randomInt } from "crypto";
 import { env } from "../../config/env";
 import { getTransporter } from "../../config/mailer";
 import { redisClient } from "../../config/redis";
+import { currentCount, overLimit } from "../../config/rateLimit";
 import { Types } from "mongoose";
 import { User, StaffUser, StaffRole, StaffUserDoc, PRIVACY_POLICY_VERSION, hasCurrentConsent } from "./model";
 
@@ -51,6 +52,27 @@ function otpKey(email: string) {
   return `otp:${email}`;
 }
 
+// Intentos con el codigo vigente de ese email: contador aparte (INCR, atomico) para que muchas
+// peticiones a la vez no se salten el limite.
+function otpAttemptsKey(email: string) {
+  return `otp-attempts:${email}`;
+}
+
+/**
+ * Limites del codigo de acceso de los clientes. Con 6 cifras, sin ellos se podia probar codigos
+ * sin parar hasta acertar (unos mil por segundo) y entrar en la cuenta de cualquiera.
+ * - Cada codigo admite pocos fallos: luego se invalida y hay que pedir otro.
+ * - Pedir codigos: uno por minuto y unos pocos por hora para cada email (que no se pueda
+ *   bombardear un buzon), y un tope por IP para quien lo reparte entre muchos emails.
+ * - Fallos por IP: frena a quien prueba con muchos emails a la vez.
+ */
+const OTP_MAX_ATTEMPTS = 5;
+const OTP_RESEND_SECONDS = 60;
+const OTP_PER_EMAIL_PER_HOUR = 5;
+const OTP_REQUESTS_PER_IP = 10;
+const OTP_FAILS_PER_IP = 20;
+const IP_WINDOW_SECONDS = 15 * 60;
+
 function generateCustomerCode() {
   return `LQ-${randomInt(1000, 9999)}`;
 }
@@ -78,17 +100,36 @@ export async function findExistingCustomer(identifier: string) {
  * En desarrollo el codigo tambien se imprime en consola, para poder probar el flujo
  * aunque SMTP_URL no este configurada todavia.
  */
-export async function requestOtp(identifier: string): Promise<void> {
+export async function requestOtp(identifier: string, clientIp: string | null = null): Promise<void> {
   const email = normalizeEmail(identifier);
+
+  // Recien enviado: no se manda otro (ni cuenta para los topes). Sin error: el que le acaba de
+  // llegar sigue valiendo, y la web pasa a pedirlo igual (p. ej. si volvio a escribir su email).
+  const ttl = await redisClient.ttl(otpKey(email));
+  if (ttl > env.otpTtlSeconds - OTP_RESEND_SECONDS) return;
+  if (clientIp && (await overLimit(`rl:otp-request:ip:${clientIp}`, OTP_REQUESTS_PER_IP, IP_WINDOW_SECONDS))) {
+    throw new Error("Demasiadas solicitudes de código desde esta conexión. Espera unos minutos.");
+  }
+  if (await overLimit(`rl:otp-request:email:${email}`, OTP_PER_EMAIL_PER_HOUR, 60 * 60)) {
+    throw new Error("Has pedido demasiados códigos. Vuelve a intentarlo dentro de un rato.");
+  }
+
   const code = String(randomInt(100000, 999999));
-  await redisClient.set(otpKey(email), code, "EX", env.otpTtlSeconds);
+  // Codigo nuevo: los intentos vuelven a empezar.
+  await redisClient.multi().set(otpKey(email), code, "EX", env.otpTtlSeconds).del(otpAttemptsKey(email)).exec();
 
   if (env.nodeEnv !== "production") {
     // eslint-disable-next-line no-console
     console.log(`[otp] codigo para ${email}: ${code} (valido ${env.otpTtlSeconds}s)`);
   }
 
-  await sendOtpEmail(email, code);
+  try {
+    await sendOtpEmail(email, code);
+  } catch (err) {
+    // Sin correo no hay codigo que esperar: que se pueda pedir otro sin esperar el minuto.
+    await redisClient.del(otpKey(email));
+    throw err;
+  }
 }
 
 export async function verifyOtpAndIssueToken(
@@ -96,12 +137,35 @@ export async function verifyOtpAndIssueToken(
   code: string,
   name?: string,
   acceptPrivacyPolicy = false,
-  subscribeNewsletter = false
+  subscribeNewsletter = false,
+  clientIp: string | null = null
 ): Promise<{ token: string; user: InstanceType<typeof User> }> {
   const email = normalizeEmail(identifier);
+  const ipFailsKey = clientIp ? `rl:otp-fail:ip:${clientIp}` : null;
+  if (ipFailsKey && (await currentCount(ipFailsKey)) >= OTP_FAILS_PER_IP) {
+    throw new Error("Demasiados intentos fallidos desde esta conexión. Espera unos minutos.");
+  }
+  const fail = async (message = "Codigo invalido o caducado") => {
+    if (ipFailsKey) await overLimit(ipFailsKey, OTP_FAILS_PER_IP, IP_WINDOW_SECONDS);
+    return new Error(message);
+  };
+
   const stored = await redisClient.get(otpKey(email));
-  if (!stored || stored !== code) {
-    throw new Error("Codigo invalido o caducado");
+  if (!stored) throw await fail();
+
+  // Se cuenta el intento antes de comparar: con el codigo ya agotado ni se mira si acierta.
+  const counted = await redisClient.multi().incr(otpAttemptsKey(email)).expire(otpAttemptsKey(email), env.otpTtlSeconds, "NX").exec();
+  const attempts = Number(counted?.[0]?.[1] ?? OTP_MAX_ATTEMPTS + 1);
+  if (attempts > OTP_MAX_ATTEMPTS) {
+    await redisClient.del(otpKey(email), otpAttemptsKey(email));
+    throw await fail("Demasiados intentos con este código. Pide uno nuevo.");
+  }
+  if (stored !== code.trim()) {
+    if (attempts === OTP_MAX_ATTEMPTS) {
+      await redisClient.del(otpKey(email), otpAttemptsKey(email));
+      throw await fail("Código incorrecto. Has agotado los intentos: pide un código nuevo.");
+    }
+    throw await fail();
   }
 
   let user = await User.findOne({ email });
@@ -109,9 +173,11 @@ export async function verifyOtpAndIssueToken(
   // Sin autorizacion expresa no se crea la cuenta (ni se deja entrar a quien la tiene de una
   // version anterior de la politica). El codigo no se consume, para poder reintentar.
   if (!(user && hasCurrentConsent(user)) && !acceptPrivacyPolicy) {
+    // El codigo era bueno: ese intento no cuenta.
+    await redisClient.decr(otpAttemptsKey(email));
     throw new Error("Para continuar tienes que aceptar la politica de tratamiento de datos");
   }
-  await redisClient.del(otpKey(email));
+  await redisClient.del(otpKey(email), otpAttemptsKey(email));
 
   const consent = { acceptedAt: new Date(), policyVersion: PRIVACY_POLICY_VERSION };
   if (!user) {
