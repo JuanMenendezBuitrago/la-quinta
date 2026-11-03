@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
 import { GraphQLContext, isActingCandidate, requireCustomer, requireOwnStaffSession, requireStaff } from "../../graphql/context";
 import { User, StaffUser, hasCurrentConsent } from "./model";
-import { requestOtp, verifyOtpAndIssueToken, loginStaff, loginStaffById, hashPassword, findExistingCustomer, signStaffToken, requestStaffPasswordReset, resetStaffPassword } from "./auth";
+import { requestOtp, verifyOtpAndIssueToken, loginStaff, loginStaffById, hashPassword, findExistingCustomer, signStaffToken, requestStaffPasswordReset, resetStaffPassword, sessionsCutoff } from "./auth";
 import { presetAvatarValue, removeAvatarFile } from "./avatar";
 import { UPLOAD_DIR } from "../uploads/router";
 import { MenuItem } from "../menu/model";
@@ -251,7 +251,11 @@ export const usersResolvers = {
       const update: Record<string, unknown> = {};
       if (args.name !== undefined) update.name = args.name.trim();
       if (args.role !== undefined) update.role = args.role;
-      if (args.password) update.passwordHash = await hashPassword(args.password);
+      if (args.password) {
+        update.passwordHash = await hashPassword(args.password);
+        // Se cierran sus sesiones abiertas (si es la propia, la web vuelve a entrar con la nueva).
+        update.sessionsValidFrom = sessionsCutoff();
+      }
       if (typeof args.active === "boolean") update.active = args.active;
       if (typeof args.shared === "boolean") update.shared = args.shared;
       const updated = await StaffUser.findByIdAndUpdate(args.id, update, { new: true });

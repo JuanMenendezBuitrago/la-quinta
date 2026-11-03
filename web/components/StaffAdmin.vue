@@ -194,7 +194,7 @@ const DELETE_STAFF_USER = gql`
   }
 `;
 
-const { staff } = useStaffAuth();
+const { staff, loginById } = useStaffAuth();
 const myId = computed(() => staff.value?.id ?? "");
 
 const { result, loading, error, refetch } = useQuery<{ staffUsers: StaffUserAdmin[] }>(STAFF_USERS_QUERY);
@@ -291,6 +291,9 @@ async function submitForm() {
         active: form.active,
         shared: form.shared,
       });
+      // Cambiar la contraseña cierra las sesiones abiertas de esa cuenta, la propia incluida: se
+      // vuelve a entrar con la nueva para no echar a quien la acaba de cambiar.
+      if (isSelf.value && form.password) await loginById(form.id, form.password);
     } else {
       const { mutate } = useMutation(CREATE_STAFF_USER);
       await mutate({

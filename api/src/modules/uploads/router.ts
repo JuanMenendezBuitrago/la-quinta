@@ -1,9 +1,9 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { Router } from "express";
+import { Request, Router } from "express";
 import multer from "multer";
-import { verifyToken } from "../users/auth";
+import { authFromToken } from "../../graphql/context";
 import { Types } from "mongoose";
 import { StaffUser, User } from "../users/model";
 import { AVATAR_UPLOAD_PREFIX, removeAvatarFile } from "../users/avatar";
@@ -59,13 +59,19 @@ const upload = multer({
 
 export const uploadsRouter = Router();
 
-/** Solo personal con rol "gestion" puede subir imagenes (misma regla que editar la carta). */
-uploadsRouter.post("/", (req, res) => {
+/**
+ * Sesion de la peticion con las mismas comprobaciones que GraphQL (cuenta activa, rol actual de la
+ * base de datos, sesiones cerradas al cambiar la contraseña): no basta con que el token sea valido.
+ */
+function sessionOf(req: Request) {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const payload = token ? verifyToken(token) : null;
+  return authFromToken(authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
+}
 
-  if (!payload || payload.kind !== "staff" || payload.role !== "gestion") {
+/** Solo personal con rol "gestion" puede subir imagenes (misma regla que editar la carta). */
+uploadsRouter.post("/", async (req, res) => {
+  const { staff } = await sessionOf(req);
+  if (staff?.role !== "gestion") {
     res.status(401).json({ error: "No autorizado" });
     return;
   }
@@ -117,22 +123,20 @@ const avatarUpload = multer({
  * de otro, cosa que pasaria si la ruta se mandara despues por GraphQL. Gestion puede ademas
  * subirla para otro miembro del personal con ?staffId=<id>.
  */
-uploadsRouter.post("/avatar", (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const payload = token ? verifyToken(token) : null;
-  if (!payload) {
+uploadsRouter.post("/avatar", async (req, res) => {
+  const { staff, customerId } = await sessionOf(req);
+  if (!staff && !customerId) {
     res.status(401).json({ error: "No autorizado" });
     return;
   }
   // Cuenta compartida con alguien elegido (sin contraseña): no toca avatares del personal, ni el
   // propio. Para eso se entra con la cuenta de cada cual.
-  if (payload.kind === "staff" && payload.actor) {
+  if (staff && staff.id !== staff.accountId) {
     res.status(403).json({ error: "Para cambiar avatares del personal entra con tu propia cuenta" });
     return;
   }
   const targetStaffId = typeof req.query.staffId === "string" ? req.query.staffId : null;
-  if (targetStaffId && (payload.kind !== "staff" || payload.role !== "gestion" || !Types.ObjectId.isValid(targetStaffId))) {
+  if (targetStaffId && (staff?.role !== "gestion" || !Types.ObjectId.isValid(targetStaffId))) {
     res.status(403).json({ error: "Solo gestion puede cambiar el avatar de otra persona" });
     return;
   }
@@ -157,9 +161,9 @@ uploadsRouter.post("/avatar", (req, res) => {
     try {
       // Devuelve el documento anterior: hace falta su avatar para borrar la foto vieja.
       const previous =
-        payload.kind === "staff"
-          ? await StaffUser.findByIdAndUpdate(targetStaffId ?? payload.sub, { avatar }).lean()
-          : await User.findOneAndUpdate({ _id: payload.sub, deletedAt: { $exists: false } }, { avatar }).lean();
+        staff
+          ? await StaffUser.findByIdAndUpdate(targetStaffId ?? staff.accountId, { avatar }).lean()
+          : await User.findOneAndUpdate({ _id: customerId, deletedAt: { $exists: false } }, { avatar }).lean();
       if (!previous) {
         await removeAvatarFile(avatar, UPLOAD_DIR);
         res.status(401).json({ error: "No autorizado" });
@@ -195,11 +199,9 @@ const receiptUpload = multer({
   },
 });
 
-uploadsRouter.post("/receipt", (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const payload = token ? verifyToken(token) : null;
-  if (!payload || payload.kind !== "staff") {
+uploadsRouter.post("/receipt", async (req, res) => {
+  const { staff } = await sessionOf(req);
+  if (!staff) {
     res.status(401).json({ error: "No autorizado" });
     return;
   }
@@ -263,11 +265,9 @@ async function photoProblem(customerId: string, orderId: unknown, menuItemId: un
   return { menuItemName: line.name };
 }
 
-uploadsRouter.post("/photo", (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const payload = token ? verifyToken(token) : null;
-  if (!payload || payload.kind !== "customer") {
+uploadsRouter.post("/photo", async (req, res) => {
+  const { customerId } = await sessionOf(req);
+  if (!customerId) {
     res.status(401).json({ error: "Inicia sesion para enviar fotos" });
     return;
   }
@@ -284,15 +284,15 @@ uploadsRouter.post("/photo", (req, res) => {
     }
     const url = `${PHOTO_UPLOAD_PREFIX}${req.file.filename}`;
     try {
-      const active = await User.exists({ _id: payload.sub, deletedAt: { $exists: false } });
-      const check = active ? await photoProblem(payload.sub, req.body?.orderId, req.body?.menuItemId, req.body?.consent) : "No autorizado";
+      const active = await User.exists({ _id: customerId, deletedAt: { $exists: false } });
+      const check = active ? await photoProblem(customerId, req.body?.orderId, req.body?.menuItemId, req.body?.consent) : "No autorizado";
       if (typeof check === "string") {
         await removePhotoFile(url, UPLOAD_DIR);
         res.status(active ? 400 : 401).json({ error: check });
         return;
       }
       const photo = await CustomerPhoto.create({
-        customerId: payload.sub,
+        customerId,
         orderId: req.body.orderId,
         menuItemId: req.body.menuItemId,
         menuItemName: check.menuItemName,

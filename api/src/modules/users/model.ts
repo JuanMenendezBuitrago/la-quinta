@@ -80,6 +80,9 @@ export interface StaffUserDoc {
   // Cuenta compartida (p. ej. "Gestion La Quinta"): al entrar se elige quien la esta usando, y lo
   // que se hace queda a nombre de esa persona (ver "actor" en el token, users/auth.ts).
   shared: boolean;
+  // Los tokens firmados antes de esta fecha ya no valen: se pone al cambiar la contraseña, para
+  // cerrar las sesiones abiertas (p. ej. si alguien la sabia y por eso se cambia).
+  sessionsValidFrom?: Date;
   createdAt: Date;
 }
 
@@ -93,6 +96,7 @@ const staffUserSchema = new Schema<StaffUserDoc>({
   // { active: { $ne: false } } para contarlas como activas.
   active: { type: Boolean, default: true },
   shared: { type: Boolean, default: false },
+  sessionsValidFrom: { type: Date },
   createdAt: { type: Date, default: () => new Date() },
 });
 

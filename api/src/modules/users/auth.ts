@@ -33,6 +33,16 @@ export interface AuthTokenPayload {
   // Cuenta compartida: quien la esta usando. Las acciones quedan a su nombre; los permisos son los
   // de la cuenta (sub). Lo valida el contexto GraphQL en cada peticion.
   actor?: string;
+  /** Lo pone jsonwebtoken al firmar (segundos). */
+  iat?: number;
+}
+
+/**
+ * Para sessionsValidFrom: el segundo actual, redondeado hacia abajo. iat va en segundos, asi que un
+ * token firmado justo despues (el de quien acaba de cambiar su contraseña) sigue valiendo.
+ */
+export function sessionsCutoff() {
+  return new Date(Math.floor(Date.now() / 1000) * 1000);
 }
 
 export function signToken(payload: AuthTokenPayload): string {
@@ -351,6 +361,8 @@ export async function resetStaffPassword(
 
   await redisClient.del(key);
   staff.passwordHash = await hashPassword(newPassword);
+  // Quien la tuviera (y por eso se cambia) pierde las sesiones abiertas; esta se abre despues.
+  staff.sessionsValidFrom = sessionsCutoff();
   await staff.save();
   // Si se habia bloqueado por fallos al entrar, el cambio lo desbloquea.
   await redisClient.del(staffLoginFailsKey(staff._id.toString()));

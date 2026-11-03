@@ -42,6 +42,14 @@ export function buildWsContext(connectionParams: Record<string, unknown>): Promi
 }
 
 async function buildContextFromToken(token: string | null, clientIp: string | null = null): Promise<GraphQLContext> {
+  return { pubsub, ...(await authFromToken(token)), clientIp };
+}
+
+/**
+ * Quien hace la peticion segun el token, comprobado contra la base de datos: lo usan el contexto
+ * GraphQL y las rutas de subida (uploads/router.ts), para que las dos apliquen las mismas reglas.
+ */
+export async function authFromToken(token: string | null): Promise<Pick<GraphQLContext, "customerId" | "staff">> {
   const payload = token ? verifyToken(token) : null;
 
   // Un token de cliente sigue siendo valido tras suprimir su cuenta (dura hasta 30 dias):
@@ -52,18 +60,24 @@ async function buildContextFromToken(token: string | null, clientIp: string | nu
   }
 
   // Igual con el personal: al desactivar una cuenta, su sesion abierta deja de valer al momento.
+  // El rol sale de la cuenta, no del token: si gestion pasa a alguien a barra, cuenta ya en su
+  // siguiente peticion (el token dura 30 dias). Y los tokens de antes de cambiar la contraseña
+  // dejan de valer (sessionsValidFrom).
   let staff: GraphQLContext["staff"] = null;
-  if (payload?.kind === "staff" && payload.role) {
-    const account = await StaffUser.findOne({ _id: payload.sub, active: { $ne: false } }).select("shared").lean();
-    if (account) {
-      staff = { id: payload.sub, accountId: payload.sub, role: payload.role };
+  if (payload?.kind === "staff" && Types.ObjectId.isValid(payload.sub)) {
+    const account = await StaffUser.findOne({ _id: payload.sub, active: { $ne: false } })
+      .select("shared role sessionsValidFrom")
+      .lean();
+    const issuedAt = (payload.iat ?? 0) * 1000;
+    if (account && !(account.sessionsValidFrom && issuedAt < account.sessionsValidFrom.getTime())) {
+      staff = { id: payload.sub, accountId: payload.sub, role: account.role };
       // Cuenta compartida con alguien elegido: si ya no vale (desactivado, borrado, la cuenta dejo
       // de ser compartida...), se ignora y la web vuelve a preguntar quien es.
       if (payload.actor && account.shared && (await isActingCandidate(payload.actor))) staff.id = payload.actor;
     }
   }
 
-  return { pubsub, customerId, staff, clientIp };
+  return { customerId, staff };
 }
 
 /** Puede usar una cuenta compartida: cuenta propia activa y no compartida. */
