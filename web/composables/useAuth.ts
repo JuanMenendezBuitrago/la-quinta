@@ -165,10 +165,14 @@ export function useAuth() {
    * clientes nuevos) y la autorizacion de datos (nuevos o sin la version vigente de la politica). */
   async function requestCode(identifier: string): Promise<LoginRequirements> {
     const { defaultClient } = useNuxtApp().$apollo;
-    const [, requirementsResult] = await Promise.all([
-      requestOtp({ identifier }),
-      defaultClient.query({ query: LOGIN_REQUIREMENTS, variables: { identifier }, fetchPolicy: "network-only" }),
-    ]);
+    // Primero el codigo: la API solo dice si el email ya es de un cliente cuando se le acaba de
+    // pedir uno (si no, cualquiera podria ir probando emails).
+    await requestOtp({ identifier });
+    const requirementsResult = await defaultClient.query({
+      query: LOGIN_REQUIREMENTS,
+      variables: { identifier },
+      fetchPolicy: "network-only",
+    });
     return requirementsResult?.data?.loginRequirements ?? { askName: true, askPrivacyConsent: true };
   }
 

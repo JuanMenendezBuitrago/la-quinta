@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
 import { GraphQLContext, isActingCandidate, requireCustomer, requireOwnStaffSession, requireStaff } from "../../graphql/context";
-import { User, StaffUser, hasCurrentConsent } from "./model";
-import { requestOtp, verifyOtpAndIssueToken, loginStaff, loginStaffById, hashPassword, findExistingCustomer, signStaffToken, requestStaffPasswordReset, resetStaffPassword, sessionsCutoff } from "./auth";
+import { User, StaffUser } from "./model";
+import { requestOtp, verifyOtpAndIssueToken, loginStaff, loginStaffById, hashPassword, signStaffToken, requestStaffPasswordReset, resetStaffPassword, sessionsCutoff, loginRequirementsFor } from "./auth";
 import { presetAvatarValue, removeAvatarFile } from "./avatar";
 import { UPLOAD_DIR } from "../uploads/router";
 import { MenuItem } from "../menu/model";
@@ -111,10 +111,7 @@ export const usersResolvers = {
       requireOwnStaffSession(ctx, ["gestion"]);
       return StaffUser.find().sort({ name: 1 }).exec();
     },
-    loginRequirements: async (_: unknown, args: { identifier: string }) => {
-      const existing = await findExistingCustomer(args.identifier);
-      return { askName: !existing, askPrivacyConsent: !(existing && hasCurrentConsent(existing)) };
-    },
+    loginRequirements: (_: unknown, args: { identifier: string }) => loginRequirementsFor(args.identifier),
   },
   Staff: {
     deletable: async (doc: any) => (await staffRecords(doc._id.toString())).length === 0,
@@ -197,20 +194,21 @@ export const usersResolvers = {
       await removeAvatarFile(previous.avatar, UPLOAD_DIR);
       return StaffUser.findById(staff.id).exec();
     },
-    staffLogin: async (_: unknown, args: { email: string; password: string }) => {
-      const { token, staff } = await loginStaff(args.email, args.password);
+    staffLogin: async (_: unknown, args: { email: string; password: string }, ctx: GraphQLContext) => {
+      const { token, staff } = await loginStaff(args.email, args.password, ctx.clientIp);
       return { token, staff };
     },
-    staffLoginById: async (_: unknown, args: { id: string; password: string }) => {
-      const { token, staff } = await loginStaffById(args.id, args.password);
+    staffLoginById: async (_: unknown, args: { id: string; password: string }, ctx: GraphQLContext) => {
+      const { token, staff } = await loginStaffById(args.id, args.password, ctx.clientIp);
       return { token, staff };
     },
     requestStaffPasswordReset: (_: unknown, args: { id?: string | null; email?: string | null }) =>
       requestStaffPasswordReset(args),
     resetStaffPassword: async (
       _: unknown,
-      args: { id?: string | null; email?: string | null; code: string; newPassword: string }
-    ) => resetStaffPassword(args, args.code, args.newPassword),
+      args: { id?: string | null; email?: string | null; code: string; newPassword: string },
+      ctx: GraphQLContext
+    ) => resetStaffPassword(args, args.code, args.newPassword, ctx.clientIp),
     setActingStaff: async (_: unknown, args: { staffId: string }, ctx: GraphQLContext) => {
       const session = requireStaff(ctx);
       const account = await StaffUser.findById(session.accountId);

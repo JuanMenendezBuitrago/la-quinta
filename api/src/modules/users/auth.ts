@@ -106,6 +106,19 @@ export async function findExistingCustomer(identifier: string) {
 }
 
 /**
+ * Que pedir en el paso del codigo: el nombre (cuenta nueva) y la autorizacion de datos. Dice si un
+ * email es de un cliente, asi que solo se responde de verdad si se acaba de pedir un codigo para
+ * ese email (lo que esta limitado y le avisa por correo): sin eso, cualquiera podria ir probando
+ * emails para saber quien es cliente. Si no, la respuesta es la de una cuenta nueva.
+ */
+export async function loginRequirementsFor(identifier: string) {
+  const email = normalizeEmail(identifier);
+  if (!(await redisClient.exists(otpKey(email)))) return { askName: true, askPrivacyConsent: true };
+  const existing = await findExistingCustomer(email);
+  return { askName: !existing, askPrivacyConsent: !(existing && hasCurrentConsent(existing)) };
+}
+
+/**
  * Genera un codigo de un solo uso, lo guarda en Redis con caducidad y lo envia por email.
  * En desarrollo el codigo tambien se imprime en consola, para poder probar el flujo
  * aunque SMTP_URL no este configurada todavia.
@@ -209,35 +222,52 @@ export async function verifyOtpAndIssueToken(
 }
 
 /**
- * Bloqueo por cuenta tras varios fallos seguidos. La pantalla de login lista las cuentas del
- * personal (solo hay que adivinar la contraseña), asi que sin esto se podrian probar sin limite.
+ * Limite de intentos al entrar. La pantalla de login lista las cuentas del personal (solo hay que
+ * adivinar la contraseña), asi que sin esto se podrian probar sin limite.
+ * - Por cuenta y conexion (IP): pocos fallos y un rato de espera. Contarlo solo por cuenta dejaba
+ *   que cualquiera bloqueara a un compañero fallando a proposito.
+ * - Por cuenta, de todas las conexiones juntas: un tope mas alto, para quien lo reparte entre
+ *   muchas IPs.
+ * El intento se cuenta antes de comparar (atomico): muchos a la vez no se saltan el limite.
  */
 const STAFF_LOGIN_MAX_FAILS = 5;
 const STAFF_LOGIN_LOCK_SECONDS = 5 * 60;
+const STAFF_LOGIN_MAX_FAILS_ALL = 30;
+const STAFF_LOGIN_ALL_WINDOW_SECONDS = 15 * 60;
 
-function staffLoginFailsKey(staffId: string) {
-  return `staff-login-fails:${staffId}`;
+function staffLoginFailsKey(staffId: string, clientIp: string | null) {
+  return clientIp ? `staff-login-fails:${staffId}:${clientIp}` : `staff-login-fails:${staffId}`;
+}
+function staffLoginAllFailsKey(staffId: string) {
+  return `staff-login-fails-all:${staffId}`;
 }
 
-async function issueStaffToken(staff: StaffUserDoc | null, password: string) {
+async function issueStaffToken(staff: StaffUserDoc | null, password: string, clientIp: string | null) {
   if (!staff) throw new Error("Credenciales invalidas");
-  const failsKey = staffLoginFailsKey(staff._id.toString());
+  const id = staff._id.toString();
+  const failsKey = staffLoginFailsKey(id, clientIp);
+  const allKey = staffLoginAllFailsKey(id);
 
-  const fails = Number(await redisClient.get(failsKey)) || 0;
-  if (fails >= STAFF_LOGIN_MAX_FAILS) {
+  const counted = await redisClient
+    .multi()
+    .incr(failsKey)
+    .expire(failsKey, STAFF_LOGIN_LOCK_SECONDS, "NX")
+    .incr(allKey)
+    .expire(allKey, STAFF_LOGIN_ALL_WINDOW_SECONDS, "NX")
+    .exec();
+  const fails = Number(counted?.[0]?.[1] ?? Infinity);
+  const allFails = Number(counted?.[2]?.[1] ?? Infinity);
+  if (fails > STAFF_LOGIN_MAX_FAILS || allFails > STAFF_LOGIN_MAX_FAILS_ALL) {
     throw new Error("Demasiados intentos fallidos. Espera unos minutos y vuelve a probar.");
   }
 
   const valid = await bcrypt.compare(password, staff.passwordHash);
-  if (!valid) {
-    // El plazo cuenta desde el ultimo fallo: el bloqueo se levanta solo pasados unos minutos.
-    await redisClient.multi().incr(failsKey).expire(failsKey, STAFF_LOGIN_LOCK_SECONDS).exec();
-    throw new Error("Credenciales invalidas");
-  }
+  if (!valid) throw new Error("Credenciales invalidas");
   // Despues de la contraseña: asi solo quien la sabe se entera de que la cuenta existe.
   if (staff.active === false) throw new Error("Esta cuenta esta desactivada. Habla con gestion.");
 
-  await redisClient.del(failsKey);
+  // Acierto: ese intento no era un fallo.
+  await redisClient.del(failsKey, allKey);
   return { token: signStaffToken(staff), staff };
 }
 
@@ -246,14 +276,14 @@ export function signStaffToken(account: Pick<StaffUserDoc, "_id" | "role">, acto
   return signToken({ sub: account._id.toString(), kind: "staff", role: account.role, ...(actorId ? { actor: actorId } : {}) });
 }
 
-export async function loginStaff(email: string, password: string) {
-  return issueStaffToken(await StaffUser.findOne({ email: email.toLowerCase() }), password);
+export async function loginStaff(email: string, password: string, clientIp: string | null = null) {
+  return issueStaffToken(await StaffUser.findOne({ email: email.toLowerCase() }), password, clientIp);
 }
 
 /** Login eligiendo la cuenta en la lista de la pantalla de acceso (sin escribir el email). */
-export async function loginStaffById(id: string, password: string) {
+export async function loginStaffById(id: string, password: string, clientIp: string | null = null) {
   if (!Types.ObjectId.isValid(id)) throw new Error("Credenciales invalidas");
-  return issueStaffToken(await StaffUser.findById(id), password);
+  return issueStaffToken(await StaffUser.findById(id), password, clientIp);
 }
 
 export async function hashPassword(password: string) {
@@ -341,7 +371,8 @@ export async function requestStaffPasswordReset(target: { id?: string | null; em
 export async function resetStaffPassword(
   target: { id?: string | null; email?: string | null },
   code: string,
-  newPassword: string
+  newPassword: string,
+  clientIp: string | null = null
 ) {
   if (newPassword.length < STAFF_PASSWORD_MIN_LENGTH) {
     throw new Error(`La contraseña tiene que tener al menos ${STAFF_PASSWORD_MIN_LENGTH} caracteres`);
@@ -365,7 +396,8 @@ export async function resetStaffPassword(
   staff.sessionsValidFrom = sessionsCutoff();
   await staff.save();
   // Si se habia bloqueado por fallos al entrar, el cambio lo desbloquea.
-  await redisClient.del(staffLoginFailsKey(staff._id.toString()));
+  const id = staff._id.toString();
+  await redisClient.del(staffLoginFailsKey(id, null), staffLoginFailsKey(id, clientIp), staffLoginAllFailsKey(id));
   return { token: signStaffToken(staff), staff };
 }
 
