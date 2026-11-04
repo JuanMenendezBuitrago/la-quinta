@@ -50,12 +50,12 @@
             <Plus :size="14" :stroke-width="1.8" />
           </button>
           <button
+            v-if="customer"
             class="fav-btn"
             :class="{ active: isFavorite(item) }"
             type="button"
             :aria-pressed="isFavorite(item)"
             :aria-label="isFavorite(item) ? `Quitar ${item.name} de favoritos` : `Añadir ${item.name} a favoritos`"
-            :title="customer ? undefined : 'Inicia sesión para guardar favoritos'"
             @click="toggleFavorite(item)"
           >
             <Heart :size="14" :stroke-width="1.8" />

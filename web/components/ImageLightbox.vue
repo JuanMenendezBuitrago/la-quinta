@@ -40,13 +40,13 @@
                   <h3 class="lightbox-name">{{ product.name }}</h3>
                   <span class="lightbox-price price">{{ formatPrice(unitPriceCents) }}</span>
                   <button
+                    v-if="customer"
                     class="lightbox-fav"
                     :class="{ active: isFavorite(product) }"
                     type="button"
                     :aria-pressed="isFavorite(product)"
                     :aria-label="isFavorite(product) ? `Quitar ${product.name} de favoritos` : `Añadir ${product.name} a favoritos`"
-                    :title="customer ? undefined : 'Inicia sesión para guardar favoritos'"
-                    @click="onFavoriteClick"
+                    @click="toggleFavorite(product)"
                   >
                     <Heart :size="16" :stroke-width="1.8" />
                   </button>
@@ -169,12 +169,7 @@ const emit = defineEmits<{ (e: "close"): void; (e: "prev"): void; (e: "next"): v
 
 const { customer } = useAuth();
 const { isFavorite, toggleFavorite } = useFavorites();
-// Sin sesion, toggleFavorite lleva a "Mi cuenta": se cierra antes la ficha para no dejarla abierta encima.
-function onFavoriteClick() {
-  if (!props.product) return;
-  if (!customer.value) emit("close");
-  toggleFavorite(props.product);
-}
+// El corazon de favorito solo se muestra con sesion iniciada.
 
 // Gesto de swipe horizontal para pasar de producto sin volver a la lista. Se mide en
 // touchstart/touchend (no se sigue el dedo en vivo) para no interferir con el scroll

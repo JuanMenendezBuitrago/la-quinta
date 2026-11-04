@@ -23,7 +23,7 @@ function entryMenuItemIds(entry: FavoriteTarget): string[] {
 
 /**
  * Productos favoritos del cliente con sesion. Se cargan al iniciar sesion y se vacian al salir;
- * sin sesion, marcar un favorito lleva a "Mi cuenta" para entrar.
+ * sin sesion no se muestra el corazon (y si se llamara, lleva a "Mi cuenta" para entrar).
  */
 export function useFavorites() {
   const { customer } = useAuth();
