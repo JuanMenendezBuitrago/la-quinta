@@ -21,7 +21,7 @@
     </label>
 
     <label class="photo-consent">
-      <input v-model="consent" type="checkbox" />
+      <input v-model="consent" type="checkbox" role="switch" />
       <span>
         Autorizo a La Quinta a publicar esta foto en su carta, con mi nombre y la inicial de mi apellido.
         Puedo retirarla cuando quiera desde «Mis fotos».
@@ -131,7 +131,7 @@ async function send() {
 }
 .photo-preview { display: block; width: 100%; max-height: 320px; object-fit: contain; border-radius: 10px; background: var(--surface-alt); }
 .photo-consent { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; cursor: pointer; }
-.photo-consent input { width: 18px; height: 18px; margin: 2px 0 0; flex-shrink: 0; accent-color: var(--accent); }
+.photo-consent input { margin: 0; flex-shrink: 0; }
 .photo-error { color: var(--danger); }
 .photo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 </style>

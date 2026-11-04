@@ -87,7 +87,7 @@
             <input v-model.number="p.priceCents" type="number" min="0" step="100" required aria-label="Precio (COP)" />
           </label>
           <label class="field-inline">
-            <input v-model="p.available" type="checkbox" />
+            <input v-model="p.available" type="checkbox" role="switch" />
             <span class="muted">A la venta</span>
           </label>
           <button class="button secondary" type="button" :disabled="form.presentations.length === 1" @click="form.presentations.splice(i, 1)">
@@ -101,7 +101,7 @@
       </div>
 
       <label class="field-inline">
-        <input v-model="form.available" type="checkbox" />
+        <input v-model="form.available" type="checkbox" role="switch" />
         <span class="muted">A la venta (sin marcar, ningún tamaño sale en la carta)</span>
       </label>
 
@@ -386,7 +386,7 @@ function formatPrice(priceCents: number) {
 .coffee-form h3 { margin: 0; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .field-inline { display: flex; align-items: center; gap: 8px; }
-.field-inline input { width: auto; margin: 0; }
+.field-inline input { margin: 0; }
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
 
 input[type="text"], input[type="url"], input[type="number"], select, textarea {

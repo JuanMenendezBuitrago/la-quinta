@@ -36,14 +36,14 @@
           <template v-if="activeSection === 'pedidos'">
             <div class="field">
               <label class="toggle-row">
-                <input v-model="form.staffOnlyOrders" type="checkbox" />
+                <input v-model="form.staffOnlyOrders" type="checkbox" role="switch" />
                 <span>Solo el personal puede crear pedidos</span>
               </label>
               <span class="muted">Los clientes seguirán viendo la carta y sus pedidos, pero no podrán añadir productos ni pedir desde la web.</span>
             </div>
             <div class="field">
               <label class="toggle-row">
-                <input v-model="form.orderQueueEnabled" type="checkbox" />
+                <input v-model="form.orderQueueEnabled" type="checkbox" role="switch" />
                 <span>Cola de pedidos activa</span>
               </label>
               <span class="muted">Desactivada, los pedidos se hacen y se pagan en caja en el mismo momento: desaparecen la sección «Cola» y el botón «Hacer pedido» (solo queda «Guardar y pagar»), y los clientes no pueden pedir desde la web. Para desactivarla, la cola tiene que estar vacía.</span>
@@ -55,7 +55,7 @@
             </label>
             <div class="field">
               <label class="toggle-row">
-                <input v-model="form.ticketPrintingEnabled" type="checkbox" />
+                <input v-model="form.ticketPrintingEnabled" type="checkbox" role="switch" />
                 <span>Imprimir tickets en la impresora térmica</span>
               </label>
               <span class="muted">Añade «Imprimir ticket» a los pedidos de la cola y del historial. Imprime desde la tablet Android con la app RawBT instalada y configurada con la IP de la impresora (puerto 9100).</span>
@@ -113,7 +113,7 @@
               <span class="muted">Los clientes solo pueden elegir recogida dentro de este horario. El pie de página lo muestra agrupando los días iguales.</span>
               <div v-for="day in form.openingHours" :key="day.weekday" class="schedule-row">
                 <label class="day-toggle">
-                  <input v-model="day.isOpen" type="checkbox" />
+                  <input v-model="day.isOpen" type="checkbox" role="switch" />
                   <span>{{ WEEKDAY_NAMES[day.weekday] }}</span>
                 </label>
                 <template v-if="day.isOpen">
@@ -171,7 +171,7 @@
           <template v-else-if="activeSection === 'panel'">
             <div class="field">
               <label class="toggle-row">
-                <input v-model="form.showInactiveStaff" type="checkbox" />
+                <input v-model="form.showInactiveStaff" type="checkbox" role="switch" />
                 <span>Mostrar cuentas de staff desactivadas en el listado</span>
               </label>
               <span class="muted">En la sección «Personal». Ocultas, para reactivar una cuenta hay que volver a marcar esta opción.</span>
@@ -398,7 +398,7 @@ onBeforeUnmount(() => {
 .field-label { font-size: 14px; font-weight: 600; }
 .field .muted { font-size: 13.5px; }
 .toggle-row { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
-.toggle-row input { width: auto; margin: 3px 0 0; flex-shrink: 0; }
+.toggle-row input { margin: 0; flex-shrink: 0; }
 input.short { max-width: 12rem; }
 fieldset.field { margin: 0; padding: 0; border: none; min-width: 0; }
 fieldset.field legend { padding: 0; margin-bottom: 6px; }
@@ -429,7 +429,7 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .schedule-row { grid-template-columns: minmax(0, 7rem) minmax(0, 1fr) minmax(0, 1fr); }
 .schedule-row input[type="time"] { min-width: 0; padding: 8px; }
 .day-toggle { display: flex; align-items: center; justify-content: flex-start; gap: 8px; font-size: 14px; font-weight: 600; }
-.day-toggle input { width: auto; margin: 0; }
+.day-toggle input { margin: 0; }
 .closed-label { grid-column: span 2; }
 .social-row { grid-template-columns: 90px minmax(0, 1fr) auto; }
 .social-label { font-size: 13px; font-weight: 600; color: var(--text); }

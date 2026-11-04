@@ -59,7 +59,7 @@
           <input v-model="groupForm.name" type="text" required maxlength="60" placeholder="Ej. Leche" />
         </label>
         <label class="field-inline">
-          <input v-model="groupForm.required" type="checkbox" style="width: auto" />
+          <input v-model="groupForm.required" type="checkbox" role="switch" />
           <span>Obligatoria: siempre se elige una (como el tipo de leche)</span>
         </label>
         <span class="muted">Sin marcar, es opcional: se puede pedir sin ninguna (como una adición).</span>
@@ -69,7 +69,7 @@
             <input v-model="option.name" type="text" required maxlength="60" placeholder="Ej. Avena" aria-label="Nombre de la opción" />
             <input v-model.number="option.priceDeltaCents" type="number" min="0" step="100" required aria-label="Suplemento (COP)" />
             <label class="field-inline">
-              <input v-model="option.available" type="checkbox" style="width: auto" />
+              <input v-model="option.available" type="checkbox" role="switch" />
               <span class="muted">Hay</span>
             </label>
             <button class="button secondary" type="button" :disabled="groupForm.options.length === 1" @click="groupForm.options.splice(i, 1)">
@@ -171,7 +171,7 @@
           <label class="field-inline">
             <input
               type="checkbox"
-              style="width: auto"
+              role="switch"
               :checked="form.modifiers.some((m) => m.groupId === group.id)"
               @change="toggleModifier(group, ($event.target as HTMLInputElement).checked)"
             />
@@ -193,7 +193,7 @@
       </div>
 
       <label class="field-inline">
-        <input v-model="form.available" type="checkbox" style="width: auto" />
+        <input v-model="form.available" type="checkbox" role="switch" />
         <span class="muted">Disponible en la carta</span>
       </label>
 

@@ -16,7 +16,7 @@
 
       <!-- Autorizacion aparte y opcional para las novedades: se marca y se desmarca cuando se quiera -->
       <label v-if="contactResult?.me?.email" class="newsletter">
-        <input type="checkbox" :checked="newsletterSubscribed" :disabled="savingNewsletter" @change="toggleNewsletter" />
+        <input type="checkbox" role="switch" :checked="newsletterSubscribed" :disabled="savingNewsletter" @change="toggleNewsletter" />
         <span>
           Quiero recibir por email novedades de La Quinta: ofertas, eventos y nuevos cafés. Puedo
           darme de baja cuando quiera desde aquí o desde cualquier correo.
@@ -213,7 +213,7 @@ async function deleteAccount() {
 }
 .contact, .ok, .legal-note { margin: 0; font-size: 13px; }
 .newsletter { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; line-height: 1.45; cursor: pointer; }
-.newsletter input { margin-top: 3px; flex-shrink: 0; width: auto; }
+.newsletter input { margin-top: 0; flex-shrink: 0; }
 .ok { color: var(--accent-strong); }
 .legal-note a { color: inherit; text-decoration: underline; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }

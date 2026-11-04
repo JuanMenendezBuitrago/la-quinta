@@ -84,7 +84,7 @@
       </div>
 
       <label class="check">
-        <input v-model="form.active" type="checkbox" />
+        <input v-model="form.active" type="checkbox" role="switch" />
         <span>Activa (si no, queda guardada pero no se muestra)</span>
       </label>
 
@@ -329,7 +329,7 @@ function remove(id: string) {
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .counter { float: right; font-size: 12px; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
-.check input { width: auto; margin: 0; }
+.check input { margin: 0; }
 .form-actions { display: flex; gap: 8px; }
 
 input[type="text"], input[type="date"], textarea, select {

@@ -66,7 +66,6 @@
           <div v-if="form.id" class="field">
             <label class="switch">
               <input v-model="form.active" type="checkbox" role="switch" :disabled="isSelf" />
-              <span class="switch-track" aria-hidden="true"><span class="switch-thumb" /></span>
               <span>Cuenta activa</span>
             </label>
             <span class="muted">
@@ -76,7 +75,6 @@
           <div class="field">
             <label class="switch">
               <input v-model="form.shared" type="checkbox" role="switch" />
-              <span class="switch-track" aria-hidden="true"><span class="switch-thumb" /></span>
               <span>Cuenta compartida</span>
             </label>
             <span class="muted">Al entrar con ella se elige quién la usa, y lo que se haga (pedidos, cobros, cierres…) queda a nombre de esa persona.</span>
@@ -336,34 +334,10 @@ async function submitForm() {
   letter-spacing: 0.04em;
 }
 
-/* Interruptor: el checkbox real (role=switch) queda encima, invisible pero enfocable */
-.switch { position: relative; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; }
-.switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
-.switch-track {
-  position: relative;
-  width: 40px;
-  height: 22px;
-  border-radius: 999px;
-  border: 1px solid var(--field-border);
-  background: var(--surface-alt);
-  transition: background 0.15s ease, border-color 0.15s ease;
-  flex-shrink: 0;
-}
-.switch-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  transition: transform 0.15s ease, background 0.15s ease;
-}
-.switch input:checked + .switch-track { background: var(--accent); border-color: var(--accent); }
-.switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); background: var(--bg); }
-.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
-.switch:has(input:disabled) { cursor: not-allowed; opacity: 0.6; }
-@media (prefers-reduced-motion: reduce) { .switch-track, .switch-thumb { transition: none; } }
+/* Interruptor: el checkbox con aspecto de switch (estilo global en main.css) y su texto al lado */
+.switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; }
+.switch input { margin: 0; }
+.switch:has(input:disabled) { cursor: not-allowed; }
 
 .staff-form { margin-bottom: 16px; display: flex; flex-direction: column; gap: 12px; }
 .form-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

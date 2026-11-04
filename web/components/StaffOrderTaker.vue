@@ -181,7 +181,7 @@
           </button>
           <!-- En mesa o barra, pero piden algo para llevar: se empaqueta y lleva el recargo -->
           <label v-if="place && place !== 'LLEVAR'" class="takeaway-check" title="Se lo llevan: va empaquetado y lleva el recargo por empaque">
-            <input v-model="takeaway" type="checkbox" />
+            <input v-model="takeaway" type="checkbox" role="switch" />
             <span>Empaquetar</span>
           </label>
         </div>
@@ -810,7 +810,7 @@ input {
 .reward-alert svg { flex-shrink: 0; color: var(--accent); }
 .takeaway-check { grid-column: span 2; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
 .optional-links { display: flex; gap: 16px; flex-wrap: wrap; }
-.takeaway-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.takeaway-check input { margin: 0; }
 .customer-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ticket-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 /* Cabecera de la seccion (#staff-hero-actions): "Pagar" o, tras pulsarlo, las formas de pago.

@@ -196,6 +196,48 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--accent);
 }
 
+/*
+ * Interruptores: en toda la app los checkbox se pintan como switch (role="switch" en el HTML).
+ * Siguen siendo <input type="checkbox"> nativos, asi que teclado, foco y lectores de pantalla
+ * funcionan igual. Los .visually-hidden son botones con icono y no se tocan.
+ */
+input[type="checkbox"]:not(.visually-hidden) {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--field-border);
+  background: var(--surface-alt);
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+input[type="checkbox"]:not(.visually-hidden)::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+input[type="checkbox"]:not(.visually-hidden):checked { background: var(--accent); border-color: var(--accent); }
+input[type="checkbox"]:not(.visually-hidden):checked::before { transform: translateX(18px); background: var(--bg); }
+input[type="checkbox"]:not(.visually-hidden):focus { border-color: var(--field-border); }
+input[type="checkbox"]:not(.visually-hidden):checked:focus { border-color: var(--accent); }
+input[type="checkbox"]:not(.visually-hidden):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="checkbox"]:not(.visually-hidden):disabled { cursor: not-allowed; opacity: 0.5; }
+@media (prefers-reduced-motion: reduce) {
+  input[type="checkbox"]:not(.visually-hidden),
+  input[type="checkbox"]:not(.visually-hidden)::before { transition: none; }
+}
+
 .muted { color: var(--text-muted); font-size: 14px; }
 
 .price, .tabular-nums { font-variant-numeric: tabular-nums; }

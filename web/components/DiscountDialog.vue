@@ -14,7 +14,7 @@
       <!-- Canje de sellos: solo con cliente identificado -->
       <section v-if="customer" class="redeem" :class="{ active: redeem }">
         <label class="redeem-toggle">
-          <input v-model="redeem" type="checkbox" :disabled="!canRedeem" />
+          <input v-model="redeem" type="checkbox" role="switch" :disabled="!canRedeem" />
           <span>
             <strong>Canje de sellos</strong>
             <span class="muted">{{ canRedeem ? "Un producto gratis; se restan los sellos al cliente." : "El cliente todavía no tiene sellos suficientes." }}</span>
@@ -310,7 +310,7 @@ function formatPrice(priceCents: number) {
 .redeem { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--border-strong); border-radius: 10px; }
 .redeem.active { border-color: var(--accent); background: var(--accent-soft); color: var(--on-accent-soft); }
 .redeem-toggle { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
-.redeem-toggle input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); flex-shrink: 0; }
+.redeem-toggle input { margin: 0; flex-shrink: 0; }
 .redeem-toggle > span { display: flex; flex-direction: column; gap: 2px; }
 .redeem-toggle .muted { font-size: 13px; }
 .section-title { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
