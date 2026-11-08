@@ -201,20 +201,48 @@
                 :style="band(selectedDay.hours.open, selectedDay.hours.close)"
                 aria-hidden="true"
               />
-              <button
-                v-for="shift in row.shifts"
+              <!-- La barra abre el dialogo; sus extremos se arrastran para cambiar la hora (de 15 en 15 min) -->
+              <span
+                v-for="shift in row.shifts.map(live)"
                 :key="shift.id"
-                class="g-bar"
-                :class="{ outside: isOutside(shift, selectedDay.hours) }"
-                type="button"
-                :disabled="!canEdit"
+                class="g-bar-wrap"
+                :class="{ dragging: resize?.id === shift.id, pending: pendingId === shift.id }"
                 :style="band(shift.start, shift.end)"
-                :title="chipTitle(shift, selectedDay.hours)"
-                @click="openEdit(shift)"
               >
-                <span class="tabular-nums">{{ t(shift.start) }}–{{ t(shift.end) }}</span>
-                <span v-if="shift.note" class="g-note">· {{ shift.note }}</span>
-              </button>
+                <button
+                  class="g-bar"
+                  :class="{ outside: isOutside(shift, selectedDay.hours) }"
+                  type="button"
+                  :disabled="!canEdit"
+                  :title="chipTitle(shift, selectedDay.hours)"
+                  @click="openEdit(shift)"
+                >
+                  <span class="tabular-nums">{{ t(shift.start) }}–{{ t(shift.end) }}</span>
+                  <span v-if="resize?.id === shift.id" class="g-note tabular-nums">· {{ formatHours(duration(shift)) }}</span>
+                  <span v-else-if="shift.note" class="g-note">· {{ shift.note }}</span>
+                </button>
+                <template v-if="canEdit">
+                  <span
+                    v-for="edge in (['start', 'end'] as const)"
+                    :key="edge"
+                    class="g-handle"
+                    :class="edge"
+                    role="slider"
+                    tabindex="0"
+                    :aria-label="`${edge === 'start' ? 'Entrada' : 'Salida'} de ${shift.staffName}`"
+                    :aria-valuemin="0"
+                    :aria-valuemax="24 * 60"
+                    :aria-valuenow="toMin(shift[edge])"
+                    :aria-valuetext="t(shift[edge])"
+                    @pointerdown="startResize($event, shift, edge)"
+                    @pointermove="moveResize"
+                    @pointerup="endResize"
+                    @pointercancel="cancelResize"
+                    @keydown="keyResize($event, shift, edge)"
+                    @blur="commitKeyResize"
+                  />
+                </template>
+              </span>
             </span>
           </div>
 
@@ -705,6 +733,123 @@ const band = (start: string, end: string) => ({
   width: `${((toMin(end) - toMin(start)) / (ganttRange.value.to - ganttRange.value.from)) * 100}%`,
 });
 
+// ---------- Cambiar la duracion arrastrando los extremos de la barra ----------
+const STEP = 15;
+const LAST_MIN = 23 * 60 + 45; // la API no admite 24:00
+type Edge = "start" | "end";
+// Horas provisionales mientras se arrastra (o se cambia con el teclado) y hasta que llega la recarga.
+const draft = ref<{ id: string; start: number; end: number } | null>(null);
+const resize = ref<{ id: string; edge: Edge; pointerId: number; x: number; minPerPx: number; from: number } | null>(null);
+const pendingId = ref<string | null>(null);
+let keyTimer: ReturnType<typeof setTimeout> | undefined;
+
+const live = (s: Shift): Shift =>
+  draft.value?.id === s.id ? { ...s, start: fromMin(draft.value.start), end: fromMin(draft.value.end) } : s;
+
+// Hasta donde puede llegar un extremo: lo que se ve de la escala, sin pisar otro turno de la misma persona
+// y dejando al menos 15 minutos de turno.
+function edgeLimits(s: Shift, edge: Edge, start: number, end: number) {
+  const others = dayShifts.value.filter((o) => o.staffId === s.staffId && o.id !== s.id);
+  if (edge === "start") {
+    const prevEnd = Math.max(ganttRange.value.from, ...others.map((o) => toMin(o.end)).filter((m) => m <= toMin(s.start)));
+    return { min: Math.ceil(prevEnd / STEP) * STEP, max: end - STEP };
+  }
+  const nextStart = Math.min(ganttRange.value.to, LAST_MIN, ...others.map((o) => toMin(o.start)).filter((m) => m >= toMin(s.end)));
+  return { min: start + STEP, max: Math.floor(nextStart / STEP) * STEP };
+}
+function setEdge(s: Shift, edge: Edge, value: number) {
+  const cur = draft.value?.id === s.id ? draft.value : { id: s.id, start: toMin(s.start), end: toMin(s.end) };
+  const { min, max } = edgeLimits(s, edge, cur.start, cur.end);
+  const snapped = Math.min(max, Math.max(min, Math.round(value / STEP) * STEP));
+  draft.value = { ...cur, [edge]: snapped };
+}
+
+function startResize(e: PointerEvent, s: Shift, edge: Edge) {
+  if (!canEdit.value || pendingId.value || e.button > 0) return;
+  const track = (e.currentTarget as HTMLElement).closest(".g-track") as HTMLElement | null;
+  if (!track) return;
+  e.preventDefault();
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  const original = shifts.value.find((x) => x.id === s.id) ?? s;
+  draft.value = { id: s.id, start: toMin(original.start), end: toMin(original.end) };
+  resize.value = {
+    id: s.id,
+    edge,
+    pointerId: e.pointerId,
+    x: e.clientX,
+    minPerPx: (ganttRange.value.to - ganttRange.value.from) / track.getBoundingClientRect().width,
+    from: toMin(original[edge]),
+  };
+}
+function moveResize(e: PointerEvent) {
+  const r = resize.value;
+  if (!r || e.pointerId !== r.pointerId) return;
+  const s = shifts.value.find((x) => x.id === r.id);
+  if (s) setEdge(s, r.edge, r.from + (e.clientX - r.x) * r.minPerPx);
+}
+function endResize(e: PointerEvent) {
+  const r = resize.value;
+  if (!r || e.pointerId !== r.pointerId) return;
+  resize.value = null;
+  void commitDraft();
+}
+function cancelResize() {
+  resize.value = null;
+  draft.value = null;
+}
+
+// Con el teclado: flechas de 15 en 15; se guarda al parar un momento, con Enter o al salir del tirador.
+function keyResize(e: KeyboardEvent, s: Shift, edge: Edge) {
+  if (pendingId.value) return;
+  const step = { ArrowLeft: -STEP, ArrowDown: -STEP, ArrowRight: STEP, ArrowUp: STEP }[e.key];
+  if (e.key === "Enter") {
+    e.preventDefault();
+    commitKeyResize();
+    return;
+  }
+  if (e.key === "Escape" && draft.value) {
+    clearTimeout(keyTimer);
+    draft.value = null;
+    return;
+  }
+  if (!step) return;
+  e.preventDefault();
+  const cur = draft.value?.id === s.id ? draft.value[edge] : toMin(s[edge]);
+  setEdge(shifts.value.find((x) => x.id === s.id) ?? s, edge, cur + step);
+  clearTimeout(keyTimer);
+  keyTimer = setTimeout(commitDraft, 800);
+}
+function commitKeyResize() {
+  clearTimeout(keyTimer);
+  if (!resize.value) void commitDraft();
+}
+
+async function commitDraft() {
+  const d = draft.value;
+  if (!d || pendingId.value) return;
+  const s = shifts.value.find((x) => x.id === d.id);
+  if (!s || (toMin(s.start) === d.start && toMin(s.end) === d.end)) {
+    draft.value = null;
+    return;
+  }
+  pendingId.value = d.id;
+  notice.value = "";
+  try {
+    await useMutation(UPDATE_SHIFT).mutate({
+      id: s.id,
+      input: { staffId: s.staffId, date: s.date, start: fromMin(d.start), end: fromMin(d.end), note: s.note },
+    });
+    await refetch();
+  } catch (err: any) {
+    notice.value = err?.message ?? "No se pudo cambiar el turno";
+  } finally {
+    // Se quita al final para que la barra no salte a las horas viejas mientras llega la recarga.
+    if (draft.value?.id === d.id) draft.value = null;
+    pendingId.value = null;
+  }
+}
+onBeforeUnmount(() => clearTimeout(keyTimer));
+
 // ---------- Vista y navegacion ----------
 const view = ref<"semana" | "dia">("semana");
 onMounted(() => {
@@ -1056,10 +1201,41 @@ async function remove() {
 .tick:first-child { transform: none; }
 .tick:last-child { transform: translateX(-100%); }
 .open-band { position: absolute; top: 0; bottom: 0; border-radius: 8px; background: rgba(243, 236, 225, 0.04); outline: 1px dashed var(--border-strong); }
+.g-bar-wrap { position: absolute; top: 4px; bottom: 4px; }
+.g-bar-wrap.pending { opacity: 0.7; }
+.g-bar-wrap.dragging .g-bar { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+/* Zona de agarre generosa (tablet), centrada en el borde; se ve una muesca discreta */
+.g-handle {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  z-index: 1;
+  width: 22px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.g-handle.start { left: -11px; }
+.g-handle.end { right: -11px; }
+.g-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--bg);
+  opacity: 0.55;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.15s ease;
+}
+.g-handle.start::after { left: calc(50% + 5px); }
+.g-handle.end::after { left: calc(50% - 5px); }
+.g-bar-wrap:hover .g-handle::after, .g-bar-wrap.dragging .g-handle::after, .g-handle:focus-visible::after { opacity: 1; }
+.g-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
 .g-bar {
   position: absolute;
-  top: 4px;
-  bottom: 4px;
+  inset: 0;
   display: flex;
   align-items: center;
   gap: 4px;
