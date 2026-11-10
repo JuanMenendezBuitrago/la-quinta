@@ -92,6 +92,11 @@
             class="order-card"
             :class="[`status-${order.status}`, { 'order-card--new': order._isNew }]"
           >
+            <!-- Ya cobrado (mesa o barra que pagan antes de irse de la cola): se ve de un vistazo -->
+            <span v-if="order.paidAt" class="paid-corner" :title="`Cobrado · ${paymentDetail(order)}`">
+              <DollarSign :size="16" :stroke-width="2.4" aria-hidden="true" />
+              <span class="sr-only">Cobrado</span>
+            </span>
             <div class="order-info">
               <div class="order-head">
                 <!-- Volver al estado anterior: chevron en la esquina, lejos de los botones de avanzar -->
@@ -401,7 +406,7 @@
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
-import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, Percent, Printer, SearchX, Stamp, UserPlus, X } from "lucide-vue-next";
+import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, DollarSign, History, Inbox, Percent, Printer, SearchX, Stamp, UserPlus, X } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import {
   PAYMENT_LABELS,
@@ -768,6 +773,7 @@ watchEffect(() => {
   border-radius: 8px;
   padding: 14px 16px;
   margin-top: 10px;
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -776,6 +782,21 @@ watchEffect(() => {
 .order-card.status-EN_PREPARACION { border-left-color: var(--color5); }
 .order-card.status-LISTO { border-left-color: var(--accent-strong); }
 .order-card.status-ENTREGADO { border-left-color: var(--danger); }
+/* "$" en la esquina superior derecha de un pedido de la cola ya cobrado */
+.paid-corner {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-strong);
+  color: var(--bg);
+  box-shadow: 0 0 0 2px var(--bg);
+}
 .paid-badge {
   display: inline-block;
   margin: 6px 0 0;
