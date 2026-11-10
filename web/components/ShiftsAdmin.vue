@@ -131,13 +131,22 @@
           </div>
           <div v-for="day in days" :key="day.date" class="cell coverage-cell" :class="{ today: day.date === today }" role="cell">
             <template v-if="day.hours">
-              <div class="cov-bar" :aria-label="coverageOf(day).summary">
+              <div class="cov-wrap">
+                <div class="cov-bar" :aria-label="coverageOf(day).summary">
+                  <span
+                    v-for="(slot, i) in coverageOf(day).slots"
+                    :key="i"
+                    class="cov-slot"
+                    :style="{ flexGrow: toMin(slot.to) - toMin(slot.from) }"
+                    :class="`lvl-${Math.min(slot.count, 3)}`"
+                    :title="`${t(slot.from)}–${t(slot.to)}: ${slot.count} ${slot.count === 1 ? 'persona' : 'personas'}`"
+                  />
+                </div>
                 <span
-                  v-for="(slot, i) in coverageOf(day).slots"
-                  :key="i"
-                  class="cov-slot"
-                  :class="`lvl-${Math.min(slot.count, 3)}`"
-                  :title="`${t(slot.from)}–${t(slot.to)}: ${slot.count} ${slot.count === 1 ? 'persona' : 'personas'}`"
+                  v-if="day.date === today && nowInside(day.hours.open, day.hours.close)"
+                  class="now-mark"
+                  :style="{ left: `${((nowMin! - toMin(day.hours.open)) / (toMin(day.hours.close) - toMin(day.hours.open))) * 100}%` }"
+                  :title="`Ahora: ${nowLabel}`"
                 />
               </div>
               <span class="cov-text" :class="{ gap: coverageOf(day).gaps.length }">{{ coverageOf(day).summary }}</span>
@@ -185,6 +194,7 @@
             <span class="g-name" />
             <span class="g-track">
               <span v-for="h in ganttRange.ticks" :key="h" class="tick" :style="{ left: pct(h * 60) }">{{ h }}</span>
+              <span v-if="showNowLine" class="now-label tabular-nums" :style="{ left: pct(nowMin!) }">{{ nowLabel }}</span>
             </span>
           </div>
 
@@ -201,6 +211,7 @@
                 :style="band(selectedDay.hours.open, selectedDay.hours.close)"
                 aria-hidden="true"
               />
+              <span v-if="showNowLine" class="now-line" :style="{ left: pct(nowMin!) }" aria-hidden="true" />
               <!-- La barra abre el dialogo; sus extremos se arrastran para cambiar la hora (de 15 en 15 min) -->
               <span
                 v-for="shift in row.shifts.map(live)"
@@ -250,6 +261,7 @@
           <div v-if="selectedDay.hours" class="g-row g-coverage">
             <span class="g-name muted">Cobertura</span>
             <span class="g-track">
+              <span v-if="showNowLine" class="now-line" :style="{ left: pct(nowMin!) }" aria-hidden="true" />
               <span
                 v-for="(slot, i) in coverageOf(selectedDay).slots"
                 :key="i"
@@ -732,6 +744,25 @@ const band = (start: string, end: string) => ({
   left: pct(toMin(start)),
   width: `${((toMin(end) - toMin(start)) / (ganttRange.value.to - ganttRange.value.from)) * 100}%`,
 });
+
+// ---------- Hora actual (linea "ahora") ----------
+// Solo en el cliente, para que el SSR no pinte una hora distinta; se refresca cada 30 s.
+const nowMin = ref<number | null>(null);
+const nowLabel = computed(() => (nowMin.value === null ? "" : fromMin(nowMin.value).replace(/^0(\d)/, "$1")));
+let nowTimer: ReturnType<typeof setInterval> | undefined;
+function tickNow() {
+  const v = toStoreInput(new Date());
+  nowMin.value = v.slice(0, 10) === today ? toMin(v.slice(11, 16)) : null;
+}
+onMounted(() => {
+  tickNow();
+  nowTimer = setInterval(tickNow, 30_000);
+});
+onBeforeUnmount(() => clearInterval(nowTimer));
+const nowInside = (from: string, to: string) => nowMin.value !== null && nowMin.value >= toMin(from) && nowMin.value <= toMin(to);
+const showNowLine = computed(
+  () => selectedDate.value === today && nowMin.value !== null && nowMin.value >= ganttRange.value.from && nowMin.value <= ganttRange.value.to
+);
 
 // ---------- Cambiar la duracion arrastrando los extremos de la barra ----------
 const STEP = 15;
@@ -1255,6 +1286,42 @@ async function remove() {
 .g-bar.outside { background: linear-gradient(90deg, var(--accent), var(--color5)); }
 .g-note { font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
 .g-coverage .g-track { height: 12px; background: none; }
+/* Hora actual: linea vertical que cruza todas las filas del dia de hoy, con la hora en la escala */
+.now-line {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  z-index: 2;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--danger);
+  pointer-events: none;
+}
+.now-label {
+  position: absolute;
+  top: -1px;
+  z-index: 2;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--danger);
+  color: var(--bg);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 18px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.cov-wrap { position: relative; }
+.now-mark {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--text);
+  box-shadow: 0 0 0 1.5px var(--surface);
+}
 .cov-slot.abs { position: absolute; top: 0; bottom: 0; height: auto; border-radius: 2px; }
 .free { margin: 0; }
 
