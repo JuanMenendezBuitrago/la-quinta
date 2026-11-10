@@ -491,11 +491,11 @@ const {
 
 const { lowCount, lastAlert: stockAlert } = useInventoryAlerts(isLoggedIn);
 
-// Encabezado de cada columna en lenguaje natural: "1 nuevo", "3 listos", "2 en preparación".
+// Encabezado de cada columna en lenguaje natural: "1 nuevo", "3 servidos", "2 en preparación".
 const QUEUE_HEADINGS: Record<string, [singular: string, plural: string]> = {
   NUEVO: ["nuevo", "nuevos"],
   EN_PREPARACION: ["en preparación", "en preparación"],
-  LISTO: ["listo", "listos"],
+  LISTO: ["servido", "servidos"],
   POR_COBRAR: ["por cobrar", "por cobrar"],
 };
 function queueHeading(status: string, count: number) {

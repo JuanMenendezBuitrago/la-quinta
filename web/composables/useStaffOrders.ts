@@ -260,7 +260,7 @@ const QUEUE_COLUMNS = ["NUEVO", "EN_PREPARACION", "LISTO", "POR_COBRAR"] as cons
 const STATUS_LABELS: Record<string, string> = {
   NUEVO: "Nuevos",
   EN_PREPARACION: "En preparación",
-  LISTO: "Listos",
+  LISTO: "Servidos",
   POR_COBRAR: "Por cobrar",
   ENTREGADO: "Entregado",
   CANCELADO: "Cancelado",
@@ -281,7 +281,7 @@ const PREV_LABEL: Record<string, string> = {
 };
 const NEXT_LABEL: Record<string, string> = {
   NUEVO: "Empezar a preparar",
-  EN_PREPARACION: "Marcar listo",
+  EN_PREPARACION: "Marcar servido",
   LISTO: "Marcar entregado",
 };
 
