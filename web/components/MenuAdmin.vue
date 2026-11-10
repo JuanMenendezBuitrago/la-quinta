@@ -1,50 +1,11 @@
 <template>
-  <!-- Pantallas anchas apaisadas: productos a la izquierda; categorias y personalizaciones a la derecha.
-       En movil, categorias y personalizaciones primero (como antes) y despues los productos. -->
+  <!-- Pantallas anchas apaisadas: productos (agrupados por categoria) a la izquierda y personalizaciones
+       a la derecha. En movil, una pestaña para cada parte. Las categorias se crean, renombran y
+       reordenan (arrastrando su asa) en la propia lista de productos. -->
   <section class="menu-admin wide-layout" :data-tab="mobileTab">
     <!-- Movil y vertical: pestañas arriba, se ve una parte cada vez (en pantalla ancha, todo a la vez) -->
     <MobileTabs v-model="mobileTab" :tabs="mobileTabs" label="Partes de la carta" />
     <aside class="wide-aside">
-    <section class="categories-admin">
-      <div class="categories-header">
-        <h3>Categorías</h3>
-        <button class="button secondary" :disabled="categoryFormOpen" @click="startCreateCategory">+ Nueva categoría</button>
-      </div>
-
-      <form v-if="categoryFormOpen" class="card category-form" @submit.prevent="submitCategory">
-        <label class="field">
-          <span class="muted">Nombre</span>
-          <input v-model="categoryForm.name" type="text" required maxlength="80" />
-        </label>
-        <p v-if="categoryFormError" class="muted" style="color: var(--danger)">{{ categoryFormError }}</p>
-        <div class="form-actions">
-          <button class="button" type="submit" :disabled="savingCategory">
-            {{ savingCategory ? "Guardando…" : "Guardar" }}
-          </button>
-          <button class="button secondary cancel" type="button" :disabled="savingCategory" @click="categoryFormOpen = false">
-            <X :size="16" :stroke-width="1.8" aria-hidden="true" />
-            Cancelar
-          </button>
-        </div>
-      </form>
-
-      <div class="card category-row category-item" v-for="(category, i) in categories" :key="category.id">
-        <template v-if="editingCategoryId === category.id">
-          <input v-model="categoryNameDraft" class="category-name-input" type="text" maxlength="80" />
-          <button class="button secondary" type="button" @click="saveCategoryName(category)">Guardar</button>
-          <button class="button secondary cancel" type="button" @click="editingCategoryId = ''"><X :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
-        </template>
-        <template v-else>
-          <span class="category-name">{{ category.name }}</span>
-          <div class="category-actions">
-            <button class="button secondary" type="button" :disabled="i === 0" @click="moveCategory(i, -1)">▲</button>
-            <button class="button secondary" type="button" :disabled="i === categories.length - 1" @click="moveCategory(i, 1)">▼</button>
-            <button class="button secondary" type="button" @click="startEditCategoryName(category)">Editar nombre</button>
-          </div>
-        </template>
-      </div>
-    </section>
-
     <!-- Personalizaciones: grupos reutilizables (p. ej. Leche) que se asignan a los productos -->
     <section class="groups-admin">
       <div class="categories-header">
@@ -93,6 +54,7 @@
       </form>
       </dialog>
 
+
       <EmptyState v-if="!groups.length" compact :icon="SlidersHorizontal" title="Todavía no hay personalizaciones" />
       <!-- Botones debajo de la descripcion (no a la derecha): las opciones necesitan todo el ancho -->
       <div v-for="group in groups" :key="group.id" class="card category-row group-row">
@@ -128,6 +90,7 @@
     <!-- En la cabecera de la seccion, a la derecha (solo en cliente: Teleport fuera de #teleports no se renderiza en SSR) -->
     <ClientOnly>
       <Teleport to="#staff-hero-actions">
+        <button class="button secondary" type="button" @click="openCategoryDialog()">+ Nueva categoría</button>
         <button class="button" :disabled="formOpen" @click="startCreate()">+ Nuevo producto</button>
       </Teleport>
     </ClientOnly>
@@ -223,15 +186,58 @@
 
     <!-- Una categoria por grupo plegable, como en Recetas y Conteo; empiezan plegadas. El formulario
          de edicion vive dentro (v-show): plegar el grupo no pierde lo escrito. -->
+    <p class="muted categories-hint">Arrastra <GripVertical :size="14" :stroke-width="2" aria-hidden="true" class="inline-icon" /> para cambiar el orden de las categorías.</p>
+    <p v-if="reorderError" class="muted" style="color: var(--danger)">{{ reorderError }}</p>
+    <!-- Crear o renombrar una categoria -->
+    <dialog ref="categoryDialog" class="group-dialog category-dialog" aria-labelledby="category-dialog-title" @click.self="closeCategoryDialog">
+      <form class="group-form" @submit.prevent="submitCategory">
+        <div class="dialog-head">
+          <h2 id="category-dialog-title">{{ categoryForm.id ? "Editar categoría" : "Nueva categoría" }}</h2>
+          <button type="button" class="close" aria-label="Cerrar" @click="closeCategoryDialog">×</button>
+        </div>
+        <label class="field">
+          <span class="muted">Nombre</span>
+          <input v-model="categoryForm.name" type="text" required maxlength="80" placeholder="Ej. Bebidas Calientes" />
+        </label>
+        <p v-if="categoryFormError" class="muted" style="color: var(--danger)">{{ categoryFormError }}</p>
+        <div class="form-actions">
+          <button class="button" type="submit" :disabled="savingCategory">{{ savingCategory ? "Guardando…" : "Guardar" }}</button>
+          <button class="button secondary cancel" type="button" :disabled="savingCategory" @click="closeCategoryDialog"><X :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
+        </div>
+      </form>
+    </dialog>
+
+
     <CollapsibleGroup
-      v-for="category in categories"
+      v-for="category in orderedCategories"
       :key="category.id"
       class="category"
+      :class="{ dragging: dragId === category.id }"
+      :data-category-id="category.id"
       :title="category.name"
       :open="isOpen(category.id)"
       @update:open="toggleCategory(category.id)"
     >
+      <template #handle>
+        <!-- Asa: se arrastra con raton o dedo; con el teclado, flechas arriba y abajo -->
+        <button
+          type="button"
+          class="drag-handle"
+          :aria-label="`Mover ${category.name} (flechas arriba y abajo)`"
+          title="Arrastra para cambiar el orden"
+          @pointerdown="startDrag($event, category.id)"
+          @keydown.up.prevent="moveByKey(category.id, -1)"
+          @keydown.down.prevent="moveByKey(category.id, 1)"
+        >
+          <GripVertical :size="18" :stroke-width="2" aria-hidden="true" />
+        </button>
+      </template>
       <template #meta>{{ category.items.length }}</template>
+      <template #actions>
+        <button type="button" class="icon-button" :aria-label="`Editar el nombre de ${category.name}`" title="Editar nombre" @click="openCategoryDialog(category)">
+          <Pencil :size="16" :stroke-width="1.8" aria-hidden="true" />
+        </button>
+      </template>
       <template v-for="item in category.items" :key="item.id">
       <div class="card item-row" :class="{ unavailable: !item.available, editing: formOpen && form.id === item.id }">
         <img v-if="item.imageUrl" :src="resolveImageUrl(item.imageUrl) ?? undefined" alt="" class="thumb" />
@@ -276,7 +282,7 @@
 import MobileTabs from "~/components/MobileTabs.vue";
 import EmptyState from "~/components/EmptyState.vue";
 import CollapsibleGroup from "~/components/CollapsibleGroup.vue";
-import { PackageOpen, SlidersHorizontal, Trash2, X } from "lucide-vue-next";
+import { GripVertical, PackageOpen, Pencil, SlidersHorizontal, Trash2, X } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 
 interface ModifierOptionAdmin {
@@ -422,61 +428,128 @@ const groups = computed(() => result.value?.modifierGroups ?? []);
 const loadError = computed(() => (error.value ? "No se pudo cargar la carta." : ""));
 const { resolveImageUrl } = useImageUrl();
 
-// --- Categorías: crear, renombrar y reordenar (sin borrar, para no dejar items huérfanos) ---
-const categoryFormOpen = ref(false);
+// --- Categorías: crear y renombrar (en un modal) y reordenar arrastrando en la lista. Sin borrar,
+// para no dejar productos huérfanos. ---
+const categoryDialog = ref<HTMLDialogElement | null>(null);
 const savingCategory = ref(false);
 const categoryFormError = ref("");
-const categoryForm = reactive({ name: "" });
+const categoryForm = reactive({ id: "", name: "" });
 
-function startCreateCategory() {
-  categoryForm.name = "";
+function openCategoryDialog(category?: MenuCategoryAdmin) {
+  Object.assign(categoryForm, { id: category?.id ?? "", name: category?.name ?? "" });
   categoryFormError.value = "";
-  categoryFormOpen.value = true;
+  mobileTab.value = "productos";
+  categoryDialog.value?.showModal();
+}
+
+function closeCategoryDialog() {
+  if (!savingCategory.value) categoryDialog.value?.close();
 }
 
 async function submitCategory() {
+  const name = categoryForm.name.trim();
+  if (!name) return;
   savingCategory.value = true;
   categoryFormError.value = "";
   try {
-    const { mutate } = useMutation(CREATE_MENU_CATEGORY);
-    await mutate({ name: categoryForm.name.trim(), order: categories.value.length });
+    if (categoryForm.id) {
+      const { mutate } = useMutation(UPDATE_MENU_CATEGORY);
+      await mutate({ id: categoryForm.id, name });
+    } else {
+      const { mutate } = useMutation(CREATE_MENU_CATEGORY);
+      // Al final de la lista
+      await mutate({ name, order: Math.max(-1, ...categories.value.map((c) => c.order)) + 1 });
+    }
     await refetch();
-    categoryFormOpen.value = false;
+    categoryDialog.value?.close();
   } catch (err: any) {
-    categoryFormError.value = err?.message ?? "No se pudo crear la categoría";
+    categoryFormError.value = err?.message ?? "No se pudo guardar la categoría";
   } finally {
     savingCategory.value = false;
   }
 }
 
-const editingCategoryId = ref("");
-const categoryNameDraft = ref("");
+// Orden mientras se arrastra (ids); null: el de la carta.
+const dragOrder = ref<string[] | null>(null);
+const dragId = ref("");
+const reorderError = ref("");
+const orderedCategories = computed(() => {
+  if (!dragOrder.value) return categories.value;
+  const byId = new Map(categories.value.map((c) => [c.id, c]));
+  return dragOrder.value.flatMap((id) => byId.get(id) ?? []);
+});
 
-function startEditCategoryName(category: MenuCategoryAdmin) {
-  editingCategoryId.value = category.id;
-  categoryNameDraft.value = category.name;
+// Con eventos de puntero (raton y pantalla tactil) en window: al reordenar, Vue mueve el elemento
+// arrastrado en el DOM y perderia la captura del puntero.
+function startDrag(event: PointerEvent, id: string) {
+  if (event.button !== 0 || dragId.value) return;
+  event.preventDefault();
+  reorderError.value = "";
+  dragId.value = id;
+  dragOrder.value = categories.value.map((c) => c.id);
+  window.addEventListener("pointermove", onDragMove);
+  window.addEventListener("pointerup", endDrag);
+  window.addEventListener("pointercancel", endDrag);
 }
 
-async function saveCategoryName(category: MenuCategoryAdmin) {
-  const name = categoryNameDraft.value.trim();
-  editingCategoryId.value = "";
-  if (!name || name === category.name) return;
-  const { mutate } = useMutation(UPDATE_MENU_CATEGORY);
-  await mutate({ id: category.id, name });
-  await refetch();
+function onDragMove(event: PointerEvent) {
+  if (!dragId.value) return;
+  // Se coloca delante de la primera categoria cuya cabecera quede por debajo del puntero
+  const others = [...document.querySelectorAll<HTMLElement>(".menu-admin [data-category-id]")].filter(
+    (el) => el.dataset.categoryId !== dragId.value
+  );
+  let index = others.findIndex((el) => {
+    const r = (el.querySelector(".group-title") ?? el).getBoundingClientRect();
+    return event.clientY < r.top + r.height / 2;
+  });
+  if (index === -1) index = others.length;
+  const ids = others.map((el) => el.dataset.categoryId!);
+  ids.splice(index, 0, dragId.value);
+  if (ids.join() !== dragOrder.value?.join()) dragOrder.value = ids;
+  // Cerca de los bordes, la pagina se desplaza sola
+  if (event.clientY < 90) window.scrollBy(0, -14);
+  else if (event.clientY > window.innerHeight - 110) window.scrollBy(0, 14);
 }
 
-// Intercambia el `order` de dos categorías adyacentes (sin drag-and-drop).
-async function moveCategory(index: number, delta: number) {
-  const a = categories.value[index];
-  const b = categories.value[index + delta];
-  if (!a || !b) return;
-  const { mutate } = useMutation(UPDATE_MENU_CATEGORY);
-  await Promise.all([
-    mutate({ id: a.id, order: b.order }),
-    mutate({ id: b.id, order: a.order }),
-  ]);
-  await refetch();
+function endDrag() {
+  window.removeEventListener("pointermove", onDragMove);
+  window.removeEventListener("pointerup", endDrag);
+  window.removeEventListener("pointercancel", endDrag);
+  const ids = dragOrder.value;
+  dragId.value = "";
+  if (ids) saveOrder(ids);
+}
+onBeforeUnmount(endDrag);
+
+function moveByKey(id: string, delta: number) {
+  const ids = categories.value.map((c) => c.id);
+  const from = ids.indexOf(id);
+  const to = from + delta;
+  if (from < 0 || to < 0 || to >= ids.length) return;
+  ids.splice(to, 0, ...ids.splice(from, 1));
+  dragOrder.value = ids;
+  saveOrder(ids).then(() => {
+    // El foco sigue en el asa de la categoria movida
+    nextTick(() => document.querySelector<HTMLElement>(`.menu-admin [data-category-id="${id}"] .drag-handle`)?.focus());
+  });
+}
+
+// Guarda como `order` la posicion de cada categoria (solo las que cambian).
+async function saveOrder(ids: string[]) {
+  const changed = ids
+    .map((id, order) => ({ id, order }))
+    .filter(({ id, order }) => categories.value.find((c) => c.id === id)?.order !== order);
+  try {
+    if (changed.length) {
+      const { mutate } = useMutation(UPDATE_MENU_CATEGORY);
+      await Promise.all(changed.map((c) => mutate(c)));
+      await refetch();
+    }
+  } catch {
+    reorderError.value = "No se pudo guardar el orden de las categorías";
+  } finally {
+    dragOrder.value = null;
+  }
 }
 
 // --- Personalizaciones de una opcion como maximo: obligatorias (Leche) u opcionales (Adicion) ---
@@ -624,10 +697,9 @@ function toggleModifier(group: ModifierGroupAdmin, checked: boolean) {
 const form = reactive(emptyForm());
 
 // --- Pestañas en movil ---
-type MobileTab = "productos" | "categorias" | "personalizaciones";
+type MobileTab = "productos" | "personalizaciones";
 const mobileTabs = computed(() => [
   { id: "productos", label: "Productos", count: categories.value.reduce((n, c) => n + c.items.length, 0) },
-  { id: "categorias", label: "Categorías", count: categories.value.length },
   { id: "personalizaciones", label: "Personalizaciones", count: groups.value.length },
 ]);
 const mobileTab = ref<MobileTab>("productos");
@@ -736,31 +808,17 @@ function formatPrice(priceCents: number) {
 <style scoped>
 @media (max-width: 999px), (orientation: portrait) {
   .menu-admin[data-tab="productos"] .wide-aside,
-  .menu-admin[data-tab="categorias"] .groups-admin,
-  .menu-admin[data-tab="categorias"] .wide-main,
-  .menu-admin[data-tab="personalizaciones"] .categories-admin,
   .menu-admin[data-tab="personalizaciones"] .wide-main { display: none; }
   /* La parte visible empieza arriba, sin el margen ni la raya que la separaban de la siguiente */
-  .menu-admin .categories-admin, .menu-admin .groups-admin { margin-top: 0; border-bottom: none; }
+  .menu-admin .groups-admin { margin-top: 0; border-bottom: none; }
 }
 
 .menu-admin { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
 .menu-admin .wide-main, .menu-admin .wide-aside { gap: 0; }
 @media (min-width: 1000px) and (orientation: landscape) {
-  .menu-admin .categories-admin { margin-top: 0; }
+  .menu-admin .groups-admin { margin-top: 0; }
 }
 
-.categories-admin { margin-top: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); container-type: inline-size; }
-.category-name-input { flex: 1; min-width: 0; }
-/* Columna estrecha (movil): el nombre arriba y los botones debajo, a todo el ancho; en fila, ▲ ▼ y
-   "Editar nombre" (~280 px) no caben junto al nombre y desbordan la tarjeta. */
-@container (max-width: 460px) {
-  .category-item { flex-wrap: wrap; }
-  .category-item .category-name { flex: 1 1 100%; }
-  .category-item .category-actions { flex: 1 1 100%; display: grid; grid-template-columns: auto auto 1fr; }
-  .category-item .category-name-input { flex: 1 1 100%; }
-  .category-item > .button { flex: 1 1 0; }
-}
 .categories-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 10px; }
 .category-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
 .category-name { font-weight: 600; }
@@ -769,7 +827,6 @@ function formatPrice(priceCents: number) {
 /* Editar y Borrar (o Si y No al confirmar) a medias; el aviso de borrar, a todo el ancho encima */
 .group-row .category-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .group-row .category-actions > span { grid-column: 1 / -1; }
-.category-form { margin: 12px 0; display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
 
 .groups-admin { margin-top: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
 .group-dialog {
@@ -799,6 +856,29 @@ function formatPrice(priceCents: number) {
 
 /* Aire entre una categoria desplegada y la cabecera de la siguiente */
 .category { margin-bottom: 12px; }
+.categories-hint { margin: 0 0 4px; }
+.inline-icon { vertical-align: -2px; }
+.category-dialog { width: min(420px, calc(100vw - 32px)); }
+/* Asa para arrastrar la categoria: touch-action none para que el dedo arrastre en vez de hacer scroll */
+.drag-handle, .icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.drag-handle { cursor: grab; touch-action: none; }
+.drag-handle:hover, .icon-button:hover { color: var(--text); background: var(--accent-soft); }
+.drag-handle:focus-visible, .icon-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.category.dragging :deep(.group-title) { background: var(--accent-soft); border-radius: 8px; }
+.category.dragging .drag-handle { cursor: grabbing; color: var(--accent); }
+:global(body:has(.menu-admin .category.dragging)) { cursor: grabbing; user-select: none; }
 .item-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
 .item-row.unavailable { opacity: 0.55; }
 .item-row.editing { border-color: var(--accent); opacity: 1; }
