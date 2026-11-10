@@ -189,19 +189,19 @@ export const menuResolvers = {
       const existing = await ModifierGroup.findById(args.id).lean();
       if (!existing) throw new Error("Personalizacion no encontrada");
       const data = modifierGroupData(args.input, existing);
+      const updated = await ModifierGroup.findByIdAndUpdate(args.id, data, { new: true });
       // Una opcion eliminada que era la de por defecto de algun producto deja ese producto sin
-      // defecto: se avisa en lugar de dejar la carta con un "+" que no sabe que servir.
+      // defecto. Si el grupo es obligatorio, la carta pide elegirla al pedir y al editar el producto.
       const kept = new Set(data.options.map((o) => o._id.toString()));
       const removed = existing.options.filter((o) => !kept.has(o._id.toString())).map((o) => o._id);
       if (removed.length) {
-        const using = await MenuItem.find({ modifiers: { $elemMatch: { groupId: existing._id, defaultOptionId: { $in: removed } } } })
-          .select("name")
-          .lean();
-        if (using.length) {
-          throw new Error(`No se puede eliminar una opcion que es la de por defecto de: ${using.map((i) => i.name).join(", ")}`);
-        }
+        await MenuItem.updateMany(
+          { modifiers: { $elemMatch: { groupId: existing._id, defaultOptionId: { $in: removed } } } },
+          { $set: { "modifiers.$[m].defaultOptionId": null } },
+          { arrayFilters: [{ "m.groupId": existing._id, "m.defaultOptionId": { $in: removed } }] }
+        );
       }
-      return ModifierGroup.findByIdAndUpdate(args.id, data, { new: true });
+      return updated;
     },
     deleteModifierGroup: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
       requireStaff(ctx, ["gestion"]);

@@ -53,7 +53,13 @@
       </div>
       <p class="muted">Opciones que se eligen al pedir, como el tipo de leche. Se asignan a cada producto al editarlo.</p>
 
-      <form v-if="groupFormOpen" class="card group-form" @submit.prevent="submitGroup">
+      <!-- Crear o editar una personalizacion: en un modal, encima de la carta -->
+      <dialog ref="groupDialog" class="group-dialog" aria-labelledby="group-dialog-title" @click.self="closeGroupForm" @close="groupFormOpen = false">
+      <form v-if="groupFormOpen" class="group-form" @submit.prevent="submitGroup">
+        <div class="dialog-head">
+          <h2 id="group-dialog-title">{{ groupForm.id ? "Editar personalización" : "Nueva personalización" }}</h2>
+          <button type="button" class="close" aria-label="Cerrar" @click="closeGroupForm">×</button>
+        </div>
         <label class="field">
           <span class="muted">Nombre</span>
           <input v-model="groupForm.name" type="text" required maxlength="60" placeholder="Ej. Leche" />
@@ -82,11 +88,12 @@
         <p v-if="groupFormError" class="muted" style="color: var(--danger)">{{ groupFormError }}</p>
         <div class="form-actions">
           <button class="button" type="submit" :disabled="savingGroup">{{ savingGroup ? "Guardando…" : "Guardar" }}</button>
-          <button class="button secondary cancel" type="button" :disabled="savingGroup" @click="groupFormOpen = false"><X :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
+          <button class="button secondary cancel" type="button" :disabled="savingGroup" @click="closeGroupForm"><X :size="16" :stroke-width="1.8" aria-hidden="true" /> Cancelar</button>
         </div>
       </form>
+      </dialog>
 
-      <EmptyState v-if="!groups.length && !groupFormOpen" compact :icon="SlidersHorizontal" title="Todavía no hay personalizaciones" />
+      <EmptyState v-if="!groups.length" compact :icon="SlidersHorizontal" title="Todavía no hay personalizaciones" />
       <!-- Botones debajo de la descripcion (no a la derecha): las opciones necesitan todo el ancho -->
       <div v-for="group in groups" :key="group.id" class="card category-row group-row">
         <div class="item-info">
@@ -99,6 +106,9 @@
             </template>
           </p>
           <p class="muted">{{ productsUsing(group.id) }}</p>
+          <p v-if="productsWithoutDefault(group).length" class="muted" style="color: var(--danger)">
+            Sin opción normal: {{ productsWithoutDefault(group).join(", ") }}. Elígela al editar cada producto.
+          </p>
           <p v-if="groupDeleteError === group.id" class="muted" style="color: var(--danger)">No se pudo borrar</p>
         </div>
         <div v-if="pendingGroupDeleteId === group.id" class="category-actions">
@@ -229,9 +239,14 @@
           <strong>{{ item.name }}</strong>
           <span v-if="!item.available" class="muted"> · oculto</span>
           <p v-if="item.description" class="muted">{{ item.description }}</p>
-          <p class="muted">
-            {{ formatPrice(item.priceCents)
-            }}{{ item.modifiers.length ? ` · ${item.modifiers.map((m) => m.group.name).join(", ")}` : "" }}
+          <p class="muted">{{ formatPrice(item.priceCents) }}</p>
+          <p v-if="item.modifiers.length" class="item-modifiers">
+            <span v-for="m in item.modifiers" :key="m.group.id" class="modifier-chip" :title="modifierTitle(m)">
+              {{ m.group.name }}<span class="muted">: {{ modifierDefaultLabel(m) }}</span>
+            </span>
+          </p>
+          <p v-if="missingDefaults(item).length" class="muted" style="color: var(--danger)">
+            Elige qué lleva normalmente de: {{ missingDefaults(item).join(", ") }}
           </p>
           <p v-if="deleteError === item.id" class="muted" style="color: var(--danger)">No se pudo borrar el producto</p>
         </div>
@@ -286,7 +301,7 @@ interface MenuItemAdmin {
   priceCents: number;
   imageUrl: string | null;
   available: boolean;
-  modifiers: { defaultOptionId: string | null; group: { id: string; name: string } }[];
+  modifiers: { defaultOptionId: string | null; group: { id: string; name: string; minSelect: number } }[];
   /** Bolsa de cafe en grano: se edita desde su cafe, no aqui. */
   coffee: { id: string } | null;
 }
@@ -319,6 +334,7 @@ const ADMIN_MENU_QUERY = gql`
           group {
             id
             name
+            minSelect
           }
         }
       }
@@ -465,6 +481,16 @@ async function moveCategory(index: number, delta: number) {
 
 // --- Personalizaciones de una opcion como maximo: obligatorias (Leche) u opcionales (Adicion) ---
 const groupFormOpen = ref(false);
+const groupDialog = ref<HTMLDialogElement | null>(null);
+// El modal se abre al abrir el formulario (ya pintado) y se cierra con el; Esc o el fondo lo cierran tambien.
+watch(groupFormOpen, (open) => {
+  if (open && !groupDialog.value?.open) groupDialog.value?.showModal();
+  if (!open && groupDialog.value?.open) groupDialog.value.close();
+}, { flush: "post" });
+
+function closeGroupForm() {
+  if (!savingGroup.value) groupFormOpen.value = false;
+}
 const savingGroup = ref(false);
 const groupFormError = ref("");
 
@@ -536,6 +562,30 @@ async function confirmRemoveGroup(group: ModifierGroupAdmin) {
   } finally {
     pendingGroupDeleteId.value = "";
   }
+}
+
+// Lo que lleva normalmente el producto en ese grupo (el nombre se busca en el grupo, que tiene las opciones).
+function modifierDefaultLabel(m: MenuItemAdmin["modifiers"][number]) {
+  const option = m.defaultOptionId ? groups.value.find((g) => g.id === m.group.id)?.options.find((o) => o.id === m.defaultOptionId) : null;
+  if (option) return option.name;
+  return m.group.minSelect > 0 ? "sin elegir" : "ninguna";
+}
+
+function modifierTitle(m: MenuItemAdmin["modifiers"][number]) {
+  return `${m.group.name} (${m.group.minSelect > 0 ? "obligatoria" : "opcional"}) · normalmente: ${modifierDefaultLabel(m)}`;
+}
+
+// Grupos obligatorios sin opcion normal (se borro la que tenia): al pedirlo hay que elegirla cada vez.
+function missingDefaults(item: MenuItemAdmin) {
+  return item.modifiers.filter((m) => m.group.minSelect > 0 && !m.defaultOptionId).map((m) => m.group.name);
+}
+
+function productsWithoutDefault(group: ModifierGroupAdmin) {
+  if (!group.minSelect) return [];
+  return categories.value
+    .flatMap((c) => c.items)
+    .filter((i) => i.modifiers.some((m) => m.group.id === group.id && !m.defaultOptionId))
+    .map((i) => i.name);
 }
 
 function productsUsing(groupId: string) {
@@ -722,7 +772,25 @@ function formatPrice(priceCents: number) {
 .category-form { margin: 12px 0; display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
 
 .groups-admin { margin-top: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
-.group-form { margin: 12px 0; display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
+.group-dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  border: 1px solid var(--field-border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+.group-dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+.group-form { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px 20px; }
+.dialog-head { display: flex; align-items: center; justify-content: space-between; }
+.dialog-head h2 { margin: 0; }
+.close { width: 40px; height: 40px; border: none; background: transparent; color: var(--text-muted); font-size: 26px; line-height: 1; cursor: pointer; }
+/* Movil: el suplemento y "Hay"/"Quitar" bajan a una segunda fila */
+@media (max-width: 480px) {
+  .option-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .option-row > input[type="text"] { grid-column: 1 / -1; }
+}
 .option-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px auto auto; gap: 8px; align-items: center; }
 .option-row input[type="text"], .option-row input[type="number"] { min-width: 0; }
 .option-out { text-decoration: line-through; }
@@ -735,6 +803,8 @@ function formatPrice(priceCents: number) {
 .item-row.unavailable { opacity: 0.55; }
 .item-row.editing { border-color: var(--accent); opacity: 1; }
 .item-info { flex: 1; min-width: 0; }
+.item-modifiers { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
+.modifier-chip { padding: 2px 8px; border: 1px solid var(--field-border); border-radius: 999px; font-size: 12.5px; }
 .item-actions { display: flex; gap: 8px; flex-shrink: 0; }
 /* Columna estrecha (movil): los botones de cada producto bajan a su propia fila, a mitades */
 .menu-admin .wide-main { container-type: inline-size; }

@@ -208,7 +208,7 @@
         <button v-if="!(showNote || note)" type="button" class="link-button" @click="openNote">+ Nota</button>
       </div>
 
-      <p v-if="missingChoice" class="muted" style="color: var(--danger)">Elige la opción marcada en rojo: la de siempre está agotada.</p>
+      <p v-if="missingChoice" class="muted" style="color: var(--danger)">Elige la opción marcada en rojo: la de siempre está agotada o el producto no tiene una.</p>
       <p v-if="submitError" class="muted" style="color: var(--danger)">{{ submitError }}</p>
       <!-- Pagar (guardar y cobrar en el acto, sin pasar por la cola): en la cabecera de la seccion, a
            la derecha del titulo. Primero "Pagar"; al pulsarlo, en su lugar, las formas de pago.
@@ -411,7 +411,7 @@ function removeOne(menuItemId: string) {
   if (line) setQuantity(line.key, line.quantity - 1);
 }
 
-// Lineas con una personalizacion obligatoria sin elegir (su opcion por defecto esta agotada).
+// Lineas con una personalizacion obligatoria sin elegir (su opcion por defecto esta agotada o no la hay).
 const missingChoice = computed(() =>
   lines.value.some((l) => missingModifiers(itemsById.value.get(l.menuItemId)?.modifiers, l.options).length)
 );
