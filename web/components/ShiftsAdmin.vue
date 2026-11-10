@@ -746,19 +746,18 @@ const band = (start: string, end: string) => ({
 });
 
 // ---------- Hora actual (linea "ahora") ----------
-// Solo en el cliente, para que el SSR no pinte una hora distinta; se refresca cada 30 s.
+// Solo en el cliente, para que el SSR no pinte una hora distinta. Se actualiza cada minuto,
+// justo al cambiar el minuto del reloj (no a los 60 s de abrir la pagina).
 const nowMin = ref<number | null>(null);
 const nowLabel = computed(() => (nowMin.value === null ? "" : fromMin(nowMin.value).replace(/^0(\d)/, "$1")));
-let nowTimer: ReturnType<typeof setInterval> | undefined;
+let nowTimer: ReturnType<typeof setTimeout> | undefined;
 function tickNow() {
   const v = toStoreInput(new Date());
   nowMin.value = v.slice(0, 10) === today ? toMin(v.slice(11, 16)) : null;
+  nowTimer = setTimeout(tickNow, 60_000 - (Date.now() % 60_000) + 50);
 }
-onMounted(() => {
-  tickNow();
-  nowTimer = setInterval(tickNow, 30_000);
-});
-onBeforeUnmount(() => clearInterval(nowTimer));
+onMounted(tickNow);
+onBeforeUnmount(() => clearTimeout(nowTimer));
 const nowInside = (from: string, to: string) => nowMin.value !== null && nowMin.value >= toMin(from) && nowMin.value <= toMin(to);
 const showNowLine = computed(
   () => selectedDate.value === today && nowMin.value !== null && nowMin.value >= ganttRange.value.from && nowMin.value <= ganttRange.value.to
