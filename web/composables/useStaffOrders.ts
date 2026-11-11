@@ -255,34 +255,33 @@ const ASSIGN_CUSTOMER = gql`
   }
 `;
 
-// Columnas de la cola. POR_COBRAR no es un estado: son los de mesa o barra ya servidos y sin cobrar.
-const QUEUE_COLUMNS = ["NUEVO", "EN_PREPARACION", "LISTO", "POR_COBRAR"] as const;
+// La cola tiene tres pasos: nuevo -> servido -> cobrado (y entonces sale de la cola).
+// "Servido" es ENTREGADO: de mesa o barra queda en la columna de servidos hasta cobrarlo; los
+// demas se cobran al servirlos y salen directamente.
+// "En preparación" (EN_PREPARACION) y "listo" (LISTO) estan desactivados y no se muestran, pero
+// no se eliminan: un pedido antiguo en esos estados aparece con los nuevos y se sirve igual.
+// Para volver a activarlos: ponerlos en QUEUE_COLUMNS, NEXT_STATUS y PREV_STATUS.
+const QUEUE_COLUMNS = ["NUEVO", "POR_COBRAR"] as const;
+const ACTIVE_STATUSES = ["NUEVO", "EN_PREPARACION", "LISTO"];
 const STATUS_LABELS: Record<string, string> = {
   NUEVO: "Nuevos",
   EN_PREPARACION: "En preparación",
-  LISTO: "Servidos",
-  POR_COBRAR: "Por cobrar",
-  ENTREGADO: "Entregado",
+  LISTO: "Listos",
+  POR_COBRAR: "Servidos",
+  ENTREGADO: "Servido",
   CANCELADO: "Cancelado",
 };
 const NEXT_STATUS: Record<string, string> = {
-  NUEVO: "EN_PREPARACION",
-  EN_PREPARACION: "LISTO",
+  NUEVO: "ENTREGADO",
+  EN_PREPARACION: "ENTREGADO",
   LISTO: "ENTREGADO",
 };
-// Un paso atras, solo antes de entregar (la API rechaza volver desde ENTREGADO).
+// Un paso atras, solo antes de servir (la API rechaza volver desde ENTREGADO).
 const PREV_STATUS: Record<string, string> = {
   EN_PREPARACION: "NUEVO",
-  LISTO: "EN_PREPARACION",
 };
 const PREV_LABEL: Record<string, string> = {
   EN_PREPARACION: "Volver a nuevos",
-  LISTO: "Volver a preparación",
-};
-const NEXT_LABEL: Record<string, string> = {
-  NUEVO: "Empezar a preparar",
-  EN_PREPARACION: "Marcar servido",
-  LISTO: "Marcar entregado",
 };
 
 /**
@@ -358,7 +357,7 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     QUEUE_COLUMNS.map((status) => ({
       status,
       orders: orders.value.filter((o) =>
-        status === "POR_COBRAR" ? o.status === "ENTREGADO" && o.awaitingPayment : o.status === status
+        status === "POR_COBRAR" ? o.status === "ENTREGADO" && o.awaitingPayment : ACTIVE_STATUSES.includes(o.status)
       ),
     }))
   );
@@ -402,9 +401,8 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     return NEXT_STATUS[status];
   }
   function nextStatusLabel(order: any) {
-    // Los que no son de mesa ni barra se cobran al entregarlos: al marcarlos se cierran del todo.
-    if (order.status === "LISTO" && order.serviceType !== "MESA") return "Marcar entregado y pagado";
-    return NEXT_LABEL[order.status];
+    // Los que no son de mesa ni barra se cobran al servirlos: al marcarlos se cierran del todo.
+    return paysOnDelivery(order) ? "Servir y cobrar" : "Marcar servido";
   }
   // Pedido con un cambio de estado en curso: sus botones se desactivan para evitar el doble clic.
   const busyOrderId = ref("");
@@ -435,9 +433,9 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     if (!status) return false;
     return changeStatus(order, status);
   }
-  /** Para llevar o web, ya listo: se cobra al entregarlo, asi que antes se elige el metodo de pago. */
+  /** Para llevar o web: se cobra al servirlo, asi que antes se elige el metodo de pago. */
   function paysOnDelivery(order: any) {
-    return order.status === "LISTO" && order.serviceType !== "MESA";
+    return ACTIVE_STATUSES.includes(order.status) && order.serviceType !== "MESA";
   }
   async function deliverAndPay(order: any, method: PaymentMethod, cashReceivedCents: number | null = null) {
     return changeStatus(order, "ENTREGADO", method, cashReceivedCents);

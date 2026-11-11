@@ -182,7 +182,7 @@
             <div v-if="pendingCancelId === order.id" class="cancel-confirm" role="alert">
               <p>
                 <strong>¿Cancelar el pedido <span class="nowrap">{{ order.code }}</span>?</strong>
-                {{ order.awaitingPayment ? "Ya está servido y sin cobrar: quedará como no pagado." : "" }}
+                {{ order.status === "ENTREGADO" && order.awaitingPayment ? "Ya está servido y sin cobrar: quedará como no pagado." : "" }}
                 No se puede deshacer.
               </p>
               <div class="order-actions">
@@ -197,7 +197,7 @@
             </div>
             <!-- Cobro (mesa y barra): un toque en el metodo de pago -->
             <div v-else-if="payingId === order.id" class="pay-box">
-              <span class="muted">{{ order.awaitingPayment ? "Cobrar" : "Entregar y cobrar" }} {{ formatPrice(order.totalCents) }} con:</span>
+              <span class="muted">{{ order.awaitingPayment ? "Cobrar" : "Servir y cobrar" }} {{ formatPrice(order.totalCents) }} con:</span>
               <div class="pay-methods">
                 <button
                   v-for="method in PAYMENT_OPTIONS"
@@ -236,8 +236,7 @@
                 :disabled="busyOrderId === order.id"
                 @click="paysOnDelivery(order) ? (payingId = order.id) : advance(order)"
               >
-                <!-- Check en los pasos que terminan algo: listo, y entregado (y pagado) -->
-                <Check v-if="order.status === 'EN_PREPARACION' || order.status === 'LISTO'" :size="16" :stroke-width="2" aria-hidden="true" />
+                <Check :size="16" :stroke-width="2" aria-hidden="true" />
                 {{ nextStatusLabel(order) }}
               </button>
               <button v-if="ticketPrintingEnabled" class="button secondary" type="button" @click="printOrderTicket(order)">
@@ -496,12 +495,13 @@ const {
 
 const { lowCount, lastAlert: stockAlert } = useInventoryAlerts(isLoggedIn);
 
-// Encabezado de cada columna en lenguaje natural: "1 nuevo", "3 servidos", "2 en preparación".
+// Encabezado de cada columna en lenguaje natural: "1 nuevo", "3 servidos (sin cobrar)".
+// EN_PREPARACION y LISTO no tienen columna (desactivados, ver useStaffOrders.ts).
 const QUEUE_HEADINGS: Record<string, [singular: string, plural: string]> = {
   NUEVO: ["nuevo", "nuevos"],
   EN_PREPARACION: ["en preparación", "en preparación"],
-  LISTO: ["servido", "servidos"],
-  POR_COBRAR: ["por cobrar", "por cobrar"],
+  LISTO: ["listo", "listos"],
+  POR_COBRAR: ["servido sin cobrar", "servidos sin cobrar"],
 };
 function queueHeading(status: string, count: number) {
   const words = QUEUE_HEADINGS[status];
@@ -745,7 +745,7 @@ watchEffect(() => {
 .stock-alert-actions { display: flex; gap: 8px; }
 
 .queue-board { display: flex; flex-direction: column; gap: 28px; }
-/* 4 columnas no caben en los 720 px del panel: en escritorio el tablero usa mas ancho que la pagina */
+/* En escritorio el tablero usa mas ancho que la pagina (720 px) */
 @media (min-width: 900px) {
   .queue-board, .staff-hero--queue {
     width: min(1160px, calc(100vw - 40px));
@@ -759,7 +759,7 @@ watchEffect(() => {
 }
 @media (min-width: 900px) {
   /* En columnas: linea suave entre ellas, a toda la altura del tablero (stretch). */
-  .queue-board { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; align-items: stretch; }
+  .queue-board { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; align-items: stretch; }
   .queue-column { padding: 0 12px; }
   .queue-column:first-child { padding-left: 0; }
   .queue-column:last-child { padding-right: 0; }

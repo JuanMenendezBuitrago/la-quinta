@@ -10,11 +10,14 @@ export type OrderStatus = "NUEVO" | "EN_PREPARACION" | "LISTO" | "ENTREGADO" | "
  */
 // Se puede volver un paso atras mientras el pedido no se ha entregado (p. ej. se marco listo por
 // error). Desde ENTREGADO no: la entrega ya desconto el inventario y puede haber cerrado el pedido.
+// La cola del personal ya solo usa Nuevo -> Servido (ENTREGADO) -> cobrado: se entrega directamente
+// desde cualquier estado activo. EN_PREPARACION y LISTO se conservan (desactivados en la cola) por
+// los pedidos antiguos y por si se vuelven a usar.
 export const ALLOWED_FROM: Record<OrderStatus, OrderStatus[]> = {
   NUEVO: ["EN_PREPARACION"],
   EN_PREPARACION: ["NUEVO", "LISTO"],
   LISTO: ["EN_PREPARACION"],
-  ENTREGADO: ["LISTO"],
+  ENTREGADO: ["NUEVO", "EN_PREPARACION", "LISTO"],
   CANCELADO: ["NUEVO", "EN_PREPARACION", "LISTO"],
 };
 
