@@ -12,7 +12,7 @@
         <p v-if="printNotice" class="print-notice" role="alert">{{ printNotice }}</p>
       </div>
       <div class="sent-actions">
-        <button v-if="ticketPrintingEnabled && lastOrder" class="button" type="button" @click="printLastTicket">
+        <button v-if="ticketPrintingEnabled && lastOrder && lastPaidWith" class="button" type="button" @click="printLastTicket">
           <Printer :size="16" :stroke-width="1.8" aria-hidden="true" />
           Imprimir ticket
         </button>

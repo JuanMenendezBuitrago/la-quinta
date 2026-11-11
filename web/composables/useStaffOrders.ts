@@ -361,13 +361,26 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
 
   // --- Ultimos cobrados: los mas recientes del historial y, despues, los que se cierran en vivo ---
   const recentClosed = ref<any[]>([]);
-  const { onResult: onRecentResult } = useQuery(HISTORY_QUERY, { limit: 20 }, () => ({
+  const { onResult: onRecentResult, refetch: refetchRecent } = useQuery(HISTORY_QUERY, { limit: 20 }, () => ({
     enabled: enabled.value,
     fetchPolicy: "network-only",
   }));
   onRecentResult((r: any) => {
     if (r.data?.orderHistory) recentClosed.value = mergeRecent(r.data.orderHistory, recentClosed.value);
   });
+  // Lo que pasa mientras el websocket esta caido no llega por la suscripcion: al (re)conectar se
+  // recarga la cola. Pasa al elegir quien toma un pedido en la cuenta compartida (el token nuevo
+  // reinicia el websocket y el pedido se crea antes de que la suscripcion vuelva) y con cortes de wifi.
+  if (import.meta.client) {
+    const ws = (useNuxtApp() as any)._apolloWsClients?.default;
+    const off = ws?.on?.("connected", () => {
+      if (!enabled.value) return;
+      refetchQueue()?.catch(() => {});
+      refetchRecent()?.catch(() => {});
+    });
+    if (off) onScopeDispose(off);
+  }
+
   /** Nuevos primero; sin repetir (gana la version mas reciente) y sin cancelados. */
   function mergeRecent(incoming: any[], current: any[]) {
     const seen = new Set<string>();
