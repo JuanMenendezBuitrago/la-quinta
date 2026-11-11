@@ -261,13 +261,17 @@ const ASSIGN_CUSTOMER = gql`
 // "En preparación" (EN_PREPARACION) y "listo" (LISTO) estan desactivados y no se muestran, pero
 // no se eliminan: un pedido antiguo en esos estados aparece con los nuevos y se sirve igual.
 // Para volver a activarlos: ponerlos en QUEUE_COLUMNS, NEXT_STATUS y PREV_STATUS.
-const QUEUE_COLUMNS = ["NUEVO", "POR_COBRAR"] as const;
+// COBRADO no es un estado ni parte de la cola: los ultimos pedidos ya servidos y cobrados (cerrados),
+// para tenerlos a mano un rato (reimprimir el ticket, comprobar que se cobro).
+const QUEUE_COLUMNS = ["NUEVO", "POR_COBRAR", "COBRADO"] as const;
+const RECENT_LIMIT = 6;
 const ACTIVE_STATUSES = ["NUEVO", "EN_PREPARACION", "LISTO"];
 const STATUS_LABELS: Record<string, string> = {
   NUEVO: "Nuevos",
   EN_PREPARACION: "En preparación",
   LISTO: "Listos",
   POR_COBRAR: "Servidos",
+  COBRADO: "Últimos cobrados",
   ENTREGADO: "Servido",
   CANCELADO: "Cancelado",
 };
@@ -322,9 +326,11 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     if (!updated) return;
     const idx = orders.value.findIndex((o) => o.id === updated.id);
 
-    // Sale de la cola al cancelarse o al cerrarse (entregado y, si es de mesa, cobrado).
+    // Sale de la cola al cancelarse o al cerrarse (entregado y, si es de mesa, cobrado); lo cerrado
+    // pasa a la columna de ultimos cobrados.
     if (updated.status === "CANCELADO" || (updated.status === "ENTREGADO" && !updated.awaitingPayment)) {
       if (idx >= 0) orders.value = orders.value.filter((o) => o.id !== updated.id);
+      if (updated.status === "ENTREGADO") recentClosed.value = mergeRecent([updated], recentClosed.value);
       return;
     }
     if (idx >= 0) {
@@ -353,12 +359,33 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     }, 3000);
   });
 
+  // --- Ultimos cobrados: los mas recientes del historial y, despues, los que se cierran en vivo ---
+  const recentClosed = ref<any[]>([]);
+  const { onResult: onRecentResult } = useQuery(HISTORY_QUERY, { limit: 20 }, () => ({
+    enabled: enabled.value,
+    fetchPolicy: "network-only",
+  }));
+  onRecentResult((r: any) => {
+    if (r.data?.orderHistory) recentClosed.value = mergeRecent(r.data.orderHistory, recentClosed.value);
+  });
+  /** Nuevos primero; sin repetir (gana la version mas reciente) y sin cancelados. */
+  function mergeRecent(incoming: any[], current: any[]) {
+    const seen = new Set<string>();
+    return [...incoming, ...current]
+      .filter((o) => o.status === "ENTREGADO" && !o.awaitingPayment && !seen.has(o.id) && seen.add(o.id))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, RECENT_LIMIT);
+  }
+
   const groupedQueue = computed(() =>
     QUEUE_COLUMNS.map((status) => ({
       status,
-      orders: orders.value.filter((o) =>
-        status === "POR_COBRAR" ? o.status === "ENTREGADO" && o.awaitingPayment : ACTIVE_STATUSES.includes(o.status)
-      ),
+      orders:
+        status === "COBRADO"
+          ? recentClosed.value
+          : orders.value.filter((o) =>
+              status === "POR_COBRAR" ? o.status === "ENTREGADO" && o.awaitingPayment : ACTIVE_STATUSES.includes(o.status)
+            ),
     }))
   );
 

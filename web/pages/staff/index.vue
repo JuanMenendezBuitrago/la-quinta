@@ -90,10 +90,10 @@
             v-for="order in group.orders"
             :key="order.id"
             class="order-card"
-            :class="[`status-${order.status}`, { 'order-card--new': order._isNew }]"
+            :class="[`status-${order.status}`, { 'order-card--new': order._isNew, 'order-card--closed': group.status === 'COBRADO' }]"
           >
             <!-- Ya cobrado (mesa o barra que pagan antes de irse de la cola): se ve de un vistazo -->
-            <span v-if="order.paidAt" class="paid-corner" :title="`Cobrado · ${paymentDetail(order)}`">
+            <span v-if="order.paidAt && group.status !== 'COBRADO'" class="paid-corner" :title="`Cobrado · ${paymentDetail(order)}`">
               <DollarSign :size="16" :stroke-width="2.4" aria-hidden="true" />
               <span class="sr-only">Cobrado</span>
             </span>
@@ -133,7 +133,7 @@
               <!-- Sin cliente: el boton de asignar ocupa el sitio del avatar, encima del texto -->
               <span v-else class="order-customer order-customer--stacked">
                 <button
-                  v-if="assigningId !== order.id"
+                  v-if="assigningId !== order.id && group.status !== 'COBRADO'"
                   class="assign-icon"
                   type="button"
                   :aria-label="`Asignar cliente al pedido ${order.code}`"
@@ -165,7 +165,9 @@
                 </button>
               </div>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
-              <p v-if="order.paidAt" class="paid-badge">Cobrado · {{ paymentDetail(order) }}</p>
+              <p v-if="order.paidAt" class="paid-badge">
+                Cobrado · {{ paymentDetail(order) }}<template v-if="group.status === 'COBRADO'"> · {{ formatTime(order.paidAt) }}</template>
+              </p>
             </div>
 
             <div v-if="assigningId === order.id" class="assign-box">
@@ -244,6 +246,7 @@
                 Imprimir ticket
               </button>
               <button
+                v-if="group.status !== 'COBRADO'"
                 class="button secondary cancel"
                 type="button"
                 :disabled="busyOrderId === order.id"
@@ -504,6 +507,7 @@ const QUEUE_HEADINGS: Record<string, [singular: string, plural: string]> = {
   POR_COBRAR: ["servido sin cobrar", "servidos sin cobrar"],
 };
 function queueHeading(status: string, count: number) {
+  if (status === "COBRADO") return "Últimos cobrados";
   const words = QUEUE_HEADINGS[status];
   if (!words) return `${statusLabel(status)} (${count})`;
   return `${count} ${count === 1 ? words[0] : words[1]}`;
@@ -621,7 +625,10 @@ watch(pendingPhotosResult, (r) => {
 const badges = useStaffBadges();
 watchEffect(() => {
   badges.value = {
-    cola: groupedQueue.value.reduce((sum: number, g: { orders: unknown[] }) => sum + g.orders.length, 0),
+    // Solo lo pendiente: los ultimos cobrados ya estan cerrados.
+    cola: groupedQueue.value
+      .filter((g: { status: string }) => g.status !== "COBRADO")
+      .reduce((sum: number, g: { orders: unknown[] }) => sum + g.orders.length, 0),
     inventario: lowCount.value,
     fotos: pendingPhotos.value,
   };
@@ -759,7 +766,7 @@ watchEffect(() => {
 }
 @media (min-width: 900px) {
   /* En columnas: linea suave entre ellas, a toda la altura del tablero (stretch). */
-  .queue-board { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; align-items: stretch; }
+  .queue-board { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; align-items: stretch; }
   .queue-column { padding: 0 12px; }
   .queue-column:first-child { padding-left: 0; }
   .queue-column:last-child { padding-right: 0; }
@@ -782,6 +789,8 @@ watchEffect(() => {
 .order-card.status-EN_PREPARACION { border-left-color: var(--color5); }
 .order-card.status-LISTO { border-left-color: var(--accent-strong); }
 .order-card.status-ENTREGADO { border-left-color: var(--danger); }
+/* Ultimos cobrados: ya cerrados, en segundo plano respecto a lo pendiente */
+.order-card--closed { border-left-color: var(--border-strong) !important; opacity: 0.8; }
 /* "$" en la esquina superior derecha de un pedido de la cola ya cobrado */
 .paid-corner {
   position: absolute;
