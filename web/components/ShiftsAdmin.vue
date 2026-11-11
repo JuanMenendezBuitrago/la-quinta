@@ -222,7 +222,7 @@
               >
                 <button
                   class="g-bar"
-                  :class="{ outside: isOutside(shift, selectedDay.hours) }"
+                  :class="outsideClass(shift, selectedDay.hours)"
                   type="button"
                   :disabled="!canEdit"
                   :title="chipTitle(shift, selectedDay.hours)"
@@ -687,6 +687,12 @@ const myWeek = computed(() => {
 
 function isOutside(s: Shift, hours: OpeningHours | null) {
   return !hours || s.start < hours.open || s.end > hours.close;
+}
+/** En la barra del día, de qué lado se sale del horario: el degradado va hacia ese lado. */
+function outsideClass(s: Shift, hours: OpeningHours | null) {
+  if (!isOutside(s, hours)) return {};
+  if (!hours) return { outside: true };
+  return { outside: true, early: s.start < hours.open, late: s.end > hours.close };
 }
 function chipTitle(s: Shift, hours: OpeningHours | null) {
   const base = `${s.staffName}: ${t(s.start)}–${t(s.end)} (${formatHours(duration(s))})${s.note ? ` · ${s.note}` : ""}`;
@@ -1283,6 +1289,9 @@ async function remove() {
 }
 .g-bar:disabled { cursor: default; opacity: 1; }
 .g-bar.outside { background: linear-gradient(90deg, var(--accent), var(--color5)); }
+/* Empieza antes de abrir: amarillo -> azul; acaba despues de cerrar: azul -> amarillo; ambos: los dos lados. */
+.g-bar.outside.early { background: linear-gradient(90deg, var(--color5), var(--accent)); }
+.g-bar.outside.early.late { background: linear-gradient(90deg, var(--color5), var(--accent), var(--color5)); }
 .g-note { font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
 .g-coverage .g-track { height: 12px; background: none; }
 /* Hora actual: linea vertical que cruza todas las filas del dia de hoy, con la hora en la escala */
