@@ -8,9 +8,6 @@
     </template>
 
     <template v-else>
-      <!-- Cuenta compartida: antes de nada, quien la esta usando, en un modal sobre el panel (luego
-           se cambia desde la cabecera) -->
-      <StaffActingPicker v-if="staff.shared && !staff.actingAs" />
       <!-- En las secciones que usan mas ancho que la pagina (cola, caja), el titulo se alinea con ellas -->
       <header
         class="account-hero staff-hero"
@@ -436,7 +433,6 @@ import { useTicketPrinter } from "~/composables/useTicketPrinter";
 import MenuAdmin from "~/components/MenuAdmin.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
 import StaffLogin from "~/components/StaffLogin.vue";
-import StaffActingPicker from "~/components/StaffActingPicker.vue";
 import CashClosingAdmin from "~/components/CashClosingAdmin.vue";
 import ReviewsAdmin from "~/components/ReviewsAdmin.vue";
 import PhotosModeration from "~/components/PhotosModeration.vue";

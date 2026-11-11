@@ -227,7 +227,7 @@
                   class="button"
                   type="button"
                   :disabled="!canSubmit"
-                  @click="method === 'EFECTIVO' ? cashDialog?.open() : submit(method)"
+                  @click="askWho(() => (method === 'EFECTIVO' ? cashDialog?.open() : submit(method)))"
                 >
                   {{ submitting ? "Guardando…" : PAYMENT_LABELS[method] }}
                 </button>
@@ -242,9 +242,10 @@
         </Teleport>
       </ClientOnly>
       <CashChangeDialog ref="cashDialog" :total-cents="finalCents" :busy="submitting" @confirm="payCash" />
+      <StaffActingPicker v-if="pendingAction" @chosen="onWhoChosen" @cancel="pendingAction = null" />
       <div v-if="queueEnabled || lines.length" class="ticket-actions">
         <!-- Sin cola nadie lo prepararia: solo se registran pedidos ya servidos y cobrados -->
-        <button v-if="queueEnabled" class="button secondary" type="button" :disabled="!canSubmit" @click="submit()">
+        <button v-if="queueEnabled" class="button secondary" type="button" :disabled="!canSubmit" @click="askWho(() => submit())">
           {{ submitting ? "Haciendo pedido…" : "Hacer pedido" }}
         </button>
         <button v-if="lines.length" class="button secondary" type="button" :disabled="submitting" @click="reset">Vaciar</button>
@@ -268,6 +269,7 @@ import { gql } from "graphql-tag";
 import { orderLinesInput, useCart } from "~/composables/useCart";
 import { MENU_QUERY, defaultCartOptions, missingModifiers, type MenuCategory, type MenuItem } from "~/composables/useMenu";
 import CashChangeDialog from "~/components/CashChangeDialog.vue";
+import StaffActingPicker from "~/components/StaffActingPicker.vue";
 import DiscountDialog from "~/components/DiscountDialog.vue";
 import { useStaffAuth } from "~/composables/useAuth";
 import LineOptionsPicker from "~/components/LineOptionsPicker.vue";
@@ -510,6 +512,19 @@ function reset() {
   redeemLineKey.value = null;
   search.value = "";
   choosingPayment.value = false;
+}
+
+// Cuenta compartida: antes de guardar cada pedido se pregunta quien lo toma, para que quede a su
+// nombre aunque la tablet la vayan usando varias personas. Con cuenta propia, directamente.
+const pendingAction = ref<(() => void) | null>(null);
+function askWho(action: () => void) {
+  if (staff.value?.shared) pendingAction.value = action;
+  else action();
+}
+function onWhoChosen() {
+  const action = pendingAction.value;
+  pendingAction.value = null;
+  action?.();
 }
 
 // Efectivo: antes, el modal calcula el cambio; al confirmar se guarda y se cierra (si falla, el error sale en el ticket).

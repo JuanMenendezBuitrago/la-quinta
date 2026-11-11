@@ -199,7 +199,7 @@ export function useAuth() {
   return { customer, requestCode, verifyCode, logout };
 }
 
-/** Quien puede usar una cuenta compartida (selector de la cabecera y pantalla "¿Quién eres?"). */
+/** Quien puede usar una cuenta compartida (selector de la cabecera y "¿Quién toma el pedido?"). */
 export const ACTING_STAFF_OPTIONS = gql`
   query ActingStaffOptions {
     actingStaffOptions {
