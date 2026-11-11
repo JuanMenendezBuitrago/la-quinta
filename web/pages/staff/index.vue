@@ -294,12 +294,11 @@
               <strong v-else class="muted">Cliente anónimo</strong>
             </span>
             <OrderItems :items="order.items" list />
+            <!-- 1. Mesa y fecha; 2. quien lo tomo y quien lo cobro; 3. lo cobrado y el cambio -->
             <p class="muted">
-              {{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}{{
-                order.paidAt ? ` · Cobrado con ${paymentDetail(order)}` : ""
-              }}
+              {{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}
             </p>
-            <!-- Quien lo tomo y quien lo cobro (los pedidos web no tienen quien los tome) -->
+            <!-- Los pedidos web no tienen quien los tome -->
             <p v-if="takenBy(order) || order.paidByName" class="history-people">
               <span v-if="takenBy(order)" class="history-person">
                 <span class="muted">Tomado por</span>
@@ -311,6 +310,9 @@
                 <UserAvatar :avatar="order.paidByAvatar" :name="order.paidByName" :size="22" />
                 <strong>{{ order.paidByName }}</strong>
               </span>
+            </p>
+            <p v-if="order.paidAt" class="muted">
+              Cobrado {{ formatPrice(order.totalCents) }} con {{ paymentDetail(order) }}
             </p>
             <p v-if="order.redemption" class="muted discount-note">
               Canje de sellos · {{ order.redemption.name }}: − {{ formatPrice(order.redemption.amountCents) }}{{
