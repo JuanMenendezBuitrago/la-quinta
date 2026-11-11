@@ -169,7 +169,10 @@
               </div>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
               <!-- En "Últimos cobrados" sobra: todos lo estan -->
-              <p v-if="order.paidAt && group.status !== 'COBRADO'" class="paid-badge">Cobrado · {{ paymentDetail(order) }}</p>
+              <p v-if="order.paidAt && group.status !== 'COBRADO'" class="paid-note">
+                <Check :size="14" :stroke-width="2.2" aria-hidden="true" />
+                <span>Cobrado · {{ paymentDetail(order) }}</span>
+              </p>
             </div>
 
             <div v-if="assigningId === order.id" class="assign-box">
@@ -808,16 +811,17 @@ watchEffect(() => {
   color: var(--bg);
   box-shadow: 0 0 0 2px var(--bg);
 }
-.paid-badge {
-  display: inline-block;
-  margin: 6px 0 0;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--accent-strong);
-  color: var(--bg);
-  font-size: 12px;
-  font-weight: 700;
+/* Datos del cobro: una nota discreta (el "$" de la esquina ya avisa de que esta cobrado) */
+.paid-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.35;
 }
+.paid-note svg { flex: none; margin-top: 2px; color: var(--accent); }
 .pay-box { display: flex; flex-direction: column; gap: 8px; }
 .pay-methods { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .pay-methods .button { min-height: 44px; }
