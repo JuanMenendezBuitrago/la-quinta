@@ -33,6 +33,18 @@ async function activeCustomerExists(customerId: string) {
   return !!(await User.exists({ _id: customerId, deletedAt: { $exists: false } }));
 }
 
+/** Quien cobro el pedido; una sola consulta aunque se pidan nombre y avatar. */
+const paidByCache = new WeakMap<object, Promise<{ name?: string; avatar?: string | null } | null>>();
+function paidBy(doc: any) {
+  if (!doc.paidByStaffId) return null;
+  let found = paidByCache.get(doc);
+  if (!found) {
+    found = StaffUser.findById(doc.paidByStaffId).select("name avatar").lean().then((s: any) => s ?? null);
+    paidByCache.set(doc, found);
+  }
+  return found;
+}
+
 async function staffNameOf(staffId: unknown) {
   if (!staffId) return null;
   const who = await StaffUser.findById(staffId).select("name").lean();
@@ -123,6 +135,8 @@ export const ordersResolvers = {
     discount: (doc: any) => doc.discount ?? null,
     paidAt: (doc: any) => iso(doc.paidAt),
     paymentMethod: (doc: any) => doc.paymentMethod ?? null,
+    paidByName: async (doc: any) => (await paidBy(doc))?.name ?? null,
+    paidByAvatar: async (doc: any) => (await paidBy(doc))?.avatar ?? null,
     cashReceivedCents: (doc: any) => doc.cashReceivedCents ?? null,
     changeCents: (doc: any) => (doc.cashReceivedCents != null ? doc.cashReceivedCents - doc.totalCents : null),
     awaitingPayment: (doc: any) =>

@@ -174,7 +174,7 @@
               <!-- En "Últimos cobrados" sobra: todos lo estan -->
               <p v-if="order.paidAt && group.status !== 'COBRADO'" class="paid-note">
                 <Check :size="14" :stroke-width="2.2" aria-hidden="true" />
-                <span>Cobrado · {{ paymentDetail(order) }}</span>
+                <span>Cobrado · {{ paymentDetail(order) }}{{ order.paidByName ? ` · ${order.paidByName}` : "" }}</span>
               </p>
             </div>
 
@@ -215,7 +215,7 @@
                   class="button"
                   type="button"
                   :disabled="busyOrderId === order.id"
-                  @click="method === 'EFECTIVO' ? openCash(order) : doPay(order, method)"
+                  @click="askWhoPays(() => (method === 'EFECTIVO' ? openCash(order) : doPay(order, method)))"
                 >
                   {{ PAYMENT_LABELS[method] }}
                 </button>
@@ -296,7 +296,7 @@
             <OrderItems :items="order.items" list />
             <p class="muted">
               {{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}{{
-                order.paidAt ? ` · Cobrado con ${paymentDetail(order)}` : ""
+                order.paidAt ? ` · Cobrado${order.paidByName ? ` por ${order.paidByName}` : ""} con ${paymentDetail(order)}` : ""
               }}
             </p>
             <p v-if="order.redemption" class="muted discount-note">
@@ -390,6 +390,13 @@
         <SiteSettingsAdmin />
       </section>
     </template>
+    <StaffActingPicker
+      v-if="pendingPayAction"
+      title="¿Quién cobra?"
+      back-label="Volver"
+      @chosen="onPayerChosen"
+      @cancel="pendingPayAction = null"
+    />
     <CashChangeDialog
       ref="cashDialog"
       :total-cents="cashOrder?.totalCents ?? 0"
@@ -443,6 +450,7 @@ import SiteSettingsAdmin from "~/components/SiteSettingsAdmin.vue";
 import CustomersAdmin from "~/components/CustomersAdmin.vue";
 import StaffOrderTaker from "~/components/StaffOrderTaker.vue";
 import CashChangeDialog from "~/components/CashChangeDialog.vue";
+import StaffActingPicker from "~/components/StaffActingPicker.vue";
 import DiscountDialog from "~/components/DiscountDialog.vue";
 import HeroAdmin from "~/components/HeroAdmin.vue";
 import CustomerLookup from "~/components/CustomerLookup.vue";
@@ -545,6 +553,18 @@ watch(stockAlert, (alert) => {
 
 const pendingCancelId = ref("");
 const payingId = ref("");
+// Cuenta compartida: antes de cobrar, quien cobra (queda como la persona elegida, como al tomar
+// un pedido). Si vuelven sin elegir, no se cobra.
+const pendingPayAction = ref<(() => void) | null>(null);
+function askWhoPays(action: () => void) {
+  if (staff.value?.shared) pendingPayAction.value = action;
+  else action();
+}
+function onPayerChosen() {
+  const action = pendingPayAction.value;
+  pendingPayAction.value = null;
+  action?.();
+}
 async function doPay(order: any, method: PaymentMethod, cashReceivedCents: number | null = null) {
   // Mesa: se cobra aparte. Para llevar o web: se entrega y se cobra a la vez (cuenta en el cierre de caja).
   const done = order.awaitingPayment

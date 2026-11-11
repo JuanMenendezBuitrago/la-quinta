@@ -1,9 +1,9 @@
 <template>
-  <!-- Cuenta compartida: al guardar cada pedido (tomar pedido), quien lo toma. Al entrar no se
-       pregunta: solo aqui. Sin contraseña: solo decide a nombre de quien queda (los permisos siguen
+  <!-- Cuenta compartida: al guardar cada pedido (tomar pedido), quien lo toma, y al cobrar en la
+       cola, quien cobra. Al entrar no se pregunta: solo aqui. Sin contraseña: solo decide a nombre de quien queda (los permisos siguen
        siendo los de la cuenta). Se puede volver al ticket sin elegir, y entonces no se guarda. -->
   <dialog ref="dialog" class="acting-picker" aria-labelledby="acting-picker-title" tabindex="-1" @cancel.prevent="emit('cancel')">
-    <h2 id="acting-picker-title">¿Quién toma el pedido?</h2>
+    <h2 id="acting-picker-title">{{ title }}</h2>
     <p class="muted">Entraste con <strong>{{ staff?.name }}</strong>.</p>
     <p v-if="loading && !options.length" class="muted">Cargando…</p>
     <ul class="accounts">
@@ -21,7 +21,7 @@
       </li>
     </ul>
     <p v-if="error" class="muted error" role="alert">{{ error }}</p>
-    <button type="button" class="link-button" :disabled="busy" @click="emit('cancel')">Volver al ticket</button>
+    <button type="button" class="link-button" :disabled="busy" @click="emit('cancel')">{{ backLabel }}</button>
   </dialog>
 </template>
 
@@ -29,6 +29,10 @@
 import { ACTING_STAFF_OPTIONS, useStaffAuth, type StaffPerson } from "~/composables/useAuth";
 import UserAvatar from "~/components/UserAvatar.vue";
 
+withDefaults(defineProps<{ title?: string; backLabel?: string }>(), {
+  title: "¿Quién toma el pedido?",
+  backLabel: "Volver al ticket",
+});
 const emit = defineEmits<{ chosen: []; cancel: [] }>();
 
 const { staff, setActingStaff } = useStaffAuth();
@@ -42,7 +46,7 @@ const busy = ref(false);
 const error = ref("");
 const dialog = ref<HTMLDialogElement | null>(null);
 
-// Quien lo usa lo monta solo mientras pregunta (ver StaffOrderTaker.vue).
+// Quien lo usa lo monta solo mientras pregunta (ver StaffOrderTaker.vue y la cola en staff/index.vue).
 // El foco al propio modal: al abrirse las cuentas aun no han cargado y se lo llevaria "Volver".
 onMounted(() => {
   dialog.value?.showModal();

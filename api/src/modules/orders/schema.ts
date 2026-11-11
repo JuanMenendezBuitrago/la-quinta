@@ -133,6 +133,9 @@ export const ordersTypeDefs = /* GraphQL */ `
     """Solo pedidos de mesa y barra, que se cobran aparte (antes o despues de entregar)."""
     paidAt: String
     paymentMethod: PaymentMethod
+    """Quien lo cobro (en una cuenta compartida, la persona elegida al cobrar)."""
+    paidByName: String
+    paidByAvatar: String
     """Solo en efectivo, si se anoto al cobrar: lo que entrego el cliente."""
     cashReceivedCents: Int
     """El cambio que se devolvio (cashReceivedCents - totalCents); null si no se anoto lo recibido."""

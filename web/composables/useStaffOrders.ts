@@ -153,6 +153,8 @@ export const ORDER_FIELDS = `
   updatedAt
   paidAt
   paymentMethod
+  paidByName
+  paidByAvatar
   cashReceivedCents
   changeCents
   awaitingPayment
