@@ -296,8 +296,21 @@
             <OrderItems :items="order.items" list />
             <p class="muted">
               {{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}{{
-                order.paidAt ? ` · Cobrado${order.paidByName ? ` por ${order.paidByName}` : ""} con ${paymentDetail(order)}` : ""
+                order.paidAt ? ` · Cobrado con ${paymentDetail(order)}` : ""
               }}
+            </p>
+            <!-- Quien lo tomo y quien lo cobro (los pedidos web no tienen quien los tome) -->
+            <p v-if="takenBy(order) || order.paidByName" class="history-people">
+              <span v-if="takenBy(order)" class="history-person">
+                <span class="muted">Tomado por</span>
+                <UserAvatar :avatar="takenBy(order)!.staffAvatar" :name="takenBy(order)!.staffName" :size="22" />
+                <strong>{{ takenBy(order)!.staffName }}</strong>
+              </span>
+              <span v-if="order.paidByName" class="history-person">
+                <span class="muted">Cobrado por</span>
+                <UserAvatar :avatar="order.paidByAvatar" :name="order.paidByName" :size="22" />
+                <strong>{{ order.paidByName }}</strong>
+              </span>
             </p>
             <p v-if="order.redemption" class="muted discount-note">
               Canje de sellos · {{ order.redemption.name }}: − {{ formatPrice(order.redemption.amountCents) }}{{
@@ -319,12 +332,7 @@
               Imprimir ticket
             </button>
           </div>
-          <!-- Quien lo tomo, junto al estado (los pedidos web no tienen a nadie) -->
           <span class="history-status">
-            <span v-if="takenBy(order)" class="handled-by" :title="`Tomado por ${takenBy(order)!.staffName}`">
-              <UserAvatar :avatar="takenBy(order)!.staffAvatar" :name="takenBy(order)!.staffName" :size="22" />
-              <span class="sr-only">Tomado por {{ takenBy(order)!.staffName }}</span>
-            </span>
             <span class="status-badge" :class="`status-${order.status}`">{{ statusLabel(order.status) }}</span>
           </span>
         </div>
@@ -932,6 +940,8 @@ watchEffect(() => {
 .history-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .history-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
 .history-status { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.history-people { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 2px 0; font-size: 13.5px; }
+.history-person { display: inline-flex; align-items: center; gap: 6px; }
 
 .status-badge {
   flex-shrink: 0;

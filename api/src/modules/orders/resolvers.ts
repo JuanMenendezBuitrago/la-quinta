@@ -86,8 +86,12 @@ export const ordersResolvers = {
         if (!Types.ObjectId.isValid(value)) throw new Error("Identificador no valido");
         return new Types.ObjectId(value);
       };
-      // Quien lo tomo o le cambio el estado en algun momento (el alta del personal tambien queda ahi).
-      if (args.staffId) filter["statusHistory.staffId"] = id(args.staffId);
+      // Quien lo tomo, le cambio el estado en algun momento (el alta del personal tambien queda ahi)
+      // o lo cobro (al cobrar una mesa no cambia el estado). Ya hay un $or: van juntos en un $and.
+      if (args.staffId) {
+        const staffId = id(args.staffId);
+        filter.$and = [{ $or: [{ "statusHistory.staffId": staffId }, { paidByStaffId: staffId }] }];
+      }
       if (args.customerId) filter.customerId = id(args.customerId);
       const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
       return Order.find(filter).sort({ updatedAt: -1 }).limit(limit).exec();
