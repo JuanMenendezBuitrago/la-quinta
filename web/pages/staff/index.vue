@@ -119,6 +119,17 @@
                     <UserAvatar :avatar="handledBy(order)!.staffAvatar" :name="handledBy(order)!.staffName" :size="22" />
                     <span class="sr-only">Gestionado por {{ handledBy(order)!.staffName }}</span>
                   </span>
+                  <!-- Últimos cobrados: solo reimprimir, con un icono en la cabecera para que la tarjeta sea pequeña -->
+                  <button
+                    v-if="group.status === 'COBRADO' && ticketPrintingEnabled"
+                    class="reprint"
+                    type="button"
+                    :aria-label="`Imprimir ticket del pedido ${order.code}`"
+                    title="Imprimir ticket"
+                    @click="printOrderTicket(order)"
+                  >
+                    <Printer :size="16" :stroke-width="1.8" aria-hidden="true" />
+                  </button>
                 </span>
               </div>
               <!-- En "Últimos cobrados" (ya cerrados) no hace falta el cliente -->
@@ -220,7 +231,7 @@
                 <button class="button secondary" type="button" @click="payingId = ''">Volver</button>
               </div>
             </div>
-            <div v-else class="order-actions">
+            <div v-else-if="group.status !== 'COBRADO'" class="order-actions">
               <button
                 v-if="order.awaitingPayment"
                 :class="group.status === 'POR_COBRAR' ? 'button' : 'button secondary'"
@@ -246,7 +257,6 @@
                 Imprimir ticket
               </button>
               <button
-                v-if="group.status !== 'COBRADO'"
                 class="button secondary cancel"
                 type="button"
                 :disabled="busyOrderId === order.id"
@@ -841,6 +851,23 @@ watchEffect(() => {
 
 /* Un boton por fila y a todo el ancho de la tarjeta: blancos grandes para tocar con prisa */
 .order-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.reprint {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.reprint:hover, .reprint:focus-visible { border-color: var(--border-strong); color: var(--text); }
+/* Ultimos cobrados: tarjeta compacta (cabecera y productos, sin mas) */
+.order-card--closed { padding-top: 10px; padding-bottom: 10px; }
+.order-card--closed .order-head { margin-bottom: 4px; }
+.order-card--closed .order-items { margin: 4px 0 0; }
 .order-actions .button { width: 100%; min-height: 44px; padding-left: 16px; padding-right: 16px; }
 .cancel-confirm {
   padding: 10px 12px;
