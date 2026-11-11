@@ -126,25 +126,28 @@
                   </span>
                 </span>
               </div>
-              <span v-if="order.customer" class="order-customer order-customer--stacked">
-                <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="36" />
-                <strong>{{ order.customer.name }}</strong>
-              </span>
-              <!-- Sin cliente: el boton de asignar ocupa el sitio del avatar, encima del texto -->
-              <span v-else class="order-customer order-customer--stacked">
-                <button
-                  v-if="assigningId !== order.id && group.status !== 'COBRADO'"
-                  class="assign-icon"
-                  type="button"
-                  :aria-label="`Asignar cliente al pedido ${order.code}`"
-                  title="Asignar cliente"
-                  :disabled="busyOrderId === order.id"
-                  @click="assigningId = order.id"
-                >
-                  <UserPlus :size="18" :stroke-width="1.8" aria-hidden="true" />
-                </button>
-                <strong class="muted">Sin cliente</strong>
-              </span>
+              <!-- En "Últimos cobrados" (ya cerrados) no hace falta el cliente -->
+              <template v-if="group.status !== 'COBRADO'">
+                <span v-if="order.customer" class="order-customer order-customer--stacked">
+                  <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="36" />
+                  <strong>{{ order.customer.name }}</strong>
+                </span>
+                <!-- Sin cliente: el boton de asignar ocupa el sitio del avatar, encima del texto -->
+                <span v-else class="order-customer order-customer--stacked">
+                  <button
+                    v-if="assigningId !== order.id"
+                    class="assign-icon"
+                    type="button"
+                    :aria-label="`Asignar cliente al pedido ${order.code}`"
+                    title="Asignar cliente"
+                    :disabled="busyOrderId === order.id"
+                    @click="assigningId = order.id"
+                  >
+                    <UserPlus :size="18" :stroke-width="1.8" aria-hidden="true" />
+                  </button>
+                  <strong class="muted">Cliente anónimo</strong>
+                </span>
+              </template>
               <OrderItems :items="order.items" list />
               <!-- Para llevar ya lo dice la cabecera; aqui, sobre todo, mesa o barra que se lo llevan -->
               <p v-if="order.packagingCents || (order.takeaway && order.serviceType === 'MESA')" class="muted packaging-note">
@@ -283,7 +286,7 @@
                 <UserAvatar :avatar="order.customer.avatar" :name="order.customer.name" :size="24" />
                 <strong>{{ order.customer.name }}</strong>
               </span>
-              <strong v-else class="muted">Sin cliente</strong>
+              <strong v-else class="muted">Cliente anónimo</strong>
             </span>
             <OrderItems :items="order.items" list />
             <p class="muted">
