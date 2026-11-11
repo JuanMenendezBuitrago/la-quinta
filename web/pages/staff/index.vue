@@ -165,9 +165,8 @@
                 </button>
               </div>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
-              <p v-if="order.paidAt" class="paid-badge">
-                Cobrado · {{ paymentDetail(order) }}<template v-if="group.status === 'COBRADO'"> · {{ formatTime(order.paidAt) }}</template>
-              </p>
+              <!-- En "Últimos cobrados" sobra: todos lo estan -->
+              <p v-if="order.paidAt && group.status !== 'COBRADO'" class="paid-badge">Cobrado · {{ paymentDetail(order) }}</p>
             </div>
 
             <div v-if="assigningId === order.id" class="assign-box">
