@@ -192,6 +192,8 @@
                 <span>Cobrado · {{ paymentDetail(order) }}{{ order.paidByName ? ` · ${order.paidByName}` : "" }}</span>
               </p>
             </div>
+            <!-- Últimos cobrados: el importe, destacado abajo a la derecha -->
+            <span v-if="group.status === 'COBRADO'" class="ticket-total tabular-nums">{{ formatPrice(order.totalCents) }}</span>
 
             <div v-if="assigningId === order.id" class="assign-box">
               <p class="assign-title">
@@ -343,8 +345,12 @@
               Imprimir ticket
             </button>
           </div>
+          <!-- Estado arriba; el importe del ticket, destacado abajo a la derecha (tachado si se cancelo) -->
           <span class="history-status">
             <span class="status-badge" :class="`status-${order.status}`">{{ statusLabel(order.status) }}</span>
+            <span class="ticket-total tabular-nums" :class="{ 'ticket-total--void': order.status === 'CANCELADO' }">
+              {{ formatPrice(order.totalCents) }}
+            </span>
           </span>
         </div>
         </div>
@@ -925,6 +931,9 @@ watchEffect(() => {
 .order-card--closed { padding-top: 10px; padding-bottom: 10px; }
 .order-card--closed .order-head { margin-bottom: 4px; }
 .order-card--closed .order-items { margin: 4px 0 0; }
+/* El importe va en la esquina de abajo: el texto de la tarjeta le deja sitio */
+.order-card--closed .order-info > :not(.order-head) { padding-right: 96px; }
+.order-card--closed .ticket-total { position: absolute; right: 16px; bottom: 10px; }
 .order-actions .button { width: 100%; min-height: 44px; padding-left: 16px; padding-right: 16px; }
 /* En la cola: cobrar, servido y ticket en una sola fila, a partes iguales */
 .order-actions--row { flex-direction: row; gap: 6px; }
@@ -973,9 +982,19 @@ watchEffect(() => {
 
 .history-list { gap: 10px; }
 /* Estado (entregado/cancelado) en la esquina superior derecha, alineado con el codigo */
-.history-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.history-row { display: flex; align-items: stretch; justify-content: space-between; gap: 16px; }
 .history-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
-.history-status { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.history-status { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 8px; flex-shrink: 0; }
+/* Importe del ticket: destacado, abajo a la derecha (historial y "Últimos cobrados") */
+.ticket-total {
+  font-family: var(--font-futura-text);
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--text);
+  white-space: nowrap;
+}
+.ticket-total--void { color: var(--text-muted); text-decoration: line-through; }
 .history-meta { display: flex; flex-direction: column; gap: 3px; margin: 10px 0; }
 .history-meta p { margin: 0; }
 .history-people { display: flex; flex-wrap: wrap; gap: 2px 16px; font-size: 13.5px; }
