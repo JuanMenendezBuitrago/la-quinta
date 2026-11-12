@@ -183,20 +183,37 @@
         Desde {{ formatDateTime(c.periodStart) }} · {{ c.staffName }} · {{ c.ordersCount }}
         {{ c.ordersCount === 1 ? "pedido" : "pedidos" }}
       </p>
-      <p class="closing-figures">
-        Total {{ formatPrice(c.totalCents) }} · Efectivo {{ formatPrice(c.cashCents) }} · Tarjeta
-        {{ formatPrice(c.cardCents) }} · Transferencia {{ formatPrice(c.transferCents) }}<template
-          v-if="c.unknownMethodCents"
-        > · Sin método {{ formatPrice(c.unknownMethodCents) }}</template>
-      </p>
+      <!-- Ingresos y gastos: arriba cada metodo con su icono, debajo el total -->
+      <div class="closing-money">
+        <div class="money-block">
+          <span class="money-label">Ingresos</span>
+          <span class="money-methods">
+            <span v-for="m in incomeByMethod(c)" :key="m.method" class="money-method" :title="m.label">
+              <component :is="m.icon" :size="15" :stroke-width="1.8" aria-hidden="true" />
+              <span class="vh">{{ m.label }}</span>
+              {{ formatPrice(m.cents) }}
+            </span>
+            <span v-if="!incomeByMethod(c).length" class="muted">—</span>
+          </span>
+          <strong class="money-total tabular-nums">{{ formatPrice(c.totalCents) }}</strong>
+        </div>
+        <div v-if="c.expensesCount" class="money-block">
+          <span class="money-label">Gastos</span>
+          <span class="money-methods">
+            <span v-for="m in expensesByMethod(c)" :key="m.method" class="money-method" :title="m.label">
+              <component :is="m.icon" :size="15" :stroke-width="1.8" aria-hidden="true" />
+              <span class="vh">{{ m.label }}</span>
+              − {{ formatPrice(m.cents) }}
+            </span>
+          </span>
+          <strong class="money-total tabular-nums">− {{ formatPrice(c.expensesTotalCents) }}</strong>
+        </div>
+      </div>
       <p v-if="c.discountsCount" class="closing-figures">
         Descuentos {{ formatPrice(c.discountsCents) }}:
         {{ c.discountsByReason.map((d) => `${DISCOUNT_REASON_LABELS[d.reason]} ${formatPrice(d.amountCents)}`).join(" · ") }}
       </p>
-      <p v-if="c.expensesCount" class="closing-figures">
-        Gastos {{ formatPrice(c.expensesTotalCents) }} (de la caja {{ formatPrice(c.expensesCashCents) }}) · Neto
-        {{ formatPrice(c.netCents) }}
-      </p>
+      <p v-if="c.expensesCount" class="closing-figures">Neto {{ formatPrice(c.netCents) }}</p>
       <p class="muted">
         Fondo {{ formatPrice(c.openingFloatCents) }} · Debería haber {{ formatPrice(c.expectedCashInDrawerCents) }} ·
         Contado {{ formatPrice(c.countedCashCents) }}
@@ -322,6 +339,32 @@ const { mutate: closeCash } = useMutation(CLOSE_CASH);
 
 const summary = computed(() => result.value?.cashSummary ?? null);
 const closings = computed(() => result.value?.cashClosings ?? []);
+
+// Historial: importes por metodo con su icono (solo los que tienen algo).
+const METHOD_ICONS = {
+  EFECTIVO: { icon: Banknote, label: "Efectivo" },
+  TARJETA: { icon: CreditCard, label: "Tarjeta" },
+  TRANSFERENCIA: { icon: Smartphone, label: "Transferencia" },
+  OTRO: { icon: CircleHelp, label: "Otro / sin método" },
+} as const;
+type MethodKey = keyof typeof METHOD_ICONS;
+function byMethod(entries: [MethodKey, number][]) {
+  return entries.filter(([, cents]) => cents > 0).map(([method, cents]) => ({ method, cents, ...METHOD_ICONS[method] }));
+}
+function incomeByMethod(c: { cashCents: number; cardCents: number; transferCents: number; unknownMethodCents: number }) {
+  return byMethod([
+    ["EFECTIVO", c.cashCents],
+    ["TARJETA", c.cardCents],
+    ["TRANSFERENCIA", c.transferCents],
+    ["OTRO", c.unknownMethodCents],
+  ]);
+}
+// Los gastos por metodo salen del saldo por metodo (lo pagado); el de la caja va como efectivo.
+function expensesByMethod(c: { balances: MethodBalance[] }) {
+  return byMethod(
+    (["EFECTIVO", "TARJETA", "TRANSFERENCIA", "OTRO"] as MethodKey[]).map((m) => [m, c.balances.find((b) => b.method === m)?.outCents ?? 0]),
+  );
+}
 const lastClosing = computed(() => closings.value[0] ?? null);
 const summaryError = computed(() => (error.value ? "No se pudo cargar la caja." : ""));
 const pending = computed(() => result.value?.pendingExpenses ?? []);
@@ -500,6 +543,15 @@ async function closeRegister() {
 .closing p { margin: 4px 0 0; }
 .closing-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .closing-figures { font-size: 14px; }
+/* Ingresos y gastos del cierre: etiqueta, metodos con icono y total debajo */
+.closing-money { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 20px; margin-top: 10px; }
+.money-block { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.money-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.money-methods { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.money-method { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.money-method svg { color: var(--text-muted); }
+.money-total { font-family: var(--font-futura-text); font-size: 19px; font-weight: 900; line-height: 1.2; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .expenses { display: flex; flex-direction: column; gap: 12px; }
 .expenses-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
