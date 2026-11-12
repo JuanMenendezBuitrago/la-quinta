@@ -301,12 +301,18 @@ export async function backfillOrderCodes() {
   if (pending.length) console.log(`[orders] codigo asignado a ${pending.length} pedidos existentes`);
 }
 
+/** Desde aqui existe el cobro aparte en mesa (commit 31c8de7, 2026-09-24). */
+const PAYMENT_TRACKING_SINCE = new Date("2026-09-24T00:00:00Z");
+
 /**
  * Los pedidos entregados antes de que existiera el cobro se dan por cerrados (y su entrega, en
  * updatedAt): asi no aparecen de golpe como "por cobrar" en la cola. Idempotente.
+ * Solo los de antes del cobro: corre en cada arranque (cada despliegue) y, sin ese limite, cerraba
+ * los de mesa servidos y aun sin cobrar, que desaparecian de la cola sin pago.
  */
 export async function backfillCompletedOrders() {
-  const result = await Order.updateMany({ status: "ENTREGADO", completedAt: { $exists: false } }, [
+  const filter = { status: "ENTREGADO", completedAt: { $exists: false }, createdAt: { $lt: PAYMENT_TRACKING_SINCE } };
+  const result = await Order.updateMany(filter, [
     { $set: { completedAt: "$updatedAt", deliveredAt: { $ifNull: ["$deliveredAt", "$updatedAt"] } } },
   ]);
   if (result.modifiedCount) console.log(`[orders] ${result.modifiedCount} pedidos entregados marcados como cerrados`);
