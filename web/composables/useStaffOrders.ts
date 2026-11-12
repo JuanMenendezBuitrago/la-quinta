@@ -442,10 +442,6 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
   function nextStatus(status: string) {
     return NEXT_STATUS[status];
   }
-  function nextStatusLabel(order: any) {
-    // Los que no son de mesa ni barra se cobran al servirlos: al marcarlos se cierran del todo.
-    return paysOnDelivery(order) ? "Servir y cobrar" : "Marcar servido";
-  }
   // Pedido con un cambio de estado en curso: sus botones se desactivan para evitar el doble clic.
   const busyOrderId = ref("");
   const actionError = ref("");
@@ -580,7 +576,6 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     busyOrderId,
     actionError,
     nextStatus,
-    nextStatusLabel,
     statusLabel,
     serviceLabel,
     formatTime,

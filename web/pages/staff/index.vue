@@ -240,7 +240,7 @@
                 <button class="button secondary" type="button" @click="payingId = ''">Volver</button>
               </div>
             </div>
-            <div v-else-if="group.status !== 'COBRADO'" class="order-actions">
+            <div v-else-if="group.status !== 'COBRADO'" class="order-actions order-actions--row">
               <button
                 v-if="order.awaitingPayment"
                 :class="group.status === 'POR_COBRAR' ? 'button' : 'button secondary'"
@@ -259,11 +259,11 @@
                 @click="paysOnDelivery(order) ? (payingId = order.id) : advance(order)"
               >
                 <Check :size="16" :stroke-width="2" aria-hidden="true" />
-                {{ nextStatusLabel(order) }}
+                Servido
               </button>
               <button v-if="ticketPrintingEnabled" class="button secondary" type="button" @click="printOrderTicket(order)">
                 <Printer :size="16" :stroke-width="1.8" aria-hidden="true" />
-                Imprimir ticket
+                Ticket
               </button>
             </div>
           </div>
@@ -514,7 +514,6 @@ const {
   busyOrderId,
   actionError,
   nextStatus,
-  nextStatusLabel,
   statusLabel,
   serviceLabel,
   formatTime,
@@ -888,7 +887,7 @@ watchEffect(() => {
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid var(--border);
+  border: 0px solid var(--border);
   border-radius: 6px;
   background: none;
   color: var(--text-muted);
@@ -902,7 +901,7 @@ watchEffect(() => {
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid var(--border);
+  border: 0px solid var(--border);
   border-radius: 6px;
   background: none;
   color: var(--text-muted);
@@ -915,6 +914,9 @@ watchEffect(() => {
 .order-card--closed .order-head { margin-bottom: 4px; }
 .order-card--closed .order-items { margin: 4px 0 0; }
 .order-actions .button { width: 100%; min-height: 44px; padding-left: 16px; padding-right: 16px; }
+/* En la cola: cobrar, servido y ticket en una sola fila, a partes iguales */
+.order-actions--row { flex-direction: row; gap: 6px; }
+.order-actions--row .button { flex: 1 1 0; min-width: 0; padding-left: 6px; padding-right: 6px; gap: 5px; }
 .cancel-confirm {
   padding: 10px 12px;
   border-radius: 6px;
