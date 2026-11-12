@@ -158,7 +158,7 @@ export const ordersTypeDefs = /* GraphQL */ `
     serviceType: ServiceType!
     """Obligatoria si serviceType es MESA."""
     table: String
-    """Cliente registrado, si da su codigo o telefono (ver lookupCustomer)."""
+    """Cliente registrado, si da su codigo o email (ver lookupCustomer)."""
     customerId: ID
     note: String
     """Mesa o barra, pero se lo llevan (empaquetado): lleva el recargo por empaque y descuenta

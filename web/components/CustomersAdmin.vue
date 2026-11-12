@@ -10,7 +10,7 @@
         v-model="search"
         class="search"
         type="search"
-        placeholder="Buscar por nombre, email, teléfono o código"
+        placeholder="Buscar por nombre, email o código"
         aria-label="Buscar clientes"
       />
 

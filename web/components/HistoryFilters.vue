@@ -17,7 +17,7 @@
           <option v-for="s in staffOptions" :key="s.id" :value="s.id">{{ s.name }}</option>
         </select>
       </label>
-      <!-- A todo el ancho: el buscador de cliente necesita sitio para "Código (LQ-1234) o teléfono" -->
+      <!-- A todo el ancho: el buscador de cliente necesita sitio para "Nombre, código (LQ-1234) o email" -->
       <div class="field field--full">
         <span class="muted">Cliente</span>
         <div v-if="customer" class="customer-chip">

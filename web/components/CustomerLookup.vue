@@ -3,8 +3,8 @@
     <input
       v-model="query"
       type="text"
-      placeholder="Nombre, código (LQ-1234) o teléfono"
-      aria-label="Nombre, código o teléfono del cliente"
+      placeholder="Nombre, código (LQ-1234) o email"
+      aria-label="Nombre, código o email del cliente"
       autocomplete="off"
     />
     <button
@@ -83,7 +83,7 @@ async function search() {
     if (found.length === 1) choose(found[0]);
     else if (found.length) matches.value = found;
     else if (text.replace(/[^\p{L}]/gu, "").length < 3 && !/\d/.test(text)) message.value = "Escribe al menos 3 letras del nombre.";
-    else message.value = "No hay ningún cliente con ese nombre, código o teléfono.";
+    else message.value = "No hay ningún cliente con ese nombre, código o email.";
   } catch (err: any) {
     message.value = err?.message ?? "No se pudo buscar el cliente";
   } finally {
