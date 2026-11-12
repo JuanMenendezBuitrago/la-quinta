@@ -83,6 +83,9 @@
             <Inbox :size="22" :stroke-width="1.6" />
             <span>Nada aquí ahora mismo.</span>
           </div>
+          <!-- Al entrar una tarjeta en la columna (pedido nuevo o que llega de otra) aparece
+               deslizandose, y las de debajo bajan suavemente para hacerle sitio. -->
+          <TransitionGroup tag="div" name="card" class="queue-cards">
           <div
             v-for="order in group.orders"
             :key="order.id"
@@ -267,6 +270,7 @@
               </button>
             </div>
           </div>
+          </TransitionGroup>
         </div>
       </section>
 
@@ -878,6 +882,14 @@ watchEffect(() => {
   font-size: 14px;
 }
 .order-card--new { animation: order-pulse 0.9s ease-out 2; }
+/* Tarjeta que entra en una columna de la cola; las demas se desplazan para hacerle sitio.
+   Al salir desaparece sin mas (la misma tarjeta entra a la vez en la otra columna). */
+.card-enter-active { transition: opacity 0.35s ease-out, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.card-enter-from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+.card-move { transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .card-enter-active, .card-move { transition: none; }
+}
 
 /* Un boton por fila y a todo el ancho de la tarjeta: blancos grandes para tocar con prisa */
 .order-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
