@@ -22,6 +22,53 @@ function startOfTodayInStore(now: Date) {
   return new Date(now.getTime() - elapsedMs);
 }
 
+/** "YYYY-MM-DD" de un instante en la zona horaria del local. */
+function storeDateKey(d: Date) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: env.storeTimeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+
+/**
+ * Lo cobrado y lo gastado por dia en los ultimos `days` dias (hoy incluido). Lo cobrado sigue
+ * las mismas reglas que el cierre (summarize): pedidos no cancelados, por su paidAt o, los
+ * antiguos sin metodo que no son de mesa, por su entrega. Los gastos, por su fecha (spentAt).
+ */
+async function dailyStats(days: number, now: Date) {
+  const todayStart = startOfTodayInStore(now);
+  // Sin horario de verano en el local: cada dia son 24 h exactas.
+  const start = new Date(todayStart.getTime() - (days - 1) * 86_400_000);
+  const tz = env.storeTimeZone;
+  const [income, expenses] = await Promise.all([
+    Order.aggregate<{ _id: string; cents: number; count: number }>([
+      {
+        $match: {
+          status: { $ne: "CANCELADO" },
+          $or: [
+            { paidAt: { $gte: start, $lte: now } },
+            { paidAt: { $exists: false }, serviceType: { $ne: "MESA" }, status: "ENTREGADO", deliveredAt: { $gte: start, $lte: now } },
+          ],
+        },
+      },
+      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: { $ifNull: ["$paidAt", "$deliveredAt"] }, timezone: tz } }, cents: { $sum: "$totalCents" }, count: { $sum: 1 } } },
+    ]),
+    Expense.aggregate<{ _id: string; cents: number }>([
+      { $match: { spentAt: { $gte: start, $lte: now } } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$spentAt", timezone: tz } }, cents: { $sum: "$amountCents" } } },
+    ]),
+  ]);
+  const incomeByDay = new Map(income.map((r) => [r._id, r]));
+  const expensesByDay = new Map(expenses.map((r) => [r._id, r.cents]));
+  return Array.from({ length: days }, (_, i) => {
+    // Mediodia de cada dia: lejos de los bordes, da la fecha correcta en la zona del local.
+    const date = storeDateKey(new Date(start.getTime() + i * 86_400_000 + 12 * 3_600_000));
+    return {
+      date,
+      incomeCents: incomeByDay.get(date)?.cents ?? 0,
+      ordersCount: incomeByDay.get(date)?.count ?? 0,
+      expensesCents: expensesByDay.get(date) ?? 0,
+    };
+  });
+}
+
 async function currentPeriodStart(now: Date) {
   const last = await CashClosing.findOne().sort({ periodEnd: -1 }).select("periodEnd").lean();
   return last?.periodEnd ?? startOfTodayInStore(now);
@@ -157,6 +204,11 @@ export const cashResolvers = {
     note: (doc: CashClosingDoc) => doc.note || null,
   },
   Query: {
+    cashDailyStats: async (_: unknown, args: { days?: number | null }, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["barra", "gestion"]);
+      const days = Math.min(90, Math.max(1, Math.trunc(args.days ?? 30)));
+      return dailyStats(days, new Date());
+    },
     cashSummary: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireStaff(ctx, ["barra", "gestion"]);
       const now = new Date();

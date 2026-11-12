@@ -170,6 +170,7 @@
 
     <!-- Historial de cierres -->
     <div class="cash-history">
+    <CashTrendChart />
     <h2 class="history-title">Cierres anteriores</h2>
     <EmptyState v-if="!closings.length" :icon="Archive" title="Todavía no hay ningún cierre">Aparecerán aquí cada vez que se cierre la caja.</EmptyState>
     <article v-for="c in closings" :key="c.id" class="card closing">
@@ -265,6 +266,7 @@ import { useImageUrl } from "~/composables/useImageUrl";
 import { DISCOUNT_REASON_LABELS, type DiscountReason } from "~/composables/useStaffOrders";
 import { EXPENSE_CATEGORY_LABELS, EXPENSE_FIELDS, EXPENSE_METHOD_LABELS, type Expense } from "~/composables/useExpenses";
 import ExpenseForm from "~/components/ExpenseForm.vue";
+import CashTrendChart from "~/components/CashTrendChart.vue";
 import ImageLightbox from "~/components/ImageLightbox.vue";
 import BalanceTable, { type MethodBalance } from "~/components/CashBalanceTable.vue";
 

@@ -76,11 +76,22 @@ export const cashTypeDefs = /* GraphQL */ `
     createdAt: String!
   }
 
+  """Un dia (en la zona horaria del local): lo cobrado, los gastos y los pedidos cobrados."""
+  type CashDay {
+    """YYYY-MM-DD"""
+    date: String!
+    incomeCents: Int!
+    expensesCents: Int!
+    ordersCount: Int!
+  }
+
   extend type Query {
     """Personal: lo cobrado desde el ultimo cierre hasta ahora (lo que cerraria un cierre ahora)."""
     cashSummary: CashSummary!
     """Personal: cierres anteriores, el mas reciente primero."""
     cashClosings(limit: Int): [CashClosing!]!
+    """Personal: los ultimos dias (30 por defecto, hasta 90), hoy incluido; los dias sin nada, a cero."""
+    cashDailyStats(days: Int): [CashDay!]!
   }
 
   extend type Mutation {
