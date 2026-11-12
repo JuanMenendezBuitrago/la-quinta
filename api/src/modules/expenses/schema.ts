@@ -50,6 +50,8 @@ export const expensesTypeDefs = /* GraphQL */ `
     pendingExpenses: [Expense!]!
     """Personal: gastos de un cierre del historial."""
     closingExpenses(closingId: ID!): [Expense!]!
+    """Personal: proveedores ya usados en gastos (los mas usados primero), para autocompletar."""
+    expenseSuppliers: [String!]!
   }
 
   extend type Mutation {

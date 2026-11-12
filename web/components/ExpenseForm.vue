@@ -42,7 +42,11 @@
       </label>
       <label class="field">
         <span class="muted">Proveedor (opcional)</span>
-        <input v-model="supplier" type="text" maxlength="80" />
+        <!-- Se autocompleta con los proveedores de gastos anteriores mientras se escribe -->
+        <input v-model="supplier" type="text" maxlength="80" autocomplete="off" :list="`${uid}-suppliers`" />
+        <datalist :id="`${uid}-suppliers`">
+          <option v-for="name in suppliers" :key="name" :value="name" />
+        </datalist>
       </label>
     </div>
 
@@ -101,6 +105,11 @@ const CREATE = gql`
     createExpense(input: $input) { ${EXPENSE_FIELDS} }
   }
 `;
+const SUPPLIERS = gql`
+  query ExpenseSuppliers {
+    expenseSuppliers
+  }
+`;
 const UPDATE = gql`
   mutation UpdateExpense($id: ID!, $input: ExpenseInput!) {
     updateExpense(id: $id, input: $input) { ${EXPENSE_FIELDS} }
@@ -122,6 +131,12 @@ const spentAt = ref(toStoreInput(props.existing ? new Date(props.existing.spentA
 const receiptUrl = ref<string | null>(props.existing?.receiptUrl ?? null);
 
 const valid = computed(() => typeof amount.value === "number" && amount.value >= 1 && description.value.trim() !== "");
+
+// Proveedores ya usados, para el autocompletado (de la cache al momento; se refrescan detras).
+const { result: suppliersResult } = useQuery<{ expenseSuppliers: string[] }>(SUPPLIERS, null, {
+  fetchPolicy: "cache-and-network",
+});
+const suppliers = computed(() => suppliersResult.value?.expenseSuppliers ?? []);
 
 const { mutate: create } = useMutation(CREATE);
 const { mutate: update } = useMutation(UPDATE);
@@ -185,6 +200,8 @@ async function uploadReceipt(event: Event) {
 .expense-form { display: flex; flex-direction: column; gap: 12px; }
 .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* Proveedor: las sugerencias salen al escribir; sin la flecha de Chrome, que lo hace parecer un desplegable */
+input[list]::-webkit-calendar-picker-indicator { display: none !important; }
 .field input, .field select {
   width: 100%;
   padding: 10px 12px;

@@ -15,6 +15,8 @@ import {
 
 // Mismo tope de cordura que el cierre de caja (100 millones de pesos).
 const MAX_AMOUNT_CENTS = 100_000_000;
+// Proveedores que se ofrecen al autocompletar.
+const MAX_SUPPLIERS = 300;
 
 interface ExpenseInput {
   amountCents: number;
@@ -67,6 +69,19 @@ export const expensesResolvers = {
       requireStaff(ctx, ["barra", "gestion"]);
       const list = await Expense.find({ closingId: null }).sort({ spentAt: -1 }).lean<ExpenseDoc[]>();
       return list.map(toGraphql);
+    },
+    expenseSuppliers: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["barra", "gestion"]);
+      // Uno por nombre sin distinguir mayusculas, escrito como se escribio mas veces.
+      const rows = await Expense.aggregate<{ name: string }>([
+        { $match: { supplier: { $type: "string", $ne: "" } } },
+        { $group: { _id: "$supplier", uses: { $sum: 1 }, last: { $max: "$spentAt" } } },
+        { $sort: { uses: -1, last: -1 } },
+        { $group: { _id: { $toLower: "$_id" }, name: { $first: "$_id" }, uses: { $sum: "$uses" }, last: { $max: "$last" } } },
+        { $sort: { uses: -1, last: -1 } },
+        { $limit: MAX_SUPPLIERS },
+      ]);
+      return rows.map((r) => r.name);
     },
     closingExpenses: async (_: unknown, args: { closingId: string }, ctx: GraphQLContext) => {
       requireStaff(ctx, ["barra", "gestion"]);
