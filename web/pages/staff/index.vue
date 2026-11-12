@@ -127,6 +127,18 @@
                   >
                     <Printer :size="16" :stroke-width="1.8" aria-hidden="true" />
                   </button>
+                  <!-- Cancelar: una x en la esquina; pide confirmacion abajo, en la tarjeta -->
+                  <button
+                    v-if="group.status !== 'COBRADO'"
+                    class="card-cancel"
+                    type="button"
+                    :aria-label="`Cancelar el pedido ${order.code}`"
+                    title="Cancelar pedido"
+                    :disabled="busyOrderId === order.id || pendingCancelId === order.id"
+                    @click="pendingCancelId = order.id"
+                  >
+                    <X :size="16" :stroke-width="2" aria-hidden="true" />
+                  </button>
                 </span>
               </div>
               <!-- En "Últimos cobrados" (ya cerrados) no hace falta el cliente -->
@@ -253,15 +265,6 @@
                 <Printer :size="16" :stroke-width="1.8" aria-hidden="true" />
                 Imprimir ticket
               </button>
-              <button
-                class="button secondary cancel"
-                type="button"
-                :disabled="busyOrderId === order.id"
-                @click="pendingCancelId = order.id"
-              >
-                <X :size="16" :stroke-width="1.8" aria-hidden="true" />
-                Cancelar
-              </button>
             </div>
           </div>
         </div>
@@ -294,26 +297,28 @@
               <strong v-else class="muted">Cliente anónimo</strong>
             </span>
             <OrderItems :items="order.items" list />
-            <!-- 1. Mesa y fecha; 2. quien lo tomo y quien lo cobro; 3. lo cobrado y el cambio -->
-            <p class="muted">
-              {{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}
-            </p>
-            <!-- Los pedidos web no tienen quien los tome -->
-            <p v-if="takenBy(order) || order.paidByName" class="history-people">
-              <span v-if="takenBy(order)" class="history-person">
-                <span class="muted">Tomado por</span>
-                <UserAvatar :avatar="takenBy(order)!.staffAvatar" :name="takenBy(order)!.staffName" :size="22" />
-                <strong>{{ takenBy(order)!.staffName }}</strong>
-              </span>
-              <span v-if="order.paidByName" class="history-person">
-                <span class="muted">Cobrado por</span>
-                <UserAvatar :avatar="order.paidByAvatar" :name="order.paidByName" :size="22" />
-                <strong>{{ order.paidByName }}</strong>
-              </span>
-            </p>
-            <p v-if="order.paidAt" class="muted">
-              Cobrado {{ formatPrice(order.totalCents) }} con {{ paymentDetail(order) }}
-            </p>
+            <!-- 1. Mesa y fecha; 2. quien lo tomo y quien lo cobro; 3. lo cobrado y el cambio (juntas) -->
+            <div class="history-meta">
+              <p class="muted">
+                {{ order.serviceType ? `${serviceLabel(order)} · ` : "" }}{{ formatDateTime(order.updatedAt) }}
+              </p>
+              <!-- Los pedidos web no tienen quien los tome -->
+              <p v-if="takenBy(order) || order.paidByName" class="history-people">
+                <span v-if="takenBy(order)" class="history-person">
+                  <span class="muted">Tomado por</span>
+                  <UserAvatar :avatar="takenBy(order)!.staffAvatar" :name="takenBy(order)!.staffName" :size="22" />
+                  <strong>{{ takenBy(order)!.staffName }}</strong>
+                </span>
+                <span v-if="order.paidByName" class="history-person">
+                  <span class="muted">Cobrado por</span>
+                  <UserAvatar :avatar="order.paidByAvatar" :name="order.paidByName" :size="22" />
+                  <strong>{{ order.paidByName }}</strong>
+                </span>
+              </p>
+              <p v-if="order.paidAt" class="muted">
+                Cobrado {{ formatPrice(order.totalCents) }} con {{ paymentDetail(order) }}
+              </p>
+            </div>
             <p v-if="order.redemption" class="muted discount-note">
               Canje de sellos · {{ order.redemption.name }}: − {{ formatPrice(order.redemption.amountCents) }}{{
                 order.redemption.staffName ? ` · ${order.redemption.staffName}` : ""
@@ -890,6 +895,21 @@ watchEffect(() => {
   cursor: pointer;
 }
 .reprint:hover, .reprint:focus-visible { border-color: var(--border-strong); color: var(--text); }
+/* La x de cancelar, como el boton de reimprimir pero en rojo al pasar por encima */
+.card-cancel {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.card-cancel:hover:not(:disabled), .card-cancel:focus-visible { border-color: var(--danger); color: var(--danger); }
+.card-cancel:disabled { opacity: 0.4; cursor: default; }
 /* Ultimos cobrados: tarjeta compacta (cabecera y productos, sin mas) */
 .order-card--closed { padding-top: 10px; padding-bottom: 10px; }
 .order-card--closed .order-head { margin-bottom: 4px; }
@@ -942,7 +962,9 @@ watchEffect(() => {
 .history-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .history-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
 .history-status { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.history-people { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 2px 0; font-size: 13.5px; }
+.history-meta { display: flex; flex-direction: column; gap: 3px; margin: 10px 0; }
+.history-meta p { margin: 0; }
+.history-people { display: flex; flex-wrap: wrap; gap: 2px 16px; font-size: 13.5px; }
 .history-person { display: inline-flex; align-items: center; gap: 6px; }
 
 .status-badge {
