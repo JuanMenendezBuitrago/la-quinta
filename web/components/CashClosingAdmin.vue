@@ -106,6 +106,7 @@
                 </button>
               </div>
             </div>
+            <ExpenseItemsBlock :expense="e" :format="formatPrice" @saved="onItemsSaved" />
           </template>
         </li>
       </ul>
@@ -170,6 +171,34 @@
 
     <!-- Historial de cierres -->
     <div class="cash-history">
+    <!-- Gastos agrupados de cierres ya hechos que siguen sin desglosar del todo -->
+    <div v-if="toItemize.length" class="card expenses">
+      <h2 class="card-title">Por desglosar</h2>
+      <p class="muted period">Compras apuntadas por su total en cierres anteriores. Desglosarlas no cambia el cierre.</p>
+      <ul class="expense-list">
+        <li v-for="e in toItemize" :key="e.id" class="expense">
+          <div class="expense-main">
+            <strong>{{ e.description }}</strong>
+            <span class="muted">
+              <template v-if="e.supplier">{{ e.supplier }} · </template>{{ formatDateTime(e.spentAt) }} · {{ e.staffName }}
+            </span>
+          </div>
+          <span class="expense-amount">− {{ formatPrice(e.amountCents) }}</span>
+          <div v-if="e.receiptUrl" class="expense-actions">
+            <button
+              type="button"
+              class="icon-btn"
+              :aria-label="`Ver recibo de ${e.description}`"
+              title="Ver recibo"
+              @click="openLightbox(resolveImageUrl(e.receiptUrl)!)"
+            >
+              <ImageIcon :size="16" :stroke-width="1.8" aria-hidden="true" />
+            </button>
+          </div>
+          <ExpenseItemsBlock :expense="e" :format="formatPrice" @saved="onItemsSaved" />
+        </li>
+      </ul>
+    </div>
     <CashTrendChart />
     <h2 class="history-title">Cierres anteriores</h2>
     <EmptyState v-if="!closings.length" :icon="Archive" title="Todavía no hay ningún cierre">Aparecerán aquí cada vez que se cierre la caja.</EmptyState>
@@ -246,6 +275,8 @@
               <ImageIcon :size="16" :stroke-width="1.8" aria-hidden="true" />
             </button>
           </div>
+          <!-- El desglose no cambia importes: se puede completar con la caja ya cerrada -->
+          <ExpenseItemsBlock :expense="e" :format="formatPrice" @saved="onItemsSaved" />
         </li>
       </ul>
     </article>
@@ -266,6 +297,7 @@ import { useImageUrl } from "~/composables/useImageUrl";
 import { DISCOUNT_REASON_LABELS, type DiscountReason } from "~/composables/useStaffOrders";
 import { EXPENSE_CATEGORY_LABELS, EXPENSE_FIELDS, EXPENSE_METHOD_LABELS, type Expense } from "~/composables/useExpenses";
 import ExpenseForm from "~/components/ExpenseForm.vue";
+import ExpenseItemsBlock from "~/components/ExpenseItemsBlock.vue";
 import CashTrendChart from "~/components/CashTrendChart.vue";
 import ImageLightbox from "~/components/ImageLightbox.vue";
 import BalanceTable, { type MethodBalance } from "~/components/CashBalanceTable.vue";
@@ -307,6 +339,7 @@ const CASH_QUERY = gql`
   query CashClosingData {
     cashSummary { ${SUMMARY_FIELDS} }
     pendingExpenses { ${EXPENSE_FIELDS} }
+    expensesToItemize { ${EXPENSE_FIELDS} }
     cashClosings(limit: 30) {
       id ${SUMMARY_FIELDS} staffName openingFloatCents countedCashCents expectedCashInDrawerCents differenceCents note
     }
@@ -335,6 +368,7 @@ const DELETE_EXPENSE = gql`
 const { result, error, refetch } = useQuery<{
   cashSummary: CashSummary;
   pendingExpenses: Expense[];
+  expensesToItemize: Expense[];
   cashClosings: CashClosing[];
 }>(CASH_QUERY, null, { fetchPolicy: "network-only" });
 const { mutate: closeCash } = useMutation(CLOSE_CASH);
@@ -370,6 +404,7 @@ function expensesByMethod(c: { balances: MethodBalance[] }) {
 const lastClosing = computed(() => closings.value[0] ?? null);
 const summaryError = computed(() => (error.value ? "No se pudo cargar la caja." : ""));
 const pending = computed(() => result.value?.pendingExpenses ?? []);
+const toItemize = computed(() => result.value?.expensesToItemize ?? []);
 
 // --- Gastos: cualquiera los añade; corregir y borrar, solo gestion ---
 const { staff } = useStaffAuth();
@@ -406,6 +441,12 @@ async function removeExpense(id: string) {
   } finally {
     deleting.value = false;
   }
+}
+
+// Desglose guardado: el gasto abierto de un cierre se actualiza en su sitio; el resto, con la recarga.
+async function onItemsSaved(saved: Expense) {
+  closingExpenses.value = closingExpenses.value.map((e) => (e.id === saved.id ? saved : e));
+  await refetch();
 }
 
 // Gastos de un cierre del historial: se piden al abrirlos.

@@ -1,5 +1,24 @@
 <template>
   <form class="expense-form" @submit.prevent="save">
+    <!-- Atajos para apuntar rapido una compra por su total y desglosarla despues -->
+    <div v-if="!existing" class="field">
+      <span class="muted" :id="`${uid}-presets`">Gasto agrupado</span>
+      <div class="chips" role="group" :aria-labelledby="`${uid}-presets`">
+        <button
+          v-for="p in GROUPED_PRESETS"
+          :key="p.description"
+          type="button"
+          class="chip"
+          :class="{ active: grouped && description === p.description }"
+          :aria-pressed="grouped && description === p.description"
+          @click="applyPreset(p)"
+        >
+          <ShoppingBasket :size="14" :stroke-width="1.8" aria-hidden="true" />
+          {{ p.description }}
+        </button>
+      </div>
+    </div>
+
     <div class="row">
       <label class="field">
         <span class="muted">Importe</span>
@@ -55,6 +74,14 @@
       <input v-model="description" type="text" maxlength="200" required placeholder="P. ej. 2 bolsas de hielo" />
     </label>
 
+    <label class="check">
+      <input v-model="grouped" type="checkbox" />
+      <span>
+        Varios artículos: desglosar más tarde
+        <span class="muted hint">Se apunta el total ahora y los artículos cuando haya tiempo, aunque la caja ya esté cerrada.</span>
+      </span>
+    </label>
+
     <div class="field">
       <span class="muted">Foto del recibo (opcional)</span>
       <div class="receipt">
@@ -85,13 +112,14 @@
 <script setup lang="ts">
 import { shrinkImage } from "~/composables/useImageResize";
 import { gql } from "graphql-tag";
-import { Camera, Check, X } from "lucide-vue-next";
+import { Camera, Check, ShoppingBasket, X } from "lucide-vue-next";
 import { useImageUrl } from "~/composables/useImageUrl";
 import { useStoreTime } from "~/composables/useStoreTime";
 import {
   EXPENSE_CATEGORY_LABELS,
   EXPENSE_FIELDS,
   EXPENSE_METHOD_LABELS,
+  GROUPED_PRESETS,
   type Expense,
   type ExpenseCategory,
   type ExpenseMethod,
@@ -129,6 +157,13 @@ const description = ref(props.existing?.description ?? "");
 const supplier = ref(props.existing?.supplier ?? "");
 const spentAt = ref(toStoreInput(props.existing ? new Date(props.existing.spentAt) : new Date()));
 const receiptUrl = ref<string | null>(props.existing?.receiptUrl ?? null);
+const grouped = ref(props.existing?.grouped ?? false);
+
+function applyPreset(p: (typeof GROUPED_PRESETS)[number]) {
+  description.value = p.description;
+  category.value = p.category;
+  grouped.value = true;
+}
 
 const valid = computed(() => typeof amount.value === "number" && amount.value >= 1 && description.value.trim() !== "");
 
@@ -155,6 +190,7 @@ async function save() {
     description: description.value.trim(),
     supplier: supplier.value.trim() || null,
     receiptUrl: receiptUrl.value,
+    grouped: grouped.value,
     spentAt: fromStoreInput(spentAt.value).toISOString(),
   };
   try {
@@ -224,6 +260,10 @@ input[list]::-webkit-calendar-picker-indicator { display: none !important; }
   font-size: 13px;
   cursor: pointer;
 }
+.chip { display: inline-flex; align-items: center; gap: 6px; }
+.check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.check input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--accent); flex-shrink: 0; }
+.check > span { display: flex; flex-direction: column; gap: 2px; }
 .chip.active { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
 .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .receipt { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }

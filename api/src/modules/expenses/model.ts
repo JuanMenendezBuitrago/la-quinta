@@ -6,12 +6,23 @@ import { Schema, model, Types } from "mongoose";
  * Gasto de operacion o salida de caja. Entra en el siguiente cierre de caja que se haga (que lo marca
  * con su closingId), sea cual sea su fecha: spentAt es la fecha de la factura, solo informativa.
  * Con closingId ya no se puede editar ni borrar.
+ *
+ * Gasto agrupado (grouped): una compra de varios articulos ("Compras en el supermercado") que se
+ * apunta con su total para no frenar el cierre y se desglosa despues en items. El desglose no cambia
+ * el importe, asi que se puede rellenar tambien con el gasto ya cerrado. Los items nunca suman mas
+ * que el gasto; lo que falte es lo que queda por desglosar.
  */
 export type ExpenseMethod = "CAJA" | "TARJETA" | "TRANSFERENCIA" | "OTRO";
 export const EXPENSE_METHODS: ExpenseMethod[] = ["CAJA", "TARJETA", "TRANSFERENCIA", "OTRO"];
 
 export type ExpenseCategory = "INSUMOS" | "SERVICIOS" | "MANTENIMIENTO" | "PERSONAL" | "ALQUILER" | "OTROS";
 export const EXPENSE_CATEGORIES: ExpenseCategory[] = ["INSUMOS", "SERVICIOS", "MANTENIMIENTO", "PERSONAL", "ALQUILER", "OTROS"];
+
+export interface ExpenseItem {
+  name: string;
+  quantity?: number; // opcional: 2 (unidades), 1.5 (kg)...
+  amountCents: number;
+}
 
 export interface ExpenseDoc {
   _id: Types.ObjectId;
@@ -22,6 +33,8 @@ export interface ExpenseDoc {
   description: string;
   supplier?: string;
   receiptUrl?: string; // /uploads/receipts/<uuid>.<ext>
+  grouped?: boolean;
+  items?: ExpenseItem[];
   spentAt: Date;
   staffId: Types.ObjectId;
   staffName: string; // copia, como en CashClosing
@@ -30,6 +43,15 @@ export interface ExpenseDoc {
   updatedAt: Date;
 }
 
+const expenseItemSchema = new Schema<ExpenseItem>(
+  {
+    name: { type: String, required: true, trim: true, maxlength: 120 },
+    quantity: { type: Number, min: 0 },
+    amountCents: { type: Number, required: true, min: 1 },
+  },
+  { _id: false }
+);
+
 const expenseSchema = new Schema<ExpenseDoc>({
   amountCents: { type: Number, required: true, min: 1 },
   method: { type: String, enum: EXPENSE_METHODS, required: true },
@@ -37,6 +59,8 @@ const expenseSchema = new Schema<ExpenseDoc>({
   description: { type: String, required: true, trim: true, maxlength: 200 },
   supplier: { type: String, trim: true, maxlength: 80 },
   receiptUrl: { type: String },
+  grouped: { type: Boolean, default: false },
+  items: { type: [expenseItemSchema], default: [] },
   spentAt: { type: Date, required: true },
   staffId: { type: Schema.Types.ObjectId, ref: "StaffUser", required: true },
   staffName: { type: String, required: true },
