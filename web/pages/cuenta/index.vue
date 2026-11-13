@@ -139,14 +139,7 @@
           <section style="order: 3" class="loyalty-section">
             <p class="eyebrow">Fidelización</p>
             <div v-if="loyalty" class="card loyalty-card">
-              <div class="stamps-grid">
-                <span
-                  v-for="i in loyalty.rewardThreshold"
-                  :key="i"
-                  class="stamp"
-                  :class="{ filled: i <= loyalty.balance }"
-                />
-              </div>
+              <StampsGrid :balance="loyalty.balance" :threshold="loyalty.rewardThreshold" />
               <p class="stamps-label">{{ loyalty.balance }} de {{ loyalty.rewardThreshold }} sellos</p>
               <p v-if="stampsRuleText" class="stamps-rule">
                 {{ stampsRuleText }} Con {{ loyalty.rewardThreshold }}, un producto gratis.
@@ -404,10 +397,6 @@ function statusLabel(status: string) {
   text-align: center;
   padding: 26px 20px;
 }
-.stamps-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 260px; }
-/* Cada sello es un querubin (ver --stamp-img); los pendientes, tenues. */
-.stamp { width: 24px; height: 34px; background: var(--stamp-img) center / contain no-repeat; opacity: 0.22; }
-.stamp.filled { opacity: 1; }
 .stamps-label { color: var(--text-muted); font-size: 13px; margin: 0; }
 .reward-hint { margin: 0; font-weight: 600; text-align: center; }
 .stamps-rule { margin: -6px 0 0; max-width: 280px; font-size: 13px; color: var(--text-muted); }

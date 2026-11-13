@@ -95,13 +95,14 @@
           <div class="stamps-head">
             <div>
               <p class="eyebrow">Sellos</p>
-              <p class="stamps-balance">{{ detail.customer.stampsBalance }} de {{ detail.rewardThreshold }}</p>
+              <p class="stamps-balance">{{ detail.customer.stampsBalance }} de {{ detail.rewardThreshold }} sellos</p>
             </div>
             <!-- El canje va en el pedido (descuento "Canje de sellos"), ligado al ticket. -->
             <p v-if="detail.customer.rewardAvailable" class="muted reward-hint">
               Recompensa disponible: se canjea en el pedido, con el descuento «Canje de sellos».
             </p>
           </div>
+          <StampsGrid class="stamps-grid" :balance="detail.customer.stampsBalance" :threshold="detail.rewardThreshold" />
 
           <form class="adjust-form" @submit.prevent="adjust">
             <span class="muted">Ajustar sellos (p. ej. al pasar una tarjeta de cartón o corregir un error). En el motivo no pongas datos personales.</span>
@@ -477,6 +478,7 @@ input {
 .stamps-head .eyebrow { margin: 0; }
 .reward-hint { margin: 0; font-size: 13px; }
 .stamps-balance { margin: 2px 0 0; font-size: 20px; font-weight: 700; }
+.stamps-grid { align-self: center; }
 .adjust-form { display: flex; flex-direction: column; gap: 6px; }
 .adjust-row { display: grid; grid-template-columns: minmax(0, 7rem) minmax(0, 1fr) auto; gap: 8px; }
 @media (max-width: 480px) {
