@@ -75,7 +75,7 @@
     </label>
 
     <label class="check">
-      <input v-model="grouped" type="checkbox" />
+      <input v-model="grouped" type="checkbox" role="switch" />
       <span>
         Varios artículos: desglosar más tarde
         <span class="muted hint">Se apunta el total ahora y los artículos cuando haya tiempo, aunque la caja ya esté cerrada.</span>
@@ -262,7 +262,7 @@ input[list]::-webkit-calendar-picker-indicator { display: none !important; }
 }
 .chip { display: inline-flex; align-items: center; gap: 6px; }
 .check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
-.check input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--accent); flex-shrink: 0; }
+.check input { margin: 1px 0 0; flex-shrink: 0; }
 .check > span { display: flex; flex-direction: column; gap: 2px; }
 .chip.active { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
 .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
