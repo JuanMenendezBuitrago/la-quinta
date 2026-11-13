@@ -29,7 +29,9 @@ export function primeAudio() {
  * interrumpir el flujo de pedidos. */
 export function playNewOrderChime() {
   try {
-    const ctx = getAudioContext();
+    // Solo el contexto ya creado por primeAudio() (tras un gesto): crearlo aqui, sin gesto, sale
+    // suspendido, no suena y el navegador avisa en la consola.
+    const ctx = audioCtx;
     if (!ctx) return;
     const now = ctx.currentTime;
     [660, 880].forEach((freq, i) => {

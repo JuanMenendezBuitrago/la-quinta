@@ -1,4 +1,5 @@
 import { gql } from "graphql-tag";
+import { logSubscriptionError } from "./useSubscriptionErrorLog";
 import type { ComputedRef, Ref } from "vue";
 import { playNewOrderChime } from "./useOrderChime";
 import { useOrderNotifications } from "./useOrderNotifications";
@@ -320,8 +321,7 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     enabled: enabled.value,
   }));
   onQueueError((err: any) => {
-    // eslint-disable-next-line no-console
-    console.error("[useStaffOrders] error en la suscripcion de la cola", err);
+    logSubscriptionError("[useStaffOrders] error en la suscripcion de la cola", err);
   });
   onQueueUpdate((r: any) => {
     const updated = r.data?.orderQueueUpdated;

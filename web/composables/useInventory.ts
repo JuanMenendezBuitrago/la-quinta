@@ -1,4 +1,5 @@
 import { gql } from "graphql-tag";
+import { logSubscriptionError } from "./useSubscriptionErrorLog";
 import type { Ref } from "vue";
 
 export type SupplyUnit = "g" | "ml" | "ud";
@@ -184,8 +185,7 @@ export function useInventoryAlerts(enabled: Ref<boolean>) {
   const lastAlert = ref<SupplyAlert | null>(null);
   const { onResult, onError } = useSubscription(INVENTORY_ALERTS, null, () => ({ enabled: enabled.value }));
   onError((err: any) => {
-    // eslint-disable-next-line no-console
-    console.error("[useInventoryAlerts] error en la suscripcion", err);
+    logSubscriptionError("[useInventoryAlerts] error en la suscripcion", err);
   });
   onResult((r: any) => {
     const alert = r.data?.inventoryAlerts;
