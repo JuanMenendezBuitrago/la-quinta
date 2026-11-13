@@ -1,16 +1,55 @@
 <template>
   <main class="container page-account">
-    <template v-if="!customer">
-      <header class="account-hero">
+    <!-- Sin sesion: bienvenida con lo que da tener cuenta (tarjeta de sellos de muestra que se
+         llena sola) y el acceso. En movil, el acceso justo despues del titular (grid-areas). -->
+    <section v-if="!customer" class="welcome">
+      <header class="welcome-intro">
         <p class="eyebrow">Mi cuenta</p>
-        <h1>Bienvenido</h1>
+        <h1 class="welcome-title">Qué bueno <em>verte por aquí</em></h1>
+        <p class="welcome-lead">
+          Cada café suma. Entra con tu email, llena tu tarjeta de sellos y el siguiente corre por nuestra cuenta.
+        </p>
       </header>
-      <p v-if="accountDeleted" class="card deleted-notice" role="status">
-        Tu cuenta se ha eliminado. Hemos borrado tu nombre, email y teléfono.
-      </p>
-      <p class="muted">Inicia sesión con tu email para ver tus sellos y tus pedidos.</p>
-      <LoginInline @logged-in="onLoggedIn" />
-    </template>
+
+      <div class="card welcome-login">
+        <p v-if="accountDeleted" class="deleted-notice" role="status">
+          Tu cuenta se ha eliminado. Hemos borrado tu nombre, email y teléfono.
+        </p>
+        <h2>Entra o crea tu cuenta</h2>
+        <p class="muted welcome-login-hint">
+          <Mail :size="15" aria-hidden="true" />
+          Sin contraseñas: te enviamos un código a tu email.
+        </p>
+        <LoginInline @logged-in="onLoggedIn" />
+      </div>
+
+      <div class="welcome-extras">
+        <div class="welcome-stamps">
+          <StampsGrid :balance="rewardThreshold" :threshold="rewardThreshold" animated />
+          <p class="welcome-reward" :style="{ animationDelay: `${0.6 + rewardThreshold * 0.18}s` }">
+            <Gift :size="16" aria-hidden="true" /> {{ rewardThreshold }} sellos = un producto gratis
+          </p>
+        </div>
+        <ul class="perks">
+          <li>
+            <span class="perk-icon"><Stamp :size="18" aria-hidden="true" /></span>
+            <span><strong>Sellos en cada visita.</strong> {{ stampsRuleText || "Los ganas con cada pedido." }}</span>
+          </li>
+          <li>
+            <span class="perk-icon"><ShoppingBag :size="18" aria-hidden="true" /></span>
+            <span><strong>Tus pedidos al momento.</strong> Ves cuándo está listo lo que pediste.</span>
+          </li>
+          <li>
+            <span class="perk-icon"><Heart :size="18" aria-hidden="true" /></span>
+            <span><strong>Tus favoritos a mano.</strong> Lo de siempre, a un toque.</span>
+          </li>
+          <li>
+            <span class="perk-icon"><Camera :size="18" aria-hidden="true" /></span>
+            <span><strong>Una foto, un sello más.</strong> Si publicamos la foto de tu pedido, te lo sumamos.</span>
+          </li>
+        </ul>
+      </div>
+    </section>
 
     <template v-else>
       <header class="account-hero wide-head">
@@ -172,7 +211,7 @@
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
 import { useAuth } from "~/composables/useAuth";
-import { useStampsRuleText } from "~/composables/useSiteSettings";
+import { useRewardThreshold, useStampsRuleText } from "~/composables/useSiteSettings";
 import { useLightbox } from "~/composables/useLightbox";
 import ImageLightbox from "~/components/ImageLightbox.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
@@ -181,7 +220,7 @@ import FavoritesList from "~/components/FavoritesList.vue";
 import ReviewForm, { type MyReview } from "~/components/ReviewForm.vue";
 import ProductPhotoUpload from "~/components/ProductPhotoUpload.vue";
 import StarRating from "~/components/StarRating.vue";
-import { Camera, ShoppingBag, Star } from "lucide-vue-next";
+import { Camera, Gift, Heart, Mail, ShoppingBag, Stamp, Star } from "lucide-vue-next";
 import { useImageUrl } from "~/composables/useImageUrl";
 import { tableLabel } from "~/composables/useTables";
 
@@ -229,6 +268,7 @@ const STATUS_SUBSCRIPTION = gql`
 
 const { customer, logout } = useAuth();
 const stampsRuleText = useStampsRuleText();
+const rewardThreshold = useRewardThreshold();
 const accountDeleted = ref(false);
 
 const { result: loyaltyResult, refetch: refetchLoyalty } = useQuery(LOYALTY_QUERY, null, () => ({
@@ -361,7 +401,105 @@ function statusLabel(status: string) {
 
 <style scoped>
 .account-hero { margin-bottom: 22px; }
-.deleted-notice { margin-bottom: 16px; font-size: 14px; }
+.deleted-notice { margin: 0 0 4px; font-size: 14px; color: var(--text-muted); }
+
+/* --- Bienvenida (sin sesion) --- */
+.welcome {
+  display: grid;
+  grid-template-areas: "intro" "login" "extras";
+  gap: 22px;
+  padding-top: 8px;
+}
+.welcome-intro { grid-area: intro; }
+.welcome-login { grid-area: login; }
+.welcome-extras { grid-area: extras; display: flex; flex-direction: column; gap: 22px; }
+@media (min-width: 860px) {
+  .welcome {
+    --wide-width: min(1040px, calc(100vw - 40px));
+    width: var(--wide-width);
+    margin-left: calc((100% - var(--wide-width)) / 2);
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    grid-template-areas: "intro login" "extras login";
+    column-gap: 56px;
+    row-gap: 28px;
+    align-items: start;
+    padding-top: 36px;
+  }
+  .welcome-login { position: sticky; top: 96px; }
+}
+
+.welcome-title { font-size: clamp(34px, 6vw, 52px); line-height: 1.02; letter-spacing: -0.01em; }
+.welcome-title em {
+  display: block;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--accent);
+}
+.welcome-lead { margin: 16px 0 0; max-width: 30em; font-size: 17px; line-height: 1.55; color: var(--text-muted); }
+
+.welcome-login {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 26px 24px;
+  border-color: var(--border-strong);
+  background:
+    radial-gradient(120% 80% at 100% 0%, var(--accent-soft), transparent 60%),
+    var(--surface);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+.welcome-login h2 { font-size: 22px; }
+.welcome-login-hint { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; }
+.welcome-login :deep(.login-inline) { max-width: none; }
+
+.welcome-stamps {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 20px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  background: var(--surface);
+}
+/* Muestra de la tarjeta: sellos mas grandes, cinco por fila */
+.welcome-stamps :deep(.stamps-grid) { max-width: 214px; gap: 12px; }
+.welcome-stamps :deep(.stamp) { width: 32px; height: 45px; }
+.welcome-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 600;
+  animation: reward-in 0.5s ease-out both;
+}
+@keyframes reward-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .welcome-reward { animation: none; }
+}
+
+.perks { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.perks li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 1.5; color: var(--text-muted); }
+.perks strong { color: var(--text); font-weight: 600; }
+.perk-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
 
 .customer-card {
   display: flex;

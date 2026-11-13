@@ -173,3 +173,9 @@ export function useStampsRuleText() {
     return `Ganas 1 sello por cada ${amount} de consumo.`;
   });
 }
+
+/** Sellos que hacen falta para un producto gratis (para enseñarlo antes de tener cuenta). */
+export function useRewardThreshold() {
+  const { result } = useQuery<{ siteSettings: SiteSettings }>(SITE_SETTINGS_QUERY);
+  return computed(() => result.value?.siteSettings.rewardThresholdStamps ?? 10);
+}
