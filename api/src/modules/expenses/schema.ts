@@ -29,6 +29,12 @@ export const expensesTypeDefs = /* GraphQL */ `
     amountCents: Int!
   }
 
+  """Atajo del formulario de gastos: un gasto agrupado habitual."""
+  type ExpensePreset {
+    description: String!
+    category: ExpenseCategory!
+  }
+
   """Gasto de operacion. Entra en el siguiente cierre de caja; despues ya no se puede editar ni borrar."""
   type Expense {
     id: ID!
@@ -74,6 +80,8 @@ export const expensesTypeDefs = /* GraphQL */ `
     expenseSuppliers: [String!]!
     """Personal: gastos agrupados ya cerrados que aun no estan desglosados del todo (los mas recientes primero)."""
     expensesToItemize: [Expense!]!
+    """Personal: descripciones de gastos agrupados mas usadas (con la categoria de la ultima vez), para los atajos."""
+    groupedExpensePresets: [ExpensePreset!]!
   }
 
   extend type Mutation {

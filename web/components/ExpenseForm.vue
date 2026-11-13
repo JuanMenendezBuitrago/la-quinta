@@ -5,7 +5,7 @@
       <span class="muted" :id="`${uid}-presets`">Gasto agrupado</span>
       <div class="chips" role="group" :aria-labelledby="`${uid}-presets`">
         <button
-          v-for="p in GROUPED_PRESETS"
+          v-for="p in presets"
           :key="p.description"
           type="button"
           class="chip"
@@ -119,8 +119,9 @@ import {
   EXPENSE_CATEGORY_LABELS,
   EXPENSE_FIELDS,
   EXPENSE_METHOD_LABELS,
-  GROUPED_PRESETS,
+  mergePresets,
   type Expense,
+  type ExpensePreset,
   type ExpenseCategory,
   type ExpenseMethod,
 } from "~/composables/useExpenses";
@@ -136,6 +137,11 @@ const CREATE = gql`
 const SUPPLIERS = gql`
   query ExpenseSuppliers {
     expenseSuppliers
+  }
+`;
+const PRESETS = gql`
+  query GroupedExpensePresets {
+    groupedExpensePresets { description category }
   }
 `;
 const UPDATE = gql`
@@ -159,7 +165,13 @@ const spentAt = ref(toStoreInput(props.existing ? new Date(props.existing.spentA
 const receiptUrl = ref<string | null>(props.existing?.receiptUrl ?? null);
 const grouped = ref(props.existing?.grouped ?? false);
 
-function applyPreset(p: (typeof GROUPED_PRESETS)[number]) {
+// Atajos: los gastos agrupados mas usados, completados con los de partida.
+const { result: presetsResult } = useQuery<{ groupedExpensePresets: ExpensePreset[] }>(PRESETS, null, {
+  fetchPolicy: "cache-and-network",
+});
+const presets = computed(() => mergePresets(presetsResult.value?.groupedExpensePresets ?? []));
+
+function applyPreset(p: ExpensePreset) {
   description.value = p.description;
   category.value = p.category;
   grouped.value = true;

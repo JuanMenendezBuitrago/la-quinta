@@ -30,11 +30,24 @@ export interface Expense {
 export const EXPENSE_FIELDS = `id amountCents method category description supplier receiptUrl grouped items { name quantity amountCents } unitemizedCents
   spentAt staffName closingId`;
 
-// Atajos del formulario: gastos agrupados habituales, para apuntarlos rapido en el cierre.
-export const GROUPED_PRESETS: { description: string; category: ExpenseCategory }[] = [
+export interface ExpensePreset {
+  description: string;
+  category: ExpenseCategory;
+}
+
+// Atajos del formulario: los gastos agrupados mas usados (los da la API) y, para completar hasta
+// MAX_PRESETS mientras no haya bastantes, estos de partida.
+export const MAX_PRESETS = 4;
+export const DEFAULT_PRESETS: ExpensePreset[] = [
   { description: "Materias primas", category: "INSUMOS" },
   { description: "Compras en el supermercado", category: "INSUMOS" },
 ];
+
+export function mergePresets(used: ExpensePreset[]): ExpensePreset[] {
+  const seen = new Set(used.map((p) => p.description.toLowerCase()));
+  const defaults = DEFAULT_PRESETS.filter((p) => !seen.has(p.description.toLowerCase()));
+  return [...used, ...defaults].slice(0, MAX_PRESETS);
+}
 
 export const EXPENSE_METHOD_LABELS: Record<ExpenseMethod, string> = {
   CAJA: "Efectivo de la caja",

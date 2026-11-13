@@ -21,6 +21,8 @@ const MAX_SUPPLIERS = 300;
 // Desglose: tope de articulos por gasto y de gastos en la lista de pendientes de desglosar.
 const MAX_ITEMS = 200;
 const MAX_TO_ITEMIZE = 50;
+// Atajos del formulario: descripciones de gastos agrupados mas usadas.
+const MAX_PRESETS = 4;
 
 interface ExpenseInput {
   amountCents: number;
@@ -119,6 +121,26 @@ export const expensesResolvers = {
         { $limit: MAX_SUPPLIERS },
       ]);
       return rows.map((r) => r.name);
+    },
+    groupedExpensePresets: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["barra", "gestion"]);
+      // Una por descripcion sin distinguir mayusculas, con la forma y la categoria de la ultima vez.
+      const rows = await Expense.aggregate<{ description: string; category: ExpenseCategory }>([
+        { $match: { grouped: true } },
+        { $sort: { spentAt: -1 } },
+        {
+          $group: {
+            _id: { $toLower: "$description" },
+            description: { $first: "$description" },
+            category: { $first: "$category" },
+            uses: { $sum: 1 },
+            last: { $first: "$spentAt" },
+          },
+        },
+        { $sort: { uses: -1, last: -1 } },
+        { $limit: MAX_PRESETS },
+      ]);
+      return rows.map((r) => ({ description: r.description, category: r.category }));
     },
     expensesToItemize: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireStaff(ctx, ["barra", "gestion"]);
