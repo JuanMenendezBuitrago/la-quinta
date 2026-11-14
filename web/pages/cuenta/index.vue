@@ -12,6 +12,14 @@
       </header>
 
       <div class="card welcome-login">
+        <!-- El escaparate del local como cabecera de la tarjeta de acceso -->
+        <img
+          class="welcome-photo"
+          src="/escaparate-laquintaesencia.webp"
+          alt="El rótulo de La Quintaesencia en el escaparate del local"
+          width="702"
+          height="641"
+        />
         <p v-if="accountDeleted" class="deleted-notice" role="status">
           Tu cuenta se ha eliminado. Hemos borrado tu nombre, email y teléfono.
         </p>
@@ -448,6 +456,20 @@ function statusLabel(status: string) {
     radial-gradient(120% 80% at 100% 0%, var(--accent-soft), transparent 60%),
     var(--surface);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+/* Foto a sangre en la parte de arriba de la tarjeta (anula el padding con margenes negativos),
+   recortada hacia el rotulo y fundida con el fondo de la tarjeta por abajo */
+.welcome-photo {
+  display: block;
+  width: calc(100% + 48px);
+  max-width: none;
+  height: clamp(150px, 34vw, 210px);
+  margin: -26px -24px 8px;
+  object-fit: cover;
+  object-position: 50% 62%;
+  border-radius: 11px 11px 0 0;
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
 }
 .welcome-login h2 { font-size: 22px; }
 .welcome-login-hint { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; }
