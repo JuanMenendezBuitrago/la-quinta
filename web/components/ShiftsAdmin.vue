@@ -368,13 +368,26 @@
           <button type="button" class="close" aria-label="Cerrar" @click="closeDialog">×</button>
         </div>
 
-        <label class="field">
-          <span class="muted">Persona</span>
-          <select v-model="form.staffId" required>
-            <option value="" disabled>Elige a quién</option>
-            <option v-for="p in activePeople" :key="p.id" :value="p.id">{{ p.name }}</option>
-          </select>
-        </label>
+        <!-- Persona: sus avatares con el nombre, de un toque (en vez de un desplegable) -->
+        <div class="field">
+          <span id="shift-person-label" class="muted">Persona</span>
+          <div class="person-picks" role="radiogroup" aria-labelledby="shift-person-label">
+            <button
+              v-for="p in activePeople"
+              :key="p.id"
+              type="button"
+              role="radio"
+              class="person-pick"
+              :class="{ on: form.staffId === p.id }"
+              :aria-checked="form.staffId === p.id"
+              @click="form.staffId = p.id"
+            >
+              <UserAvatar :avatar="p.avatar" :name="p.name" :size="44" />
+              <span class="person-pick-name">{{ p.name }}</span>
+            </button>
+          </div>
+          <span v-if="!activePeople.length" class="muted">No hay nadie en el personal activo.</span>
+        </div>
 
         <!-- Al crear: uno o varios dias de la semana que se esta viendo. Al editar: una fecha. -->
         <div v-if="!form.id" class="field">
@@ -1414,6 +1427,25 @@ async function remove() {
 .dialog-head h2 { margin: 0; }
 .close { width: 40px; height: 40px; border: none; background: transparent; color: var(--text-muted); font-size: 26px; line-height: 1; cursor: pointer; }
 .field { display: flex; flex-direction: column; gap: 6px; }
+.person-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.person-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 4px;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.person-pick:hover:not(.on) { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.person-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.person-pick.on { border-color: var(--accent); background: var(--accent-soft); color: var(--on-accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.person-pick-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
 .day-picks { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .day-pick {
   display: flex;
