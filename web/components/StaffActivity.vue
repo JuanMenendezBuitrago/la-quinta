@@ -1,15 +1,15 @@
 <template>
-  <!-- Resumen de la actividad de una persona del personal, mes a mes o entre dos fechas (solo gestion) -->
   <div class="activity">
-    <div class="mode-toggle" role="tablist" aria-label="Periodo">
-      <button type="button" role="tab" :aria-selected="mode === 'mes'" :class="{ on: mode === 'mes' }" @click="mode = 'mes'">
-        <CalendarDays :size="16" :stroke-width="1.8" aria-hidden="true" /> Por meses
-      </button>
-      <button type="button" role="tab" :aria-selected="mode === 'fechas'" :class="{ on: mode === 'fechas' }" @click="mode = 'fechas'">
-        <Calculator :size="16" :stroke-width="1.8" aria-hidden="true" /> Calculadora de horas
-      </button>
-    </div>
+    <!-- Resumen de la actividad de una persona del personal, mes a mes o entre dos fechas (solo gestion).
+         El comentario va dentro del div: fuera, en desarrollo, el componente tendria dos raices y el
+         <Transition> que lo envuelve (StaffAdmin) no podria animarlo. -->
+    <SegmentedControl
+      v-model="mode"
+      aria-label="Periodo"
+      :options="[{ value: 'mes', label: 'Por meses', icon: CalendarDays }, { value: 'fechas', label: 'Calculadora de horas', icon: Calculator }]"
+    />
 
+    <Transition :name="mode === 'fechas' ? 'tab-swap-next' : 'tab-swap-prev'" mode="out-in">
     <div v-if="mode === 'mes'" class="period">
       <button class="nav" type="button" aria-label="Mes anterior" title="Mes anterior" @click="shiftMonth(-1)">
         <ChevronLeft :size="20" :stroke-width="2" aria-hidden="true" />
@@ -41,6 +41,7 @@
       <p v-if="calcError" class="muted" style="color: var(--danger); margin: 0">{{ calcError }}</p>
       <p v-else class="muted calc-summary">{{ calcLabel }}</p>
     </div>
+    </Transition>
 
     <p v-if="error" class="muted" style="color: var(--danger)">No se pudo cargar la actividad.</p>
     <p v-else-if="!a && loading" class="muted">Cargando actividad…</p>
@@ -115,6 +116,7 @@
 import { Calculator, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clock, TimerReset, Wallet } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { useStoreTime } from "~/composables/useStoreTime";
+import SegmentedControl from "~/components/SegmentedControl.vue";
 
 const props = defineProps<{ staffId: string; shared: boolean }>();
 
@@ -272,25 +274,6 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 <style scoped>
 .activity { display: flex; flex-direction: column; gap: 16px; }
-.mode-toggle { display: inline-flex; align-self: flex-start; flex-wrap: wrap; padding: 3px; border: 1px solid var(--border-strong); border-radius: 10px; }
-.mode-toggle button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 6px 14px;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.mode-toggle button.on { background: var(--accent-soft); color: var(--on-accent-soft); }
-.mode-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
 .calc { display: flex; flex-direction: column; gap: 10px; }
 .calc-dates { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; max-width: 420px; }
 .calc .field { display: flex; flex-direction: column; gap: 4px; }

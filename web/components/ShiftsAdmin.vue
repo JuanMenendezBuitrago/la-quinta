@@ -29,14 +29,11 @@
         </button>
         <button v-if="monday !== todayMonday" class="link-button" type="button" @click="goToday">Hoy</button>
       </div>
-      <div class="view-toggle" role="tablist" aria-label="Vista">
-        <button type="button" role="tab" :aria-selected="view === 'semana'" :class="{ on: view === 'semana' }" @click="view = 'semana'">
-          <CalendarDays :size="16" :stroke-width="1.8" aria-hidden="true" /> Semana
-        </button>
-        <button type="button" role="tab" :aria-selected="view === 'dia'" :class="{ on: view === 'dia' }" @click="view = 'dia'">
-          <GanttChart :size="16" :stroke-width="1.8" aria-hidden="true" /> Día
-        </button>
-      </div>
+      <SegmentedControl
+        v-model="view"
+        aria-label="Vista"
+        :options="[{ value: 'semana', label: 'Semana', icon: CalendarDays }, { value: 'dia', label: 'Día', icon: GanttChart }]"
+      />
     </div>
 
     <p v-if="notice" class="notice" role="status">
@@ -54,6 +51,8 @@
       </span>
     </p>
 
+    <!-- Al cambiar de vista: la saliente se desvanece y la nueva entra deslizando (tab-swap, main.css) -->
+    <Transition :name="view === 'dia' ? 'tab-swap-next' : 'tab-swap-prev'" mode="out-in">
     <!-- ===================== Vista semana ===================== -->
     <div v-if="view === 'semana'" class="board-scroll">
       <div class="board" role="table" :aria-label="`Turnos de la ${weekLabel}`">
@@ -282,6 +281,7 @@
         </p>
       </div>
     </div>
+    </Transition>
 
     <div class="legend muted" aria-hidden="true">
       <span><i class="cov-slot lvl-0" /> Sin nadie</span>
@@ -494,6 +494,7 @@ import {
 } from "lucide-vue-next";
 import EmptyState from "~/components/EmptyState.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
+import SegmentedControl from "~/components/SegmentedControl.vue";
 import { useStaffAuth } from "~/composables/useAuth";
 import { useStoreTime } from "~/composables/useStoreTime";
 import { SITE_SETTINGS_QUERY, type OpeningHours, type SiteSettings } from "~/composables/useSiteSettings";
@@ -1063,23 +1064,6 @@ async function remove() {
 }
 .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
 .link-button { border: none; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; padding: 6px 8px; }
-.view-toggle { display: inline-flex; padding: 3px; border: 1px solid var(--border-strong); border-radius: 10px; }
-.view-toggle button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 6px 14px;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.view-toggle button.on { background: var(--accent-soft); color: var(--on-accent-soft); }
 
 .notice, .error { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0; }
 .notice { padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); color: var(--on-accent-soft); }

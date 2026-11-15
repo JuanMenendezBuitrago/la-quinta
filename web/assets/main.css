@@ -290,3 +290,19 @@ input[type="checkbox"]:not(.visually-hidden):disabled { cursor: not-allowed; opa
     margin-left: calc((100% - var(--wide-width)) / 2);
   }
 }
+
+/*
+ * Cambio de vista en los selectores (SegmentedControl: Semana / Dia, Datos / Actividad...): la
+ * vista saliente se desvanece y la nueva entra deslizando desde el lado de la opcion elegida
+ * (-next: la de la derecha; -prev: la de la izquierda). Se usa con <Transition mode="out-in">.
+ */
+.tab-swap-next-enter-active, .tab-swap-prev-enter-active { transition: opacity 0.22s ease, transform 0.26s cubic-bezier(0.3, 0.7, 0.2, 1); }
+.tab-swap-next-leave-active, .tab-swap-prev-leave-active { transition: opacity 0.12s ease, transform 0.12s ease; }
+.tab-swap-next-enter-from { opacity: 0; transform: translateX(18px); }
+.tab-swap-prev-enter-from { opacity: 0; transform: translateX(-18px); }
+.tab-swap-next-leave-to { opacity: 0; transform: translateX(-8px); }
+.tab-swap-prev-leave-to { opacity: 0; transform: translateX(8px); }
+@media (prefers-reduced-motion: reduce) {
+  .tab-swap-next-enter-active, .tab-swap-prev-enter-active, .tab-swap-next-leave-active, .tab-swap-prev-leave-active { transition: opacity 0.12s ease; }
+  .tab-swap-next-enter-from, .tab-swap-prev-enter-from, .tab-swap-next-leave-to, .tab-swap-prev-leave-to { transform: none; }
+}

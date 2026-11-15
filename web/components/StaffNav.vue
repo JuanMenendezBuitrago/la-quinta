@@ -20,7 +20,7 @@
         <span>Panel de personal</span>
         <button ref="closeBtn" type="button" class="close" aria-label="Cerrar menú" @click="open = null">×</button>
       </div>
-      <div v-for="group in groups" :key="group.id" class="group" :class="{ active: group.id === currentGroup }">
+      <div v-for="(group, i) in groups" :key="group.id" class="group" :class="{ active: group.id === currentGroup }">
         <!-- Grupo con una sola entrada: enlace directo, sin desplegable -->
         <template v-if="group.entries.length === 1">
           <span class="group-title">{{ group.label }}</span>
@@ -44,7 +44,9 @@
             <span v-if="group.badge" class="badge" :class="{ danger: group.danger }">{{ group.badge }}</span>
             <ChevronDown class="caret" :size="14" :stroke-width="2" />
           </button>
-          <ul class="dropdown" :class="{ open: open === group.id }">
+          <!-- El ultimo grupo (junto a la cuenta) abre alineado a la derecha: hacia la izquierda se
+               saldria de la pantalla y daria scroll horizontal (aun cerrado ocupa su sitio) -->
+          <ul class="dropdown" :class="{ open: open === group.id, 'align-right': i === groups.length - 1 }">
             <li v-for="entry in group.entries" :key="entry.id">
               <component
                 :is="entry.external ? 'a' : 'button'"

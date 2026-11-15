@@ -21,19 +21,18 @@
         </button>
       </div>
       <!-- En una cuenta que ya existe: sus datos o el resumen de lo que ha hecho -->
-      <div v-if="form.id" class="view-toggle" role="tablist" aria-label="Ver">
-        <button type="button" role="tab" :aria-selected="tab === 'datos'" :class="{ on: tab === 'datos' }" @click="tab = 'datos'">
-          <UserCog :size="16" :stroke-width="1.8" aria-hidden="true" /> Datos
-        </button>
-        <button type="button" role="tab" :aria-selected="tab === 'actividad'" :class="{ on: tab === 'actividad' }" @click="tab = 'actividad'">
-          <BarChart3 :size="16" :stroke-width="1.8" aria-hidden="true" /> Actividad
-        </button>
-      </div>
+      <SegmentedControl
+        v-if="form.id"
+        v-model="tab"
+        aria-label="Ver"
+        :options="[{ value: 'datos', label: 'Datos', icon: UserCog }, { value: 'actividad', label: 'Actividad', icon: BarChart3 }]"
+      />
 
+      <Transition :name="tab === 'actividad' ? 'tab-swap-next' : 'tab-swap-prev'" mode="out-in">
       <StaffActivity v-if="form.id && tab === 'actividad'" :key="form.id" :staff-id="form.id" :shared="form.shared" />
 
       <!-- Datos a la izquierda; estado de la cuenta y botones a la derecha (en movil, debajo) -->
-      <div v-show="!form.id || tab === 'datos'" class="form-grid">
+      <div v-else class="form-grid">
         <div class="form-main">
           <label class="field">
             <span class="muted">Nombre</span>
@@ -156,6 +155,7 @@
           </div>
         </div>
       </div>
+      </Transition>
     </form>
     </div>
 
@@ -188,6 +188,7 @@
 import EmptyState from "~/components/EmptyState.vue";
 import { BarChart3, Trash2, UserCog, Users, X } from "lucide-vue-next";
 import StaffActivity from "~/components/StaffActivity.vue";
+import SegmentedControl from "~/components/SegmentedControl.vue";
 import { gql } from "graphql-tag";
 import { useStaffAuth } from "~/composables/useAuth";
 import UserAvatar from "~/components/UserAvatar.vue";
@@ -479,26 +480,6 @@ async function submitForm() {
   .form-actions { flex-direction: column; }
   .form-actions .button { width: 100%; }
 }
-
-/* Pestañas Datos / Actividad (como la vista Semana / Dia de los turnos) */
-.view-toggle { display: inline-flex; align-self: flex-start; padding: 3px; border: 1px solid var(--border-strong); border-radius: 10px; }
-.view-toggle button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 6px 14px;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.view-toggle button.on { background: var(--accent-soft); color: var(--on-accent-soft); }
-.view-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .row-actions { display: flex; align-items: center; gap: 6px; }
 .icon-button {
