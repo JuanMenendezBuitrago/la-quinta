@@ -23,6 +23,9 @@ export const env = {
   storeTimeZone: process.env.STORE_TIME_ZONE || "America/Bogota",
   smtpFrom: process.env.SMTP_FROM ?? '"La Quinta" <no-reply@laquinta.local>',
   // Direccion publica de la web, para los enlaces de los correos (p. ej. darse de baja).
+  // Clave de la API de Anthropic (Claude): lee los menus de la competencia (modules/competitors).
+  // Sin ella la API funciona igual; solo no se pueden leer menus.
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY || null,
   publicSiteUrl: (process.env.PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, ""),
   // Exportacion de pedidos entregados a Google Sheets. Si falta alguno de los tres primeros
   // valores, la exportacion queda desactivada (el resto de la API funciona igual).

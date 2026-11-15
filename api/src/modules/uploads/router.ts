@@ -9,6 +9,7 @@ import { StaffUser, User } from "../users/model";
 import { AVATAR_UPLOAD_PREFIX, removeAvatarFile } from "../users/avatar";
 import { RECEIPT_UPLOAD_PREFIX } from "../expenses/model";
 import { Order } from "../orders/model";
+import { Competitor, COMPETITOR_UPLOAD_PREFIX, MAX_SOURCES_PER_COMPETITOR } from "../competitors/model";
 import {
   CustomerPhoto,
   MAX_PENDING_PHOTOS,
@@ -305,5 +306,74 @@ uploadsRouter.post("/photo", async (req, res) => {
       await removePhotoFile(url, UPLOAD_DIR);
       res.status(500).json({ error: "No se pudo guardar la foto" });
     }
+  });
+});
+
+/**
+ * Menu de una cafeteria de la competencia (ver modules/competitors): PDF o foto de la carta. Solo
+ * gestion. Como /avatar, el propio endpoint lo añade a la cafeteria (?competitorId=<id>) y devuelve
+ * su id de fuente. La web reescala las fotos antes de subirlas; los PDF van tal cual.
+ */
+const COMPETITOR_DIR = path.join(UPLOAD_DIR, "competitors");
+fs.mkdirSync(COMPETITOR_DIR, { recursive: true });
+const COMPETITOR_MAX_FILE_SIZE = 15 * 1024 * 1024;
+const COMPETITOR_MIME_EXTENSIONS: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+};
+const competitorUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, COMPETITOR_DIR),
+    filename: (_req, file, cb) => cb(null, `${crypto.randomUUID()}${COMPETITOR_MIME_EXTENSIONS[file.mimetype]}`),
+  }),
+  limits: { fileSize: COMPETITOR_MAX_FILE_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (!COMPETITOR_MIME_EXTENSIONS[file.mimetype]) {
+      cb(new Error("Formato no soportado (usa PDF, JPG, PNG o WEBP)"));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+uploadsRouter.post("/competitor-menu", async (req, res) => {
+  const { staff } = await sessionOf(req);
+  if (staff?.role !== "gestion") {
+    res.status(401).json({ error: "No autorizado" });
+    return;
+  }
+  const competitorId = String(req.query.competitorId ?? "");
+  if (!Types.ObjectId.isValid(competitorId) || !(await Competitor.exists({ _id: competitorId }))) {
+    res.status(404).json({ error: "Cafetería no encontrada" });
+    return;
+  }
+
+  competitorUpload.single("file")(req, res, async (err: unknown) => {
+    if (err) {
+      const tooBig = err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE";
+      res.status(400).json({ error: tooBig ? "El archivo es demasiado grande (máximo 15 MB)" : err instanceof Error ? err.message : "No se pudo subir el archivo" });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: "No se envio ningun archivo" });
+      return;
+    }
+    const filePath = `${COMPETITOR_UPLOAD_PREFIX}${req.file.filename}`;
+    const updated = await Competitor.findOneAndUpdate(
+      { _id: competitorId, [`sources.${MAX_SOURCES_PER_COMPETITOR - 1}`]: { $exists: false } },
+      {
+        $push: { sources: { kind: "file", filePath, fileName: Buffer.from(req.file.originalname, "latin1").toString("utf8").slice(0, 200), mimeType: req.file.mimetype } },
+        $set: { updatedAt: new Date() },
+      },
+      { new: true }
+    );
+    if (!updated) {
+      fs.rm(req.file.path, { force: true }, () => undefined);
+      res.status(400).json({ error: `Como mucho ${MAX_SOURCES_PER_COMPETITOR} fuentes por cafetería` });
+      return;
+    }
+    res.json({ ok: true });
   });
 });

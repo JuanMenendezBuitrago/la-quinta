@@ -396,6 +396,11 @@
         <ReviewsAdmin />
       </section>
 
+      <!-- Precios de la competencia (solo gestion) -->
+      <section v-else-if="activeTab === 'competencia'">
+        <CompetitorsAdmin />
+      </section>
+
       <!-- Fotos de clientes: moderacion (solo gestion) -->
       <section v-else-if="activeTab === 'fotos'">
         <PhotosModeration />
@@ -470,6 +475,7 @@ import ReviewsAdmin from "~/components/ReviewsAdmin.vue";
 import PhotosModeration from "~/components/PhotosModeration.vue";
 import CoffeeAdmin from "~/components/CoffeeAdmin.vue";
 import StaffAdmin from "~/components/StaffAdmin.vue";
+import CompetitorsAdmin from "~/components/CompetitorsAdmin.vue";
 import NewsletterAdmin from "~/components/NewsletterAdmin.vue";
 import SiteSettingsAdmin from "~/components/SiteSettingsAdmin.vue";
 import CustomersAdmin from "~/components/CustomersAdmin.vue";
@@ -647,7 +653,7 @@ async function doCancel(order: any) {
 const activeTab = useStaffSection();
 // Secciones con diseño ancho de dos columnas en pantallas apaisadas (.wide-layout en assets/main.css):
 // su titulo se alinea con las columnas.
-const WIDE_SECTIONS: string[] = ["caja", "tomar", "opiniones", "personal", "portada", "cafe", "novedades", "clientes", "carta", "pie", "historial", "horarios"];
+const WIDE_SECTIONS: string[] = ["caja", "tomar", "opiniones", "personal", "portada", "cafe", "novedades", "clientes", "carta", "pie", "historial", "horarios", "competencia"];
 const sectionLabel = computed(() => STAFF_SECTIONS.find((s) => s.id === activeTab.value)?.label ?? "");
 const selectTab = goToSection;
 

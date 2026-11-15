@@ -23,6 +23,8 @@ export const STAFF_SECTIONS = [
   { id: "personal", label: "Personal", group: "local", roles: ["gestion"] },
   // Opiniones de los clientes (con su nombre: datos personales, solo gestion).
   { id: "opiniones", label: "Opiniones", group: "local", roles: ["gestion"] },
+  // Precios de otras cafeterias frente a los nuestros (menus leidos con Claude).
+  { id: "competencia", label: "Competencia", group: "local", roles: ["gestion"] },
   { id: "carta", label: "Carta", group: "web", roles: ["gestion"] },
   // Fotos de clientes de lo que pidieron: se moderan antes de salir en la carta.
   { id: "fotos", label: "Fotos de clientes", group: "web", roles: ["gestion"] },
