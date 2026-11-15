@@ -54,6 +54,12 @@
           <strong class="tile-value tabular-nums">{{ formatHours(a.workedMinutes) }}</strong>
           <span class="muted">{{ plural(a.shiftsCount, "turno", "turnos") }}</span>
         </div>
+        <!-- Total de horas entre los dias trabajados (un dia con dos turnos cuenta como una jornada) -->
+        <div class="tile">
+          <span class="tile-label"><Gauge :size="15" :stroke-width="1.8" aria-hidden="true" /> Media por jornada</span>
+          <strong class="tile-value tabular-nums">{{ workedDays ? formatHours(Math.round(a.workedMinutes / workedDays)) : "—" }}</strong>
+          <span class="muted">{{ plural(workedDays, "día trabajado", "días trabajados") }}</span>
+        </div>
         <div class="tile">
           <span class="tile-label"><TimerReset :size="15" :stroke-width="1.8" aria-hidden="true" /> Horas extra</span>
           <strong class="tile-value tabular-nums" :class="{ warn: a.overtimeMinutes > 0 }">{{ formatHours(a.overtimeMinutes) }}</strong>
@@ -113,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-import { Calculator, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clock, TimerReset, Wallet } from "lucide-vue-next";
+import { Calculator, CalendarClock, Gauge, CalendarDays, ChevronLeft, ChevronRight, Clock, TimerReset, Wallet } from "lucide-vue-next";
 import { gql } from "graphql-tag";
 import { useStoreTime } from "~/composables/useStoreTime";
 import SegmentedControl from "~/components/SegmentedControl.vue";
@@ -269,6 +275,7 @@ function formatDay(date: string) {
   return new Date(`${date}T00:00:00Z`).toLocaleDateString("es-ES", { timeZone: "UTC", weekday: "short", day: "numeric" });
 }
 const t = (hhmm: string) => hhmm.replace(/^0(\d)/, "$1").replace(/:00$/, "");
+const workedDays = computed(() => new Set(a.value?.shifts.map((s) => s.date) ?? []).size);
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 </script>
 

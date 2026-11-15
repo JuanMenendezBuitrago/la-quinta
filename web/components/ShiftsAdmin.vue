@@ -105,7 +105,11 @@
               :title="chipTitle(shift, day.hours)"
               @click="openEdit(shift)"
             >
-              <span class="chip-time tabular-nums">{{ t(shift.start) }}–{{ t(shift.end) }}</span>
+              <!-- Duracion (hh:mm) a la derecha de la hora, si la celda da para las dos -->
+              <span class="chip-line">
+                <span class="chip-time tabular-nums">{{ t(shift.start) }}–{{ t(shift.end) }}</span>
+                <span class="chip-dur tabular-nums" :aria-label="`Duración: ${formatHours(duration(shift))}`">{{ hhmm(duration(shift)) }}</span>
+              </span>
               <span v-if="shift.note" class="chip-note">{{ shift.note }}</span>
             </button>
             <button
@@ -227,9 +231,10 @@
                   :title="chipTitle(shift, selectedDay.hours)"
                   @click="openEdit(shift)"
                 >
-                  <span class="tabular-nums">{{ t(shift.start) }}–{{ t(shift.end) }}</span>
-                  <span v-if="resize?.id === shift.id" class="g-note tabular-nums">· {{ formatHours(duration(shift)) }}</span>
-                  <span v-else-if="shift.note" class="g-note">· {{ shift.note }}</span>
+                  <span class="g-time tabular-nums">{{ t(shift.start) }}–{{ t(shift.end) }}</span>
+                  <span v-if="shift.note" class="g-note">· {{ shift.note }}</span>
+                  <!-- Duracion (hh:mm) al final de la barra, si cabe; al estirarla se ve siempre -->
+                  <span class="g-dur tabular-nums" :class="{ force: resize?.id === shift.id }" :aria-label="`Duración: ${formatHours(duration(shift))}`">{{ hhmm(duration(shift)) }}</span>
                 </button>
                 <template v-if="canEdit">
                   <span
@@ -631,6 +636,8 @@ const toMin = (hhmm: string) => {
 const fromMin = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 const t = (hhmm: string) => hhmm.replace(/^0(\d)/, "$1").replace(/:00$/, "");
 const duration = (s: { start: string; end: string }) => toMin(s.end) - toMin(s.start);
+/** Duracion como hh:mm ("06:00", "08:30"). */
+const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 function formatHours(min: number) {
   const h = Math.floor(min / 60);
   const m = min % 60;
@@ -1150,7 +1157,12 @@ async function remove() {
 .chip:disabled { cursor: default; opacity: 1; }
 .chip:not(:disabled):hover { background: color-mix(in srgb, var(--accent-soft) 70%, var(--accent)); }
 .chip.outside { border-left-color: var(--color5); }
+.chip { container-type: inline-size; }
+.chip-line { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; width: 100%; }
 .chip-time { font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.chip-dur { font-size: 12px; font-weight: 600; opacity: 0.75; white-space: nowrap; }
+/* Celda estrecha: solo la hora (la duracion no cabria al lado) */
+@container (max-width: 96px) { .chip-dur { display: none; } }
 .chip-note { font-size: 11.5px; opacity: 0.85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .add-slot {
   display: flex;
@@ -1289,7 +1301,12 @@ async function remove() {
 /* Empieza antes de abrir: amarillo -> azul; acaba despues de cerrar: azul -> amarillo; ambos: los dos lados. */
 .g-bar.outside.early { background: linear-gradient(90deg, var(--color5), var(--accent)); }
 .g-bar.outside.early.late { background: linear-gradient(90deg, var(--color5), var(--accent), var(--color5)); }
-.g-note { font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+.g-bar-wrap { container-type: inline-size; }
+.g-time { flex-shrink: 0; white-space: nowrap; }
+.g-note { flex: 0 1 auto; min-width: 0; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* La nota cede sitio antes que la duracion; con la barra muy corta, solo la hora */
+.g-dur { flex-shrink: 0; margin-left: auto; padding-left: 6px; white-space: nowrap; opacity: 0.8; }
+@container (max-width: 112px) { .g-dur:not(.force) { display: none; } }
 .g-coverage .g-track { height: 12px; background: none; }
 /* Hora actual: linea vertical que cruza todas las filas del dia de hoy, con la hora en la escala */
 .now-line {
