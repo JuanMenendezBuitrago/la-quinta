@@ -162,7 +162,16 @@
     <aside class="wide-aside wide-aside--sticky staff-list">
     <p v-if="loading" class="muted">Cargando personal…</p>
     <p v-if="loadError" class="muted" style="color: var(--danger)">{{ loadError }}</p>
-    <div class="card staff-row" :class="{ inactive: !user.active }" v-for="user in staffUsers" :key="user.id">
+    <!-- Toda la ficha abre la cuenta (en la pestaña que se este viendo: Datos o Actividad) -->
+    <button
+      v-for="user in staffUsers"
+      :key="user.id"
+      type="button"
+      class="card staff-row"
+      :class="{ inactive: !user.active, selected: formOpen && form.id === user.id }"
+      :aria-current="formOpen && form.id === user.id ? 'true' : undefined"
+      @click="startEdit(user)"
+    >
       <!-- El propio, desde la sesion: cambia al momento al elegir otro avatar -->
       <UserAvatar :avatar="user.id === myId ? staff?.avatar : user.avatar" :name="user.name" :size="40" />
       <div class="staff-info">
@@ -170,15 +179,9 @@
         <span v-if="user.id === myId" class="muted"> · tú</span>
         <span v-if="!user.active" class="inactive-badge">Desactivada</span>
         <span v-if="user.shared" class="inactive-badge">Compartida</span>
-        <p class="muted">{{ user.email }} · {{ user.role }}</p>
+        <span class="muted staff-meta">{{ user.email }} · {{ user.role }}</span>
       </div>
-      <div class="row-actions">
-        <button class="icon-button" type="button" aria-label="Ver actividad" title="Ver actividad" @click="startEdit(user, 'actividad')">
-          <BarChart3 :size="18" :stroke-width="1.8" aria-hidden="true" />
-        </button>
-        <button class="button secondary" type="button" @click="startEdit(user)">Editar</button>
-      </div>
-    </div>
+    </button>
     <EmptyState v-if="!loading && !staffUsers.length" :icon="Users" title="No hay cuentas de personal todavía" />
     </aside>
   </section>
@@ -305,8 +308,8 @@ function startCreate() {
   formOpen.value = true;
 }
 
-// Al pasar de una persona a otra se queda en la pestaña que se estaba viendo, salvo que se pida una.
-function startEdit(user: StaffUserAdmin, view?: "datos" | "actividad") {
+// Al pasar de una persona a otra se queda en la pestaña que se estaba viendo (Datos o Actividad).
+function startEdit(user: StaffUserAdmin) {
   Object.assign(form, {
     id: user.id,
     name: user.name,
@@ -321,7 +324,6 @@ function startEdit(user: StaffUserAdmin, view?: "datos" | "actividad") {
     overtimeRate: user.pay?.overtimeRateCents != null ? String(user.pay.overtimeRateCents) : "",
     weeklyHours: user.pay && user.pay.weeklyHours !== DEFAULT_WEEKLY_HOURS ? String(user.pay.weeklyHours) : "",
   });
-  if (view) tab.value = view;
   formError.value = "";
   confirmingDelete.value = false;
   formOpen.value = true;
@@ -429,8 +431,23 @@ async function submitForm() {
 @media (min-width: 1000px) and (orientation: landscape) { .form-placeholder { display: block; } }
 .staff-list { gap: 0; }
 .staff-list .staff-row:first-of-type { margin-top: 0; }
-.staff-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 10px; }
-.staff-info { flex: 1; }
+.staff-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-top: 10px;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.staff-row:hover { background: color-mix(in srgb, var(--surface) 85%, var(--text)); }
+.staff-row.selected { border-color: var(--accent); }
+.staff-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.staff-info { flex: 1; min-width: 0; }
+.staff-meta { display: block; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .staff-row.inactive .user-avatar, .staff-row.inactive strong { opacity: 0.55; }
 .inactive-badge {
   margin-left: 8px;
@@ -481,21 +498,6 @@ async function submitForm() {
   .form-actions .button { width: 100%; }
 }
 
-.row-actions { display: flex; align-items: center; gap: 6px; }
-.icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--border-strong);
-  border-radius: 50%;
-  background: none;
-  color: var(--text);
-  cursor: pointer;
-}
-.icon-button:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
-.icon-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .pay { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 0; padding: 12px 14px 14px; border: 1px solid var(--border-strong); border-radius: 10px; }
 .pay legend { padding: 0 6px; font-weight: 700; }
