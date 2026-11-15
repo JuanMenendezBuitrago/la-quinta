@@ -24,6 +24,63 @@ export const usersTypeDefs = /* GraphQL */ `
     """Solo en myStaffProfile de una cuenta compartida: quien la esta usando (null si aun no se eligio).
     Lo que se hace queda a su nombre; los permisos son los de la cuenta."""
     actingAs: Staff
+    """Sueldo: solo para gestion con su propia sesion (null para el resto)."""
+    pay: StaffPay
+  }
+
+  """Sueldo de una persona del personal. Importes en pesos, como el resto de campos "Cents"."""
+  type StaffPay {
+    """Por hora normal (null: sin indicar)."""
+    hourlyRateCents: Int
+    """Por hora extra (null: sin indicar; se paga como la normal)."""
+    overtimeRateCents: Int
+    """Horas normales por semana (lunes a domingo); lo que pase de ahi es extra."""
+    weeklyHours: Float!
+  }
+
+  """Turno ya hecho, con la parte que fue extra."""
+  type StaffActivityShift {
+    date: String!
+    start: String!
+    end: String!
+    note: String
+    minutes: Int!
+    overtimeMinutes: Int!
+  }
+
+  """Resumen de la actividad de una persona del personal en un periodo (ver staffActivity)."""
+  type StaffActivity {
+    from: String!
+    to: String!
+    weeklyHours: Float!
+    """Turnos ya hechos y sus minutos (normales + extra)."""
+    shiftsCount: Int!
+    workedMinutes: Int!
+    normalMinutes: Int!
+    overtimeMinutes: Int!
+    """Turnos del periodo que aun no se han hecho."""
+    upcomingShiftsCount: Int!
+    upcomingMinutes: Int!
+    """Lo que se le debe por las horas hechas (null si falta la tarifa por hora)."""
+    normalPayCents: Int
+    overtimePayCents: Int
+    payCents: Int
+    shifts: [StaffActivityShift!]!
+    """Pedidos que tomo (no cancelados) y su importe."""
+    ordersTakenCount: Int!
+    ordersTakenCents: Int!
+    """Pedidos que cobro y su importe."""
+    ordersChargedCount: Int!
+    ordersChargedCents: Int!
+    """Rebajas que hizo y cuanto sumaron."""
+    discountsCount: Int!
+    discountsCents: Int!
+    ordersCancelledCount: Int!
+    cashClosingsCount: Int!
+    expensesCount: Int!
+    expensesCents: Int!
+    """Ajustes y canjes de sellos."""
+    stampMovementsCount: Int!
   }
 
   enum StaffRole {
@@ -86,6 +143,9 @@ export const usersTypeDefs = /* GraphQL */ `
     actingStaffOptions: [StaffLoginOption!]!
     """Listado de personal del local (requiere rol gestion)."""
     staffUsers: [Staff!]!
+    """Gestion: resumen de la actividad de una persona del personal entre dos fechas (YYYY-MM-DD,
+    ambas incluidas, en hora de la tienda; como mucho un año)."""
+    staffActivity(staffId: ID!, from: String!, to: String!): StaffActivity!
     """Que datos pedir en el login a ese email (nombre, autorizacion de datos)."""
     loginRequirements(identifier: String!): LoginRequirements!
   }
@@ -134,5 +194,8 @@ export const usersTypeDefs = /* GraphQL */ `
     updateStaffUser(id: ID!, name: String, role: StaffRole, password: String, active: Boolean, shared: Boolean): Staff!
     """Borra una cuenta de personal sin pedidos ni otros registros a su nombre (requiere rol gestion)."""
     deleteStaffUser(id: ID!): Boolean!
+    """Gestion: sueldo de una persona del personal. null en una tarifa la deja sin indicar; weeklyHours
+    null vuelve a la jornada por defecto."""
+    setStaffPay(id: ID!, hourlyRateCents: Int, overtimeRateCents: Int, weeklyHours: Float): Staff!
   }
 `;

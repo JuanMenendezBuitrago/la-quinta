@@ -15,13 +15,25 @@
 
     <form v-if="formOpen" class="card staff-form" @submit.prevent="submitForm">
       <div class="form-head">
-        <h3>{{ form.id ? "Editar cuenta" : "Nueva cuenta" }}</h3>
+        <h3>{{ form.id ? form.name || "Cuenta" : "Nueva cuenta" }}</h3>
         <button class="close-form" type="button" aria-label="Cerrar" title="Cerrar" :disabled="saving" @click="cancelForm">
           <X :size="22" :stroke-width="2" aria-hidden="true" />
         </button>
       </div>
+      <!-- En una cuenta que ya existe: sus datos o el resumen de lo que ha hecho -->
+      <div v-if="form.id" class="view-toggle" role="tablist" aria-label="Ver">
+        <button type="button" role="tab" :aria-selected="tab === 'datos'" :class="{ on: tab === 'datos' }" @click="tab = 'datos'">
+          <UserCog :size="16" :stroke-width="1.8" aria-hidden="true" /> Datos
+        </button>
+        <button type="button" role="tab" :aria-selected="tab === 'actividad'" :class="{ on: tab === 'actividad' }" @click="tab = 'actividad'">
+          <BarChart3 :size="16" :stroke-width="1.8" aria-hidden="true" /> Actividad
+        </button>
+      </div>
+
+      <StaffActivity v-if="form.id && tab === 'actividad'" :key="form.id" :staff-id="form.id" :shared="form.shared" />
+
       <!-- Datos a la izquierda; estado de la cuenta y botones a la derecha (en movil, debajo) -->
-      <div class="form-grid">
+      <div v-show="!form.id || tab === 'datos'" class="form-grid">
         <div class="form-main">
           <label class="field">
             <span class="muted">Nombre</span>
@@ -61,6 +73,39 @@
               @changed="onAvatarChanged"
             />
           </div>
+
+          <!-- Sueldo: lo usa el resumen de actividad para calcular lo que se le debe por sus turnos.
+               Una cuenta compartida no trabaja turnos. -->
+          <fieldset v-if="!form.shared" class="pay">
+            <legend>Sueldo</legend>
+            <div class="pay-grid">
+              <label class="field">
+                <span class="muted">Hora normal</span>
+                <span class="money">
+                  <span aria-hidden="true">$</span>
+                  <input v-model="form.hourlyRate" type="number" inputmode="numeric" min="0" max="10000000" step="1" placeholder="Sin indicar" />
+                </span>
+              </label>
+              <label class="field">
+                <span class="muted">Hora extra</span>
+                <span class="money">
+                  <span aria-hidden="true">$</span>
+                  <input v-model="form.overtimeRate" type="number" inputmode="numeric" min="0" max="10000000" step="1" :placeholder="suggestedOvertime ? String(suggestedOvertime) : 'Sin indicar'" />
+                </span>
+              </label>
+              <label class="field">
+                <span class="muted">Horas normales / semana</span>
+                <input v-model="form.weeklyHours" type="number" inputmode="decimal" min="1" max="84" step="0.25" :placeholder="String(DEFAULT_WEEKLY_HOURS)" />
+              </label>
+            </div>
+            <span class="muted">
+              Las horas de sus turnos que pasen de las semanales (de lunes a domingo) cuentan como extra.
+              <template v-if="suggestedOvertime && !form.overtimeRate">
+                Con el recargo legal de la hora extra diurna (+25 %) serían {{ formatPrice(suggestedOvertime) }}:
+                <button class="link-inline" type="button" @click="form.overtimeRate = String(suggestedOvertime)">usar</button>.
+              </template>
+            </span>
+          </fieldset>
         </div>
         <div class="form-side">
           <div v-if="form.id" class="field">
@@ -127,7 +172,12 @@
         <span v-if="user.shared" class="inactive-badge">Compartida</span>
         <p class="muted">{{ user.email }} · {{ user.role }}</p>
       </div>
-      <button class="button secondary" type="button" @click="startEdit(user)">Editar</button>
+      <div class="row-actions">
+        <button class="icon-button" type="button" aria-label="Ver actividad" title="Ver actividad" @click="startEdit(user, 'actividad')">
+          <BarChart3 :size="18" :stroke-width="1.8" aria-hidden="true" />
+        </button>
+        <button class="button secondary" type="button" @click="startEdit(user)">Editar</button>
+      </div>
     </div>
     <EmptyState v-if="!loading && !staffUsers.length" :icon="Users" title="No hay cuentas de personal todavía" />
     </aside>
@@ -136,7 +186,8 @@
 
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
-import { Trash2, UserCog, Users, X } from "lucide-vue-next";
+import { BarChart3, Trash2, UserCog, Users, X } from "lucide-vue-next";
+import StaffActivity from "~/components/StaffActivity.vue";
 import { gql } from "graphql-tag";
 import { useStaffAuth } from "~/composables/useAuth";
 import UserAvatar from "~/components/UserAvatar.vue";
@@ -153,7 +204,11 @@ interface StaffUserAdmin {
   active: boolean;
   shared: boolean;
   deletable: boolean;
+  pay?: { hourlyRateCents: number | null; overtimeRateCents: number | null; weeklyHours: number } | null;
 }
+
+/** Jornada por defecto (la misma que la API, users/model.ts). */
+const DEFAULT_WEEKLY_HOURS = 42;
 
 const STAFF_USERS_QUERY = gql`
   query StaffUsers {
@@ -166,6 +221,11 @@ const STAFF_USERS_QUERY = gql`
       active
       shared
       deletable
+      pay {
+        hourlyRateCents
+        overtimeRateCents
+        weeklyHours
+      }
     }
   }
 `;
@@ -181,6 +241,14 @@ const CREATE_STAFF_USER = gql`
 const UPDATE_STAFF_USER = gql`
   mutation UpdateStaffUser($id: ID!, $name: String, $role: StaffRole, $password: String, $active: Boolean, $shared: Boolean) {
     updateStaffUser(id: $id, name: $name, role: $role, password: $password, active: $active, shared: $shared) {
+      id
+    }
+  }
+`;
+
+const SET_STAFF_PAY = gql`
+  mutation SetStaffPay($id: ID!, $hourlyRateCents: Int, $overtimeRateCents: Int, $weeklyHours: Float) {
+    setStaffPay(id: $id, hourlyRateCents: $hourlyRateCents, overtimeRateCents: $overtimeRateCents, weeklyHours: $weeklyHours) {
       id
     }
   }
@@ -218,8 +286,13 @@ function emptyForm() {
     shared: false,
     deletable: false,
     avatar: null as string | null | undefined,
+    // Sueldo, como texto del input (vacio: sin indicar)
+    hourlyRate: "",
+    overtimeRate: "",
+    weeklyHours: "",
   };
 }
+const tab = ref<"datos" | "actividad">("datos");
 const form = reactive(emptyForm());
 const isSelf = computed(() => !!form.id && form.id === myId.value);
 
@@ -227,10 +300,12 @@ function startCreate() {
   Object.assign(form, emptyForm());
   formError.value = "";
   confirmingDelete.value = false;
+  tab.value = "datos";
   formOpen.value = true;
 }
 
-function startEdit(user: StaffUserAdmin) {
+// Al pasar de una persona a otra se queda en la pestaña que se estaba viendo, salvo que se pida una.
+function startEdit(user: StaffUserAdmin, view?: "datos" | "actividad") {
   Object.assign(form, {
     id: user.id,
     name: user.name,
@@ -241,10 +316,40 @@ function startEdit(user: StaffUserAdmin) {
     shared: user.shared,
     deletable: user.deletable,
     avatar: user.avatar,
+    hourlyRate: user.pay?.hourlyRateCents != null ? String(user.pay.hourlyRateCents) : "",
+    overtimeRate: user.pay?.overtimeRateCents != null ? String(user.pay.overtimeRateCents) : "",
+    weeklyHours: user.pay && user.pay.weeklyHours !== DEFAULT_WEEKLY_HOURS ? String(user.pay.weeklyHours) : "",
   });
+  if (view) tab.value = view;
   formError.value = "";
   confirmingDelete.value = false;
   formOpen.value = true;
+}
+
+const suggestedOvertime = computed(() => {
+  const hourly = Number(form.hourlyRate);
+  return form.hourlyRate !== "" && hourly > 0 ? Math.round(hourly * 1.25) : 0;
+});
+
+function formatPrice(cents: number) {
+  return cents.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+}
+
+/** Lo que se envia del sueldo (null: sin indicar). Lanza un error legible si algo no vale. */
+function payInput() {
+  const rate = (text: string | number, label: string) => {
+    if (text === "" || text == null) return null;
+    const n = Number(text);
+    if (!Number.isInteger(n) || n < 0) throw new Error(`${label}: escribe un importe en pesos, sin decimales`);
+    return n;
+  };
+  const weekly = form.weeklyHours === "" || form.weeklyHours == null ? null : Number(form.weeklyHours);
+  if (weekly != null && !(weekly >= 1 && weekly <= 84)) throw new Error("Las horas normales por semana deben estar entre 1 y 84");
+  return {
+    hourlyRateCents: rate(form.hourlyRate, "Hora normal"),
+    overtimeRateCents: rate(form.overtimeRate, "Hora extra"),
+    weeklyHours: weekly,
+  };
 }
 
 // El avatar se guarda en el momento: se refleja en el formulario y en el listado.
@@ -279,6 +384,7 @@ async function submitForm() {
   saving.value = true;
   formError.value = "";
   try {
+    const pay = form.shared ? null : payInput();
     if (form.id) {
       const { mutate } = useMutation(UPDATE_STAFF_USER);
       await mutate({
@@ -292,15 +398,18 @@ async function submitForm() {
       // Cambiar la contraseña cierra las sesiones abiertas de esa cuenta, la propia incluida: se
       // vuelve a entrar con la nueva para no echar a quien la acaba de cambiar.
       if (isSelf.value && form.password) await loginById(form.id, form.password);
+      if (pay) await useMutation(SET_STAFF_PAY).mutate({ id: form.id, ...pay });
     } else {
       const { mutate } = useMutation(CREATE_STAFF_USER);
-      await mutate({
+      const created = await mutate({
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
         role: form.role,
         shared: form.shared,
       });
+      const id = created?.data?.createStaffUser?.id;
+      if (pay && id && Object.values(pay).some((v) => v != null)) await useMutation(SET_STAFF_PAY).mutate({ id, ...pay });
     }
     await refetch();
     formOpen.value = false;
@@ -370,6 +479,51 @@ async function submitForm() {
   .form-actions { flex-direction: column; }
   .form-actions .button { width: 100%; }
 }
+
+/* Pestañas Datos / Actividad (como la vista Semana / Dia de los turnos) */
+.view-toggle { display: inline-flex; align-self: flex-start; padding: 3px; border: 1px solid var(--border-strong); border-radius: 10px; }
+.view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.view-toggle button.on { background: var(--accent-soft); color: var(--on-accent-soft); }
+.view-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.row-actions { display: flex; align-items: center; gap: 6px; }
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.icon-button:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
+.icon-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.pay { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 0; padding: 12px 14px 14px; border: 1px solid var(--border-strong); border-radius: 10px; }
+.pay legend { padding: 0 6px; font-weight: 700; }
+.pay > .muted { font-size: 13px; }
+.pay-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.money { position: relative; display: block; }
+.money > span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.money input { padding-left: 26px; width: 100%; }
+.link-inline { border: none; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 
 select {
   width: 100%;

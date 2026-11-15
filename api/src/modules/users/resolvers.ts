@@ -1,6 +1,6 @@
 import { Types } from "mongoose";
 import { GraphQLContext, isActingCandidate, requireCustomer, requireOwnStaffSession, requireStaff } from "../../graphql/context";
-import { User, StaffUser } from "./model";
+import { User, StaffUser, DEFAULT_WEEKLY_HOURS } from "./model";
 import { requestOtp, verifyOtpAndIssueToken, loginStaff, loginStaffById, hashPassword, signStaffToken, requestStaffPasswordReset, resetStaffPassword, sessionsCutoff, loginRequirementsFor } from "./auth";
 import { presetAvatarValue, removeAvatarFile } from "./avatar";
 import { UPLOAD_DIR } from "../uploads/router";
@@ -12,6 +12,7 @@ import { LoyaltyTransaction } from "../loyalty/model";
 import { StockMovement } from "../inventory/model";
 import { NewsletterCampaign } from "../newsletter/model";
 import { Shift } from "../shifts/model";
+import { staffActivity } from "./activity";
 
 /**
  * Lo que queda a nombre de una cuenta del personal (pedidos que tomo, movio o cobro, cierres,
@@ -111,11 +112,28 @@ export const usersResolvers = {
       requireOwnStaffSession(ctx, ["gestion"]);
       return StaffUser.find().sort({ name: 1 }).exec();
     },
+    staffActivity: async (_: unknown, args: { staffId: string; from: string; to: string }, ctx: GraphQLContext) => {
+      requireOwnStaffSession(ctx, ["gestion"]);
+      if (!Types.ObjectId.isValid(args.staffId)) throw new Error("Usuario no encontrado");
+      const member = await StaffUser.findById(args.staffId).lean();
+      if (!member) throw new Error("Usuario no encontrado");
+      return staffActivity(member, args.from, args.to);
+    },
     loginRequirements: (_: unknown, args: { identifier: string }) => loginRequirementsFor(args.identifier),
   },
   Staff: {
     deletable: async (doc: any) => (await staffRecords(doc._id.toString())).length === 0,
     shared: (doc: any) => !!doc.shared,
+    // El sueldo solo lo ve gestion entrando con su propia cuenta (no barra, ni una compartida).
+    pay: (doc: any, _: unknown, ctx: GraphQLContext) => {
+      const staff = ctx.staff;
+      if (!staff || staff.role !== "gestion" || staff.id !== staff.accountId) return null;
+      return {
+        hourlyRateCents: doc.hourlyRateCents ?? null,
+        overtimeRateCents: doc.overtimeRateCents ?? null,
+        weeklyHours: doc.weeklyHours ?? DEFAULT_WEEKLY_HOURS,
+      };
+    },
     // Solo en la propia sesion (myStaffProfile): quien esta usando la cuenta compartida.
     actingAs: (doc: any, _: unknown, ctx: GraphQLContext) => {
       const staff = ctx.staff;
@@ -257,6 +275,32 @@ export const usersResolvers = {
       if (typeof args.active === "boolean") update.active = args.active;
       if (typeof args.shared === "boolean") update.shared = args.shared;
       const updated = await StaffUser.findByIdAndUpdate(args.id, update, { new: true });
+      if (!updated) throw new Error("Usuario no encontrado");
+      return updated;
+    },
+    setStaffPay: async (
+      _: unknown,
+      args: { id: string; hourlyRateCents?: number | null; overtimeRateCents?: number | null; weeklyHours?: number | null },
+      ctx: GraphQLContext
+    ) => {
+      requireOwnStaffSession(ctx, ["gestion"]);
+      if (!Types.ObjectId.isValid(args.id)) throw new Error("Usuario no encontrado");
+      const set: Record<string, number> = {};
+      const unset: Record<string, 1> = {};
+      const rate = (field: "hourlyRateCents" | "overtimeRateCents", value: number | null | undefined) => {
+        if (value === undefined) return;
+        if (value === null) return void (unset[field] = 1);
+        if (!Number.isInteger(value) || value < 0 || value > 10_000_000) throw new Error("La tarifa por hora no es válida");
+        set[field] = value;
+      };
+      rate("hourlyRateCents", args.hourlyRateCents);
+      rate("overtimeRateCents", args.overtimeRateCents);
+      if (args.weeklyHours === null) unset.weeklyHours = 1;
+      else if (args.weeklyHours !== undefined) {
+        if (!(args.weeklyHours >= 1 && args.weeklyHours <= 84)) throw new Error("Las horas por semana deben estar entre 1 y 84");
+        set.weeklyHours = Math.round(args.weeklyHours * 4) / 4;
+      }
+      const updated = await StaffUser.findByIdAndUpdate(args.id, { $set: set, $unset: unset }, { new: true });
       if (!updated) throw new Error("Usuario no encontrado");
       return updated;
     },

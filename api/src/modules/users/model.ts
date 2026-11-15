@@ -83,6 +83,12 @@ export interface StaffUserDoc {
   // Los tokens firmados antes de esta fecha ya no valen: se pone al cambiar la contraseña, para
   // cerrar las sesiones abiertas (p. ej. si alguien la sabia y por eso se cambia).
   sessionsValidFrom?: Date;
+  // Sueldo (solo lo ve y cambia gestion), en pesos como el resto de importes "Cents": por hora
+  // normal, por hora extra y las horas normales por semana (lo que pase de ahi, de lunes a
+  // domingo, cuenta como extra). Sin hourlyRateCents no se calcula lo que se le debe.
+  hourlyRateCents?: number;
+  overtimeRateCents?: number;
+  weeklyHours?: number;
   createdAt: Date;
 }
 
@@ -97,7 +103,13 @@ const staffUserSchema = new Schema<StaffUserDoc>({
   active: { type: Boolean, default: true },
   shared: { type: Boolean, default: false },
   sessionsValidFrom: { type: Date },
+  hourlyRateCents: { type: Number, min: 0 },
+  overtimeRateCents: { type: Number, min: 0 },
+  weeklyHours: { type: Number, min: 1, max: 84 },
   createdAt: { type: Date, default: () => new Date() },
 });
+
+/** Horas normales por semana si no se indicaron: la jornada maxima legal (Ley 2101, desde jul. 2026). */
+export const DEFAULT_WEEKLY_HOURS = 42;
 
 export const StaffUser = model<StaffUserDoc>("StaffUser", staffUserSchema);
