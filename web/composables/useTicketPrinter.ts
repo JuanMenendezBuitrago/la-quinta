@@ -264,14 +264,49 @@ export function useTicketPrinter() {
     return p.toBase64();
   }
 
-  /** Abre RawBT con el ticket. Devuelve un aviso si no se puede imprimir desde este dispositivo. */
-  async function printTicket(order: TicketOrder): Promise<string | null> {
+  /**
+   * Ticket de prueba (Configuración): comprueba de una vez lo que usa el ticket real, es decir, el
+   * logo, las tildes y la ñ (pagina de codigos), negrita, doble tamaño, columnas, QR y corte.
+   */
+  async function buildTest() {
+    const p = new EscPos();
+    p.align("center");
+    const logo = await loadLogo();
+    if (logo) p.image(logo.width, logo.height, logo.dots);
+    p.bold(true).double(true).line("TICKET DE PRUEBA").double(false).bold(false);
+    p.line(STORE_NAME);
+    p.line(dateText(new Date().toISOString()));
+    p.align("left").line(rule());
+    p.line("Tildes y signos: áéíóú ÁÉÍÓÚ ñÑ ü ¡! ¿? € °");
+    p.bold(true).line("Texto en negrita").bold(false);
+    p.line(cols("Columna izquierda", "derecha"));
+    p.line(rule("="));
+    p.line("1234567890".repeat(4) + "12345678"); // 48 caracteres: debe caber en una linea
+    p.line(rule());
+    p.align("center").line("Si lees bien todo y ves el QR, funciona:");
+    p.qr(`${window.location.origin}/cuenta`);
+    p.align("left").feed(3).cut();
+    return p.toBase64();
+  }
+
+  /** Envia los bytes a RawBT. Devuelve un aviso si no se puede imprimir desde este dispositivo. */
+  function sendToRawBT(data: string): string | null {
     if (!isAndroid) return "Para imprimir, usa la tablet Android con RawBT";
-    const data = await build(order);
     const fallback = encodeURIComponent(RAWBT_PLAY_URL);
     window.location.href = `intent:base64,${data}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;S.browser_fallback_url=${fallback};end;`;
     return null;
   }
 
-  return { enabled, printTicket, buildTicket: build };
+  /** Abre RawBT con el ticket. Devuelve un aviso si no se puede imprimir desde este dispositivo. */
+  async function printTicket(order: TicketOrder): Promise<string | null> {
+    if (!isAndroid) return sendToRawBT("");
+    return sendToRawBT(await build(order));
+  }
+
+  async function printTestTicket(): Promise<string | null> {
+    if (!isAndroid) return sendToRawBT("");
+    return sendToRawBT(await buildTest());
+  }
+
+  return { enabled, printTicket, printTestTicket, buildTicket: build };
 }

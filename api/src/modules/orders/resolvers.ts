@@ -11,6 +11,8 @@ import { StaffUser, User } from "../users/model";
 import { EVENTS } from "../../config/pubsub";
 import { internalEvents, INTERNAL_EVENTS } from "../../config/events";
 import { buildClosedPayload } from "./closed";
+import { deleteClosedOrder } from "./delete";
+import { updateStaffOrder, type StaffOrderUpdateInput } from "./update";
 import { getOpeningHours, orderQueueEnabled, packagingFeeCents, staffOnlyOrders } from "../settings/resolvers";
 import { pickupOutsideHoursReason } from "../settings/openingHours";
 
@@ -117,6 +119,8 @@ export const ordersResolvers = {
     createdAt: (doc: any) => new Date(doc.createdAt).toISOString(),
     updatedAt: (doc: any) => new Date(doc.updatedAt).toISOString(),
     deliveredAt: (doc: any) => iso(doc.deliveredAt),
+    editedAt: (doc: any) => iso(doc.editedAt),
+    editedByName: (doc: any) => staffNameOf(doc.editedByStaffId),
     packagingCents: (doc: any) => doc.packagingCents ?? 0,
     takeaway: (doc: any) => isTakeaway(doc),
     // Una sola consulta por pedido para el nombre y el avatar del personal que hizo cada cambio.
@@ -163,6 +167,18 @@ export const ordersResolvers = {
     },
   },
   Mutation: {
+    updateStaffOrder: async (_: unknown, args: { id: string; input: StaffOrderUpdateInput }, ctx: GraphQLContext) => {
+      const staff = requireStaff(ctx, ["barra", "gestion"]);
+      const order = await updateStaffOrder(args.id, args.input, staff);
+      await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
+      // El cliente ve en "Mi cuenta" sus pedidos con lo que de verdad pidio.
+      if (order.customerId) await ctx.pubsub.publish(EVENTS.ORDER_STATUS_CHANGED, { orderStatusChanged: order });
+      return order;
+    },
+    deleteOrder: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["gestion"]);
+      return deleteClosedOrder(args.id);
+    },
     createOrder: async (
       _: unknown,
       args: { items: OrderLineRequest[]; pickupSlot?: string | null; table?: string | null },

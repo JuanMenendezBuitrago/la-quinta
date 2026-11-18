@@ -1,5 +1,5 @@
 import { MenuItem, MenuItemDoc, ModifierGroup, ModifierGroupDoc } from "../menu/model";
-import { generateOrderCode, isDuplicateCodeError, Order, OrderDoc, OrderLineOptionDoc, OrderStatus, OrderStatusChangeDoc } from "./model";
+import { generateOrderCode, isDuplicateCodeError, Order, OrderDoc, OrderLineDoc, OrderLineOptionDoc, OrderStatus, OrderStatusChangeDoc } from "./model";
 
 const MAX_CODE_ATTEMPTS = 5;
 // Estados por los que pasa un pedido hasta entregarse, en orden.
@@ -60,7 +60,18 @@ function resolveOptions(
  * existe y esta disponible, y guarda su nombre, sus opciones y su precio de ese momento (si la
  * carta cambia despues, el pedido no se altera). El precio por unidad incluye los suplementos.
  */
-export async function buildOrderLines(items: OrderLineRequest[]) {
+/** Producto + opciones de una linea, para reconocer la misma linea al modificar un pedido. */
+function lineKey(menuItemId: string, optionIds: string[]) {
+  return `${menuItemId}:${[...optionIds].sort().join(",")}`;
+}
+
+/**
+ * `keep`: lineas que ya tenia el pedido (al modificarlo). Una linea pedida con el mismo producto y
+ * las mismas opciones conserva su nombre, opciones y precio de entonces, aunque la carta haya
+ * cambiado o el producto se haya agotado: modificar otra cosa no debe re-cobrar ni bloquear lo
+ * que ya estaba pedido. Solo las lineas nuevas o cambiadas pasan por la carta actual.
+ */
+export async function buildOrderLines(items: OrderLineRequest[], keep: OrderLineDoc[] = []) {
   if (items.length === 0) throw new Error("El pedido no puede estar vacio");
   for (const line of items) {
     if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > MAX_QUANTITY) {
@@ -68,11 +79,18 @@ export async function buildOrderLines(items: OrderLineRequest[]) {
     }
   }
 
+  const kept = new Map(
+    keep.map((l) => [lineKey(l.menuItemId.toString(), (l.options ?? []).map((o) => o.optionId.toString())), l])
+  );
   const menuItems = await MenuItem.find({ _id: { $in: items.map((i) => i.menuItemId) } }).lean();
   const groupIds = menuItems.flatMap((m) => (m.modifiers ?? []).map((x) => x.groupId));
   const groups = groupIds.length ? await ModifierGroup.find({ _id: { $in: groupIds } }).lean() : [];
 
   const lines = items.map((line) => {
+    const same = kept.get(lineKey(line.menuItemId, line.optionIds ?? []));
+    if (same) {
+      return { menuItemId: same.menuItemId, name: same.name, priceCents: same.priceCents, quantity: line.quantity, options: same.options ?? [] };
+    }
     const item = menuItems.find((m) => m._id.toString() === line.menuItemId);
     if (!item) throw new Error(`Producto no encontrado: ${line.menuItemId}`);
     if (!item.available) throw new Error(`"${item.name}" no esta disponible ahora`);

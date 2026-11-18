@@ -59,6 +59,13 @@
                 <span>Imprimir tickets en la impresora térmica</span>
               </label>
               <span class="muted">Añade «Imprimir ticket» a los pedidos de la cola y del historial. Imprime desde la tablet Android con la app RawBT instalada y configurada con la IP de la impresora (puerto 9100).</span>
+              <div class="test-print">
+                <button class="button secondary" type="button" :disabled="testPrinting" @click="printTest">
+                  <Printer :size="16" :stroke-width="1.8" aria-hidden="true" />
+                  {{ testPrinting ? "Preparando…" : "Imprimir ticket de prueba" }}
+                </button>
+                <span v-if="testPrintNotice" class="muted" role="status">{{ testPrintNotice }}</span>
+              </div>
             </div>
           </template>
 
@@ -190,7 +197,7 @@
 </template>
 
 <script setup lang="ts">
-import { ClipboardList, Contact, MapPin, PanelsTopLeft, ShieldCheck, Stamp, Trash2 } from "lucide-vue-next";
+import { ClipboardList, Contact, MapPin, PanelsTopLeft, Printer, ShieldCheck, Stamp, Trash2 } from "lucide-vue-next";
 import MobileTabs from "~/components/MobileTabs.vue";
 import {
   SITE_SETTINGS_QUERY,
@@ -217,6 +224,20 @@ const STAMPS_MODE_OPTIONS: { id: StampsMode; label: string; hint: string }[] = [
   { id: "PRODUCTO", label: "Por producto", hint: "Por cada producto del pedido." },
   { id: "IMPORTE", label: "Por importe", hint: "Uno por cada tantos pesos gastados." },
 ];
+
+// Ticket de prueba: funciona aunque la impresion de tickets este desactivada, para probar antes.
+const { printTestTicket } = useTicketPrinter();
+const testPrinting = ref(false);
+const testPrintNotice = ref("");
+async function printTest() {
+  testPrinting.value = true;
+  try {
+    testPrintNotice.value =
+      (await printTestTicket()) ?? "Enviado a RawBT. Si no sale nada, revisa en RawBT la IP de la impresora (puerto 9100).";
+  } finally {
+    testPrinting.value = false;
+  }
+}
 
 const WEEKDAY_NAMES = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
@@ -397,6 +418,8 @@ onBeforeUnmount(() => {
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-size: 14px; font-weight: 600; }
 .field .muted { font-size: 13.5px; }
+.test-print { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 4px; }
+.test-print .button { display: inline-flex; align-items: center; gap: 8px; }
 .toggle-row { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
 .toggle-row input { margin: 0; flex-shrink: 0; }
 input.short { max-width: 12rem; }

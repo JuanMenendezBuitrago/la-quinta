@@ -3,7 +3,17 @@
   <section class="order-taker wide-layout">
     <div class="wide-main">
     <!-- El texto a la izquierda; los botones, en columna a la derecha -->
-    <div v-if="lastCode" class="card sent-notice" role="status">
+    <!-- Modificando un pedido de la cola: se guarda sobre el mismo pedido, sin cobrarlo -->
+    <div v-if="editing" class="card sent-notice edit-notice" role="status">
+      <div class="sent-text">
+        <p>Modificando el pedido <strong class="code">{{ editing.code }}</strong></p>
+        <p class="muted edit-hint">Cambia lo que haga falta y pulsa «Guardar cambios». Se cobra después, desde la cola.</p>
+      </div>
+      <div class="sent-actions">
+        <button class="button secondary" type="button" :disabled="submitting" @click="cancelEdit">Cancelar</button>
+      </div>
+    </div>
+    <div v-else-if="lastCode" class="card sent-notice" role="status">
       <div class="sent-text">
         <p>
           Pedido <strong class="code">{{ lastCode }}</strong>
@@ -121,7 +131,7 @@
           <button v-if="lines.length" type="button" class="link-button" @click="openDiscounts(true)">Aplicar canje</button>
         </div>
       </div>
-      <h3>Ticket</h3>
+      <h3>{{ editing ? `Ticket · ${editing.code}` : "Ticket" }}</h3>
       <EmptyState v-if="!lines.length" :icon="Receipt" title="El ticket está vacío">Añade productos de la carta.</EmptyState>
       <ul v-else class="ticket-lines">
         <li v-for="line in lines" :key="line.key" class="ticket-line">
@@ -213,7 +223,7 @@
       <!-- Pagar (guardar y cobrar en el acto, sin pasar por la cola): en la cabecera de la seccion, a
            la derecha del titulo. Primero "Pagar"; al pulsarlo, en su lugar, las formas de pago.
            Solo en cliente: Teleport fuera de #teleports no se renderiza en SSR. -->
-      <ClientOnly>
+      <ClientOnly v-if="!editing">
         <Teleport to="#staff-hero-actions">
           <!-- Entre "Pagar" y las formas de pago, deslizando: hacia la izquierda al avanzar y hacia
                la derecha al volver -->
@@ -243,7 +253,13 @@
       </ClientOnly>
       <CashChangeDialog ref="cashDialog" :total-cents="finalCents" :busy="submitting" @confirm="payCash" />
       <StaffActingPicker v-if="pendingAction" @chosen="onWhoChosen" @cancel="pendingAction = null" />
-      <div v-if="queueEnabled || lines.length" class="ticket-actions">
+      <div v-if="editing" class="ticket-actions">
+        <button class="button" type="button" :disabled="!canSubmit" @click="askWho(() => saveEdit())">
+          {{ submitting ? "Guardando…" : "Guardar cambios" }}
+        </button>
+        <button class="button secondary" type="button" :disabled="submitting" @click="cancelEdit">Cancelar</button>
+      </div>
+      <div v-else-if="queueEnabled || lines.length" class="ticket-actions">
         <!-- Sin cola nadie lo prepararia: solo se registran pedidos ya servidos y cobrados -->
         <button v-if="queueEnabled" class="button secondary" type="button" :disabled="!canSubmit" @click="askWho(() => submit())">
           {{ submitting ? "Haciendo pedido…" : "Hacer pedido" }}
@@ -266,7 +282,7 @@ import { Banknote, Percent, Printer, Receipt, Search, SearchX, Stamp } from "luc
 import { useTicketPrinter } from "~/composables/useTicketPrinter";
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
-import { orderLinesInput, useCart } from "~/composables/useCart";
+import { cartLineKey, orderLinesInput, useCart, type CartLine } from "~/composables/useCart";
 import { MENU_QUERY, defaultCartOptions, missingModifiers, type MenuCategory, type MenuItem } from "~/composables/useMenu";
 import CashChangeDialog from "~/components/CashChangeDialog.vue";
 import StaffActingPicker from "~/components/StaffActingPicker.vue";
@@ -284,6 +300,7 @@ import {
   discountProblem,
   redemptionAmount,
   redemptionProblem,
+  useEditingOrder,
   type CustomerMatch,
   type DiscountInput,
   type OrderDiscounts,
@@ -291,6 +308,7 @@ import {
   type PaymentMethod,
 } from "~/composables/useStaffOrders";
 import { BAR_TABLE, TABLES } from "~/composables/useTables";
+import { goToSection } from "~/composables/useStaffSections";
 
 const TOP_MENU_ITEMS = gql`
   query TopMenuItems($limit: Int) {
@@ -299,6 +317,14 @@ const TOP_MENU_ITEMS = gql`
 `;
 // Se piden algunos de mas: los borrados o no disponibles no estan en la carta y se descartan.
 const SHORTCUT_COUNT = 5;
+
+const UPDATE_STAFF_ORDER = gql`
+  mutation UpdateStaffOrder($id: ID!, $input: StaffOrderUpdateInput!) {
+    updateStaffOrder(id: $id, input: $input) {
+      ${ORDER_FIELDS}
+    }
+  }
+`;
 
 const CREATE_STAFF_ORDER = gql`
   mutation CreateStaffOrder($input: StaffOrderInput!) {
@@ -311,8 +337,18 @@ const CREATE_STAFF_ORDER = gql`
 const { result, loading, error } = useQuery<{ menu: MenuCategory[] }>(MENU_QUERY);
 const menu = computed(() => result.value?.menu ?? []);
 
+// Modificar un pedido de la cola (lo fija su boton de modificar): se carga en un ticket aparte, para
+// no perder el pedido nuevo que se estuviera tomando. Se fija al abrir; al salir se suelta.
+const editingOrder = useEditingOrder();
+const editing = editingOrder.value;
+onBeforeUnmount(() => {
+  editingOrder.value = null;
+});
+
 // Ticket propio: no se mezcla con el carrito publico aunque sea el mismo navegador.
-const { lines, add, setQuantity, setOptions, clear, cartCount, totalCents } = useCart("staff-ticket-lines");
+const { lines, add, setQuantity, setOptions, clear, cartCount, totalCents } = useCart(
+  editing ? "staff-edit-lines" : "staff-ticket-lines"
+);
 
 const search = ref("");
 const searchOpen = ref(false);
@@ -469,7 +505,11 @@ const discountIssue = computed(() => {
     const problem = redemptionProblem(redemption.value, lines.value);
     if (problem) return problem;
   }
-  return discount.value ? discountProblem(discount.value, baseCents.value, staff.value?.role) : null;
+  if (!discount.value) return null;
+  // El descuento que ya tenia el pedido y no se toco: lo comprobo quien lo puso (p. ej. gestion,
+  // por encima del tope de barra) y la API lo recalcula sobre el nuevo importe.
+  if (editing && JSON.stringify(discount.value) === originalDiscount) return null;
+  return discountProblem(discount.value, baseCents.value, staff.value?.role);
 });
 function openDiscounts(withRedeem = false) {
   discountDialog.value?.open({ redemption: redemption.value, discount: discount.value }, withRedeem);
@@ -569,6 +609,82 @@ async function submit(paymentMethod: PaymentMethod | null = null, cashReceivedCe
   }
 }
 
+// --- Modificar un pedido: se carga en el ticket tal cual esta y se guarda sobre el mismo ---
+let originalDiscount = "null";
+function loadForEdit(order: any) {
+  const loaded: CartLine[] = [];
+  for (const item of order.items) {
+    const options = (item.options ?? []).map((o: any) => ({
+      id: o.optionId,
+      groupId: o.groupId,
+      name: o.name,
+      priceDeltaCents: o.priceDeltaCents,
+      isDefault: o.isDefault,
+    }));
+    const key = cartLineKey(item.menuItemId, options);
+    const twin = loaded.find((l) => l.key === key);
+    if (twin) {
+      twin.quantity += item.quantity;
+      continue;
+    }
+    const deltas = options.reduce((sum: number, o: { priceDeltaCents: number }) => sum + o.priceDeltaCents, 0);
+    // Con el precio del pedido (la API conserva el de las lineas que no cambian).
+    loaded.push({ key, menuItemId: item.menuItemId, name: item.name, basePriceCents: item.priceCents - deltas, priceCents: item.priceCents, quantity: item.quantity, imageUrl: null, options });
+  }
+  lines.value = loaded;
+  place.value = order.serviceType === "LLEVAR" ? "LLEVAR" : order.table ?? "";
+  takeaway.value = order.serviceType === "MESA" && !!order.takeaway;
+  customer.value = order.customer
+    ? { id: order.customer.id, name: order.customer.name, customerCode: order.customer.customerCode, avatar: order.customer.avatar, rewardAvailable: order.customer.rewardAvailable }
+    : null;
+  note.value = order.note ?? "";
+  redeeming.value = !!order.redemption;
+  redeemLineKey.value = order.redemption ? loaded[order.redemption.lineIndex ?? -1]?.key ?? null : null;
+  discount.value = order.discount
+    ? {
+        percent: order.discount.percent ?? null,
+        amountCents: order.discount.percent ? null : order.discount.amountCents,
+        reason: order.discount.reason,
+        note: order.discount.note ?? null,
+      }
+    : null;
+  originalDiscount = JSON.stringify(discount.value);
+}
+if (editing) loadForEdit(editing);
+
+function cancelEdit() {
+  editingOrder.value = null;
+  clear();
+  goToSection("cola");
+}
+
+async function saveEdit() {
+  if (!editing || !canSubmit.value) return;
+  submitting.value = true;
+  submitError.value = "";
+  try {
+    const { mutate } = useMutation(UPDATE_STAFF_ORDER);
+    await mutate({
+      id: editing.id,
+      input: {
+        items: orderLinesInput(lines.value),
+        serviceType: place.value === "LLEVAR" ? "LLEVAR" : "MESA",
+        table: place.value === "LLEVAR" ? null : place.value,
+        takeaway: isTakeaway.value,
+        customerId: customer.value?.id ?? null,
+        note: note.value.trim() || null,
+        redemption: redemption.value,
+        discount: discount.value,
+      },
+    });
+    cancelEdit();
+  } catch (err: any) {
+    submitError.value = err?.message ?? "No se pudo guardar el pedido";
+  } finally {
+    submitting.value = false;
+  }
+}
+
 function formatPrice(priceCents: number) {
   return priceCents.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 }
@@ -596,6 +712,7 @@ input {
 .sent-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; border-color: var(--accent); }
 .sent-text { min-width: 0; }
 .sent-text p { margin: 0; }
+.edit-notice .edit-hint { margin-top: 4px; font-size: 14px; }
 .print-notice { margin-top: 6px !important; color: var(--danger); font-size: 14px; }
 /* Botones uno debajo de otro, del mismo ancho, pegados al borde derecho */
 .sent-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; flex-shrink: 0; }

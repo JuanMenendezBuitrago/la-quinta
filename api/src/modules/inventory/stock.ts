@@ -43,3 +43,18 @@ export async function applyMovement(data: MovementData): Promise<SupplyDoc> {
   }
   return supply;
 }
+
+/**
+ * Deshace el consumo automatico de un pedido: borra sus movimientos de "consumo" y devuelve esas
+ * cantidades al saldo de cada insumo. Para un pedido que se elimina o que se modifica despues de
+ * entregarlo (luego se vuelve a descontar con sus productos nuevos).
+ */
+export async function revertConsumption(orderId: Types.ObjectId | string) {
+  const movements = await StockMovement.find({ orderId, reason: "consumo" }).select("supplyId delta").lean();
+  const bySupply = new Map<string, number>();
+  for (const m of movements) bySupply.set(m.supplyId.toString(), (bySupply.get(m.supplyId.toString()) ?? 0) + m.delta);
+  await StockMovement.deleteMany({ orderId, reason: "consumo" });
+  for (const [supplyId, total] of bySupply) {
+    await Supply.updateOne({ _id: supplyId }, { $inc: { stock: -roundQty(total) } });
+  }
+}

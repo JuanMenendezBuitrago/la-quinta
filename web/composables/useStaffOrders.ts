@@ -110,6 +110,19 @@ export function discountLabel(d: { reason: DiscountReason; note?: string | null;
 }
 
 /** Cliente identificado por el personal (lookupCustomer): solo nombre y codigo, sin contacto. */
+/**
+ * Pedido que se esta modificando en "Tomar pedido" (null: se toma uno nuevo). Lo fija el boton de
+ * modificar de la cola; el ticket lo carga al abrirse y lo suelta al guardar, cancelar o salir.
+ */
+export function useEditingOrder() {
+  return useState<any | null>("lq-editing-order", () => null);
+}
+
+/** Se puede modificar: sin cobrar y con mesa o para llevar (los web para recoger, no). */
+export function canEditOrder(order: any) {
+  return !!order.serviceType && !order.paidAt && order.status !== "CANCELADO";
+}
+
 export interface CustomerMatch {
   id: string;
   name: string;
@@ -159,7 +172,10 @@ export const ORDER_FIELDS = `
   cashReceivedCents
   changeCents
   awaitingPayment
+  editedAt
+  editedByName
   customer {
+    id
     name
     customerCode
     avatar
@@ -167,10 +183,13 @@ export const ORDER_FIELDS = `
     stampsBalance
   }
   items {
+    menuItemId
     name
     priceCents
     quantity
     options {
+      groupId
+      optionId
       groupName
       name
       isDefault
@@ -194,6 +213,12 @@ export interface HistoryFilter {
   staffId: string | null;
   customerId: string | null;
 }
+
+const DELETE_ORDER = gql`
+  mutation DeleteOrder($id: ID!) {
+    deleteOrder(id: $id)
+  }
+`;
 
 const SET_STATUS = gql`
   mutation SetOrderStatus($id: ID!, $status: OrderStatus!, $paymentMethod: PaymentMethod, $cashReceivedCents: Int) {
@@ -312,10 +337,23 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
   // siempre se reemplaza por un array u objeto nuevo. Mutar un array congelado no avisa con
   // un error visible: la excepcion queda atrapada dentro del observable de Apollo y la unica
   // señal es que la cola deja de actualizarse en vivo sin explicacion.
-  const { onResult, refetch: refetchQueue } = useQuery(QUEUE_QUERY, null, () => ({ enabled: enabled.value }));
-  onResult((r: any) => {
-    if (r.data?.orderQueue) orders.value = [...r.data.orderQueue];
-  });
+  //
+  // La cola se carga con una consulta suelta (client.query), NO con useQuery: useQuery se queda
+  // vigilando la cache y, cada vez que un pedido de su lista inicial cambia (por la suscripcion o
+  // por una mutacion), vuelve a emitir esa lista inicial. Reemplazar la cola con ella borraba los
+  // pedidos llegados despues por la suscripcion, que no estan en esa lista: "desaparecian" al
+  // cambiar de estado otro pedido y solo volvian al recargar la pagina.
+  let queueRequest = 0;
+  async function refetchQueue() {
+    if (!enabled.value) return;
+    const request = ++queueRequest;
+    const { data } = await useNuxtApp().$apollo.defaultClient.query({ query: QUEUE_QUERY, fetchPolicy: "network-only" });
+    // Si se pidio otra recarga mientras tanto, gana la ultima.
+    if (request === queueRequest && data?.orderQueue) orders.value = [...data.orderQueue];
+  }
+  if (import.meta.client) {
+    watch(enabled, (on) => on && refetchQueue().catch(() => {}), { immediate: true });
+  }
 
   const { onResult: onQueueUpdate, onError: onQueueError } = useSubscription(QUEUE_SUBSCRIPTION, null, () => ({
     enabled: enabled.value,
@@ -490,6 +528,31 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     return changeStatus(order, "CANCELADO");
   }
 
+  // Eliminar un pedido del historial (solo gestion): la API deshace stock, sellos, opinion y fotos.
+  const { mutate: deleteOrderMutation } = useMutation(DELETE_ORDER);
+  const deleteError = ref("");
+  async function deleteOrder(order: any) {
+    if (busyOrderId.value) return false;
+    busyOrderId.value = order.id;
+    deleteError.value = "";
+    try {
+      await deleteOrderMutation({ id: order.id });
+      // Fuera tambien de la cache: si no, la consulta de "ultimos cobrados" (que sigue vigilando
+      // la cache) podria volver a traerlo cuando cambie otro pedido de su lista.
+      const cache = useNuxtApp().$apollo.defaultClient.cache;
+      cache.evict({ id: cache.identify({ __typename: "Order", id: order.id }) });
+      cache.gc();
+      historyOrders.value = historyOrders.value.filter((o) => o.id !== order.id);
+      recentClosed.value = recentClosed.value.filter((o) => o.id !== order.id);
+      return true;
+    } catch (err: any) {
+      deleteError.value = err?.message ?? "No se pudo eliminar el pedido";
+      return false;
+    } finally {
+      busyOrderId.value = "";
+    }
+  }
+
   // Asociar cliente a un pedido tomado sin el (para que los sellos vayan a su cuenta). La cola
   // se actualiza sola con la suscripcion; si falla, mismo aviso que un cambio de estado rechazado.
   const { mutate: assignCustomerMutation } = useMutation(ASSIGN_CUSTOMER);
@@ -570,6 +633,8 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     deliverAndPay,
     prevStatusLabel,
     cancelOrder,
+    deleteOrder,
+    deleteError,
     assignCustomer,
     markPaid,
     setDiscounts,

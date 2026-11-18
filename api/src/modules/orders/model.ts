@@ -167,6 +167,9 @@ export interface OrderDoc {
   paidByStaffId?: Types.ObjectId;
   // Cierre: entregado y, si es de mesa, cobrado. Es lo que suma sellos y escribe la fila en la hoja.
   completedAt?: Date;
+  // Ultima modificacion de productos, mesa o nota antes de cobrarlo (ver orders/update.ts).
+  editedAt?: Date;
+  editedByStaffId?: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -256,6 +259,8 @@ const orderSchema = new Schema<OrderDoc>({
   cashReceivedCents: { type: Number, min: 0 },
   paidByStaffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
   completedAt: { type: Date },
+  editedAt: { type: Date },
+  editedByStaffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
   createdAt: { type: Date, default: () => new Date() },
   updatedAt: { type: Date, default: () => new Date() },
 });

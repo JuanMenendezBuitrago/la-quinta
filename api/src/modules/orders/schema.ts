@@ -8,6 +8,8 @@ export const ordersTypeDefs = /* GraphQL */ `
   }
 
   type OrderLineOption {
+    groupId: ID!
+    optionId: ID!
     groupName: String!
     name: String!
     priceDeltaCents: Int!
@@ -144,6 +146,9 @@ export const ordersTypeDefs = /* GraphQL */ `
     awaitingPayment: Boolean!
     createdAt: String!
     updatedAt: String!
+    """Ultima modificacion (productos, mesa, nota...) antes de cobrarlo, y quien la hizo."""
+    editedAt: String
+    editedByName: String
   }
 
   input OrderLineInput {
@@ -151,6 +156,17 @@ export const ordersTypeDefs = /* GraphQL */ `
     quantity: Int!
     """Opciones elegidas. En los grupos sin eleccion se aplica la opcion por defecto del producto."""
     optionIds: [ID!]
+  }
+
+  input StaffOrderUpdateInput {
+    items: [OrderLineInput!]!
+    serviceType: ServiceType!
+    table: String
+    takeaway: Boolean
+    customerId: ID
+    note: String
+    redemption: OrderRedemptionInput
+    discount: OrderDiscountInput
   }
 
   input StaffOrderInput {
@@ -209,6 +225,12 @@ export const ordersTypeDefs = /* GraphQL */ `
     setOrderDiscounts(id: ID!, redemption: OrderRedemptionInput, discount: OrderDiscountInput): Order!
     """Personal: asocia un cliente a un pedido activo que no tenia."""
     assignOrderCustomer(orderId: ID!, customerId: ID!): Order!
+    """Gestion: elimina un pedido del historial (cerrado o cancelado) y deshace lo que genero:
+    stock consumido, sellos, opinion y fotos. Devuelve el id borrado."""
+    deleteOrder(id: ID!): ID!
+    """Personal: modifica un pedido aun sin cobrar (no los web para recoger), como si se volviera
+    a tomar. El total, el canje, el descuento y el stock (si ya se sirvio) se recalculan."""
+    updateStaffOrder(id: ID!, input: StaffOrderUpdateInput!): Order!
   }
 
   extend type Subscription {

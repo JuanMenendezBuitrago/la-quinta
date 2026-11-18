@@ -71,6 +71,11 @@
         <button class="button secondary" type="button" @click="printNotice = ''">Cerrar</button>
       </p>
 
+      <p v-if="activeTab === 'historial' && deleteError" class="action-error" role="alert">
+        {{ deleteError }}
+        <button class="button secondary" type="button" @click="deleteError = ''">Cerrar</button>
+      </p>
+
       <!-- Cola -->
       <p v-if="activeTab === 'cola' && actionError" class="action-error" role="alert">
         {{ actionError }}
@@ -105,6 +110,18 @@
                   @click="goBack(order)"
                 >
                   <ChevronLeft :size="18" :stroke-width="2" aria-hidden="true" />
+                </button>
+                <!-- Modificar (antes de cobrarlo): a la izquierda, lejos de la x de cancelar; abre el pedido en "Tomar pedido" -->
+                <button
+                  v-if="group.status !== 'COBRADO' && canEditOrder(order)"
+                  class="card-edit"
+                  type="button"
+                  :aria-label="`Modificar el pedido ${order.code}`"
+                  title="Modificar pedido"
+                  :disabled="busyOrderId === order.id"
+                  @click="editOrder(order)"
+                >
+                  <Pencil :size="15" :stroke-width="1.9" aria-hidden="true" />
                 </button>
                 <span class="order-code">{{ order.code }}</span>
                 <!-- A la derecha: mesa u hora de recogida, y quien lo movio por ultima vez (el NUEVO
@@ -186,6 +203,11 @@
                 </button>
               </div>
               <p v-if="order.note" class="muted">Nota: {{ order.note }}</p>
+              <!-- Para que barra vea que cambio lo que estaba preparando -->
+              <p v-if="order.editedAt && group.status !== 'COBRADO'" class="edited-note">
+                <Pencil :size="13" :stroke-width="2" aria-hidden="true" />
+                <span>Modificado {{ formatTime(order.editedAt) }}{{ order.editedByName ? ` · ${order.editedByName}` : "" }}</span>
+              </p>
               <!-- En "Últimos cobrados" sobra: todos lo estan -->
               <p v-if="order.paidAt && group.status !== 'COBRADO'" class="paid-note">
                 <Check :size="14" :stroke-width="2.2" aria-hidden="true" />
@@ -344,6 +366,22 @@
               <Printer :size="16" :stroke-width="1.8" aria-hidden="true" />
               Imprimir ticket
             </button>
+            <!-- Solo gestion. Confirmacion en la propia tarjeta (sin confirm() del navegador). -->
+            <template v-if="staff?.role === 'gestion'">
+              <div v-if="confirmDeleteId === order.id" class="history-delete-confirm" role="group" :aria-label="`Eliminar pedido ${order.code}`">
+                <span>¿Eliminar el pedido {{ order.code }}? Se devuelve el stock y se quitan sus sellos. No se puede deshacer.</span>
+                <span class="history-delete-actions">
+                  <button class="button secondary delete" type="button" :disabled="busyOrderId === order.id" @click="confirmDelete(order)">
+                    {{ busyOrderId === order.id ? "Eliminando…" : "Eliminar" }}
+                  </button>
+                  <button class="button secondary" type="button" :disabled="busyOrderId === order.id" @click="confirmDeleteId = ''">Cancelar</button>
+                </span>
+              </div>
+              <button v-else class="button secondary delete history-delete" type="button" @click="confirmDeleteId = order.id">
+                <Trash2 :size="16" :stroke-width="1.8" aria-hidden="true" />
+                Eliminar pedido
+              </button>
+            </template>
           </div>
           <!-- Estado arriba; el importe del ticket, destacado abajo a la derecha (tachado si se cancelo) -->
           <span class="history-status">
@@ -452,13 +490,15 @@
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
-import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, Percent, Printer, SearchX, Stamp, UserPlus, X } from "lucide-vue-next";
+import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, Percent, Pencil, Printer, SearchX, Stamp, Trash2, UserPlus, X } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import {
   PAYMENT_LABELS,
   PAYMENT_OPTIONS,
+  canEditOrder,
   discountLabel,
   paymentDetail,
+  useEditingOrder,
   useStaffOrders,
   type CustomerMatch,
   type OrderDiscounts,
@@ -524,6 +564,8 @@ const {
   deliverAndPay,
   prevStatusLabel,
   cancelOrder,
+  deleteOrder,
+  deleteError,
   assignCustomer,
   markPaid,
   setDiscounts,
@@ -605,6 +647,17 @@ async function doPay(order: any, method: PaymentMethod, cashReceivedCents: numbe
 // Ticket en la impresora termica (RawBT), si esta activado en Configuración.
 const { enabled: ticketPrintingEnabled, printTicket } = useTicketPrinter();
 const printNotice = ref("");
+// Modificar un pedido sin cobrar: se abre en "Tomar pedido" con sus productos (ver StaffOrderTaker).
+const editingOrder = useEditingOrder();
+function editOrder(order: any) {
+  editingOrder.value = order;
+  selectTab("tomar");
+}
+// Eliminar del historial (gestion): primero se pide confirmar en la tarjeta.
+const confirmDeleteId = ref("");
+async function confirmDelete(order: any) {
+  if (await deleteOrder(order)) confirmDeleteId.value = "";
+}
 async function printOrderTicket(order: any) {
   printNotice.value = (await printTicket(order)) ?? "";
 }
@@ -864,6 +917,9 @@ watchEffect(() => {
 .pay-extra { display: flex; gap: 8px; flex-wrap: wrap; }
 .discount-note { color: var(--accent); font-size: 14px; }
 .history-print { align-self: flex-start; margin-top: 4px; }
+.history-delete { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; }
+.history-delete-confirm { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; padding: 10px 12px; border: 1px solid var(--danger); border-radius: 8px; font-size: 14px; }
+.history-delete-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .reward-alert {
   display: flex;
   flex-wrap: wrap;
@@ -918,6 +974,23 @@ watchEffect(() => {
   cursor: pointer;
 }
 .reprint:hover, .reprint:focus-visible { border-color: var(--border-strong); color: var(--text); }
+/* El lapiz de modificar, como el boton de reimprimir */
+.card-edit {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.card-edit:hover:not(:disabled), .card-edit:focus-visible { color: var(--accent); }
+.card-edit:disabled { opacity: 0.4; cursor: default; }
+.edited-note { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; color: var(--accent); font-size: 13.5px; font-weight: 600; }
 /* La x de cancelar, como el boton de reimprimir pero en rojo al pasar por encima */
 .card-cancel {
   display: grid;
