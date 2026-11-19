@@ -3,7 +3,7 @@ import { env } from "../../config/env";
 import { DISCOUNT_REASONS, Order } from "../orders/model";
 import { StaffUser } from "../users/model";
 import { CashClosing, CashClosingDoc } from "./model";
-import { Expense } from "../expenses/model";
+import { BANK_DEPOSIT, Expense } from "../expenses/model";
 
 // Tope de cordura para los importes que se escriben a mano (100 millones de pesos).
 const MAX_AMOUNT_CENTS = 100_000_000;
@@ -51,7 +51,8 @@ async function dailyStats(days: number, now: Date) {
       { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: { $ifNull: ["$paidAt", "$deliveredAt"] }, timezone: tz } }, cents: { $sum: "$totalCents" }, count: { $sum: 1 } } },
     ]),
     Expense.aggregate<{ _id: string; cents: number }>([
-      { $match: { spentAt: { $gte: start, $lte: now } } },
+      // Los ingresos al banco no son gasto: el dinero sigue siendo del local.
+      { $match: { spentAt: { $gte: start, $lte: now }, category: { $ne: BANK_DEPOSIT } } },
       { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$spentAt", timezone: tz } }, cents: { $sum: "$amountCents" } } },
     ]),
   ]);
@@ -136,17 +137,23 @@ function pendingExpensesFilter(end: Date) {
   return { closingId: null, createdAt: { $lt: end } };
 }
 async function summarizeExpenses(end: Date) {
-  const expenses = await Expense.find(pendingExpensesFilter(end)).select("_id amountCents method").lean();
+  const all = await Expense.find(pendingExpensesFilter(end)).select("_id amountCents method category").lean();
+  // Los ingresos al banco van aparte: salen del cajon (arqueo), pero no son gasto.
+  const deposits = all.filter((e) => e.category === BANK_DEPOSIT);
+  const expenses = all.filter((e) => e.category !== BANK_DEPOSIT);
   const by = { CAJA: 0, TARJETA: 0, TRANSFERENCIA: 0, OTRO: 0 };
   for (const e of expenses) by[e.method] += e.amountCents;
   return {
+    bankDepositsCount: deposits.length,
+    bankDepositsCents: deposits.reduce((n, e) => n + e.amountCents, 0),
     expensesCount: expenses.length,
     expensesCashCents: by.CAJA,
     expensesCardCents: by.TARJETA,
     expensesTransferCents: by.TRANSFERENCIA,
     expensesOtherMethodCents: by.OTRO,
     expensesOtherCents: by.TARJETA + by.TRANSFERENCIA + by.OTRO,
-    expenseIds: expenses.map((e) => e._id),
+    // Todos, ingresos al banco incluidos, pasan a este cierre.
+    expenseIds: all.map((e) => e._id),
   };
 }
 
@@ -191,7 +198,10 @@ export const cashResolvers = {
     periodStart: (doc: CashClosingDoc) => doc.periodStart.toISOString(),
     periodEnd: (doc: CashClosingDoc) => doc.periodEnd.toISOString(),
     createdAt: (doc: CashClosingDoc) => doc.createdAt.toISOString(),
-    expectedCashInDrawerCents: (doc: CashClosingDoc) => doc.openingFloatCents + doc.cashCents - (doc.expensesCashCents ?? 0),
+    expectedCashInDrawerCents: (doc: CashClosingDoc) =>
+      doc.openingFloatCents + doc.cashCents - (doc.expensesCashCents ?? 0) - (doc.bankDepositsCents ?? 0),
+    bankDepositsCount: (doc: CashClosingDoc) => doc.bankDepositsCount ?? 0,
+    bankDepositsCents: (doc: CashClosingDoc) => doc.bankDepositsCents ?? 0,
     discountsCount: (doc: CashClosingDoc) => doc.discountsCount ?? 0,
     discountsCents: (doc: CashClosingDoc) => doc.discountsCents ?? 0,
     discountsByReason: (doc: CashClosingDoc) => doc.discountsByReason ?? [],
@@ -250,7 +260,8 @@ export const cashResolvers = {
           ...summary,
           openingFloatCents,
           countedCashCents,
-          differenceCents: countedCashCents - (openingFloatCents + summary.cashCents - summary.expensesCashCents),
+          differenceCents:
+            countedCashCents - (openingFloatCents + summary.cashCents - summary.expensesCashCents - summary.bankDepositsCents),
           note,
         });
       } catch (err: any) {

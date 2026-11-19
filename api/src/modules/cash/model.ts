@@ -36,9 +36,12 @@ export interface CashClosingDoc {
   expensesCardCents: number;
   expensesTransferCents: number;
   expensesOtherMethodCents: number; // metodo OTRO
+  // Retiros del cajon para ingresar en el banco (ver BANK_DEPOSIT): fuera de los gastos de arriba.
+  bankDepositsCount: number;
+  bankDepositsCents: number;
   openingFloatCents: number;
   countedCashCents: number;
-  // contado - (fondo + efectivo cobrado - gastos de caja): negativo = falta dinero, positivo = sobra.
+  // contado - (fondo + efectivo cobrado - gastos de caja - ingresos al banco): negativo = falta dinero, positivo = sobra.
   differenceCents: number;
   note?: string;
   createdAt: Date;
@@ -70,6 +73,9 @@ const cashClosingSchema = new Schema<CashClosingDoc>({
   expensesCardCents: { type: Number, default: 0 },
   expensesTransferCents: { type: Number, default: 0 },
   expensesOtherMethodCents: { type: Number, default: 0 },
+  // Cierres anteriores a los ingresos al banco no los tienen: cuentan como 0.
+  bankDepositsCount: { type: Number, default: 0 },
+  bankDepositsCents: { type: Number, default: 0 },
   openingFloatCents: { type: Number, required: true, min: 0 },
   countedCashCents: { type: Number, required: true, min: 0 },
   differenceCents: { type: Number, required: true },

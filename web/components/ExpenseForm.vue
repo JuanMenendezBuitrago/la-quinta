@@ -31,7 +31,11 @@
       </label>
     </div>
 
-    <div class="field">
+    <!-- Ingreso al banco: siempre sale del efectivo de la caja, no hay metodo que elegir -->
+    <p v-if="isDeposit" class="muted hint deposit-hint">
+      Sale del cajón: se resta de lo que debería haber en el arqueo. No cuenta como gasto ni baja el resultado.
+    </p>
+    <div v-else class="field">
       <span class="muted" :id="`${uid}-method`">Pagado con</span>
       <div class="chips" role="radiogroup" :aria-labelledby="`${uid}-method`">
         <button
@@ -59,7 +63,7 @@
           <option v-for="(label, c) in EXPENSE_CATEGORY_LABELS" :key="c" :value="c">{{ label }}</option>
         </select>
       </label>
-      <label class="field">
+      <label v-if="!isDeposit" class="field">
         <span class="muted">Proveedor (opcional)</span>
         <!-- Se autocompleta con los proveedores de gastos anteriores mientras se escribe -->
         <input v-model="supplier" type="text" maxlength="80" autocomplete="off" :list="`${uid}-suppliers`" />
@@ -71,10 +75,16 @@
 
     <label class="field">
       <span class="muted">Descripción</span>
-      <input v-model="description" type="text" maxlength="200" required placeholder="P. ej. 2 bolsas de hielo" />
+      <input
+        v-model="description"
+        type="text"
+        maxlength="200"
+        required
+        :placeholder="isDeposit ? 'P. ej. Consignación en Bancolombia' : 'P. ej. 2 bolsas de hielo'"
+      />
     </label>
 
-    <label class="check">
+    <label v-if="!isDeposit" class="check">
       <input v-model="grouped" type="checkbox" role="switch" />
       <span>
         Varios artículos: desglosar más tarde
@@ -83,7 +93,7 @@
     </label>
 
     <div class="field">
-      <span class="muted">Foto del recibo (opcional)</span>
+      <span class="muted">{{ isDeposit ? "Foto del comprobante del banco (opcional)" : "Foto del recibo (opcional)" }}</span>
       <div class="receipt">
         <img v-if="receiptUrl" :src="resolveImageUrl(receiptUrl) ?? undefined" alt="Recibo" class="receipt-thumb" />
         <label class="button secondary upload" :class="{ disabled: uploading }">
@@ -99,7 +109,7 @@
     <div class="actions">
       <button class="button" type="submit" :disabled="saving || uploading || !valid">
         <Check :size="16" :stroke-width="2" aria-hidden="true" />
-        {{ saving ? "Guardando…" : existing ? "Guardar cambios" : "Añadir gasto" }}
+        {{ saving ? "Guardando…" : existing ? "Guardar cambios" : isDeposit ? "Añadir ingreso al banco" : "Añadir gasto" }}
       </button>
       <button class="button secondary cancel" type="button" :disabled="saving" @click="emit('cancel')">
         <X :size="16" :stroke-width="1.8" aria-hidden="true" />
@@ -116,6 +126,7 @@ import { Camera, Check, ShoppingBasket, X } from "lucide-vue-next";
 import { useImageUrl } from "~/composables/useImageUrl";
 import { useStoreTime } from "~/composables/useStoreTime";
 import {
+  BANK_DEPOSIT,
   EXPENSE_CATEGORY_LABELS,
   EXPENSE_FIELDS,
   EXPENSE_METHOD_LABELS,
@@ -170,6 +181,16 @@ const { result: presetsResult } = useQuery<{ groupedExpensePresets: ExpensePrese
   fetchPolicy: "cache-and-network",
 });
 const presets = computed(() => mergePresets(presetsResult.value?.groupedExpensePresets ?? []));
+
+// Ingreso al banco: de la caja, sin proveedor ni desglose (lo exige tambien la API).
+const isDeposit = computed(() => category.value === BANK_DEPOSIT);
+watch(isDeposit, (deposit) => {
+  if (!deposit) return;
+  method.value = "CAJA";
+  grouped.value = false;
+  supplier.value = "";
+  if (!description.value.trim()) description.value = "Ingreso en el banco";
+});
 
 function applyPreset(p: ExpensePreset) {
   description.value = p.description;
@@ -245,6 +266,7 @@ async function uploadReceipt(event: Event) {
 </script>
 
 <style scoped>
+.deposit-hint { margin: 0; }
 .expense-form { display: flex; flex-direction: column; gap: 12px; }
 .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }

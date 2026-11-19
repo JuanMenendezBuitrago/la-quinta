@@ -14,6 +14,8 @@ export const expensesTypeDefs = /* GraphQL */ `
     PERSONAL
     ALQUILER
     OTROS
+    """Retiro del cajon para ingresar en el banco: resta del arqueo, pero no es un gasto."""
+    INGRESO_BANCO
   }
 
   """Articulo del desglose de un gasto (agrupado)."""

@@ -22,6 +22,9 @@ export const cashTypeDefs = /* GraphQL */ `
     discountsCount: Int!
     discountsCents: Int!
     discountsByReason: [DiscountTotal!]!
+    """Retiros del cajon para ingresar en el banco: restan del arqueo, no son gasto."""
+    bankDepositsCount: Int!
+    bankDepositsCents: Int!
     """Gastos pendientes (los que entrarian en el cierre) o del cierre: numero, pagados de la caja y el resto."""
     expensesCount: Int!
     expensesCashCents: Int!
@@ -57,6 +60,9 @@ export const cashTypeDefs = /* GraphQL */ `
     discountsCount: Int!
     discountsCents: Int!
     discountsByReason: [DiscountTotal!]!
+    """Retiros del cajon para ingresar en el banco: restan del arqueo, no son gasto."""
+    bankDepositsCount: Int!
+    bankDepositsCents: Int!
     """Gastos pendientes (los que entrarian en el cierre) o del cierre: numero, pagados de la caja y el resto."""
     expensesCount: Int!
     expensesCashCents: Int!
@@ -68,7 +74,7 @@ export const cashTypeDefs = /* GraphQL */ `
     netCents: Int!
     openingFloatCents: Int!
     countedCashCents: Int!
-    """Fondo inicial + efectivo cobrado - gastos pagados de la caja: lo que deberia haber en el cajon."""
+    """Fondo inicial + efectivo cobrado - gastos pagados de la caja - ingresos al banco: lo que deberia haber en el cajon."""
     expectedCashInDrawerCents: Int!
     """Contado - esperado: negativo = falta dinero, positivo = sobra."""
     differenceCents: Int!

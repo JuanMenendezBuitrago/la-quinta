@@ -2,7 +2,7 @@ import { Types } from "mongoose";
 import { env } from "../../config/env";
 import { Order } from "../orders/model";
 import { CashClosing } from "../cash/model";
-import { Expense } from "../expenses/model";
+import { BANK_DEPOSIT, Expense } from "../expenses/model";
 import { LoyaltyTransaction } from "../loyalty/model";
 import { Shift } from "../shifts/model";
 import { DEFAULT_WEEKLY_HOURS, StaffUserDoc } from "./model";
@@ -142,7 +142,7 @@ export async function staffActivity(member: StaffUserDoc, from: string, to: stri
     sum(Order, { "discount.staffId": id, "discount.at": range, status: { $ne: "CANCELADO" } }, "discount.amountCents"),
     Order.countDocuments({ status: "CANCELADO", statusHistory: { $elemMatch: { status: "CANCELADO", staffId: id, at: range } } }),
     CashClosing.countDocuments({ staffId: id, createdAt: range }),
-    sum(Expense, { staffId: id, createdAt: range }, "amountCents"),
+    sum(Expense, { staffId: id, createdAt: range, category: { $ne: BANK_DEPOSIT } }, "amountCents"), // ingresos al banco: no son gasto
     LoyaltyTransaction.countDocuments({ staffId: id, createdAt: range }),
   ]);
 

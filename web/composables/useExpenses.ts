@@ -1,7 +1,13 @@
 // Gastos de operacion (ver api/src/modules/expenses): tipos y etiquetas compartidos por el
 // formulario y por la seccion de cierre de caja.
 export type ExpenseMethod = "CAJA" | "TARJETA" | "TRANSFERENCIA" | "OTRO";
-export type ExpenseCategory = "INSUMOS" | "SERVICIOS" | "MANTENIMIENTO" | "PERSONAL" | "ALQUILER" | "OTROS";
+export type ExpenseCategory = "INSUMOS" | "SERVICIOS" | "MANTENIMIENTO" | "PERSONAL" | "ALQUILER" | "OTROS" | "INGRESO_BANCO";
+
+/**
+ * Retiro del cajon para ingresarlo en el banco: se apunta como un gasto, siempre de la caja, y resta
+ * del arqueo; pero no es un gasto (el dinero sigue siendo del local), asi que no cuenta en el resultado.
+ */
+export const BANK_DEPOSIT: ExpenseCategory = "INGRESO_BANCO";
 
 export interface ExpenseItem {
   name: string;
@@ -63,4 +69,5 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   PERSONAL: "Personal",
   ALQUILER: "Alquiler",
   OTROS: "Otros",
+  INGRESO_BANCO: "Ingreso al banco",
 };

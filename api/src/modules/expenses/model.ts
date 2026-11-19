@@ -15,8 +15,15 @@ import { Schema, model, Types } from "mongoose";
 export type ExpenseMethod = "CAJA" | "TARJETA" | "TRANSFERENCIA" | "OTRO";
 export const EXPENSE_METHODS: ExpenseMethod[] = ["CAJA", "TARJETA", "TRANSFERENCIA", "OTRO"];
 
-export type ExpenseCategory = "INSUMOS" | "SERVICIOS" | "MANTENIMIENTO" | "PERSONAL" | "ALQUILER" | "OTROS";
-export const EXPENSE_CATEGORIES: ExpenseCategory[] = ["INSUMOS", "SERVICIOS", "MANTENIMIENTO", "PERSONAL", "ALQUILER", "OTROS"];
+export type ExpenseCategory = "INSUMOS" | "SERVICIOS" | "MANTENIMIENTO" | "PERSONAL" | "ALQUILER" | "OTROS" | "INGRESO_BANCO";
+export const EXPENSE_CATEGORIES: ExpenseCategory[] = ["INSUMOS", "SERVICIOS", "MANTENIMIENTO", "PERSONAL", "ALQUILER", "OTROS", "INGRESO_BANCO"];
+
+/**
+ * Retiro de efectivo del cajon para ingresarlo en el banco. Se apunta como un gasto (con su fecha,
+ * quien lo hizo y la foto del comprobante) y siempre sale de la CAJA, pero no es un gasto: el dinero
+ * sigue siendo del local. Resta del arqueo y no cuenta en los gastos ni en el resultado.
+ */
+export const BANK_DEPOSIT: ExpenseCategory = "INGRESO_BANCO";
 
 export interface ExpenseItem {
   name: string;

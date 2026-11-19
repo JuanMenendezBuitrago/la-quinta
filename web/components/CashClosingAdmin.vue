@@ -23,6 +23,11 @@
         <div class="total"><dt>Total cobrado</dt><dd>{{ formatPrice(summary.totalCents) }}</dd></div>
         <div v-if="summary.expensesCount"><dt><Receipt :size="16" :stroke-width="1.8" aria-hidden="true" /> Gastos</dt><dd>− {{ formatPrice(summary.expensesTotalCents) }}</dd></div>
         <div v-if="summary.expensesCount" class="total"><dt>Resultado neto</dt><dd>{{ formatPrice(summary.netCents) }}</dd></div>
+        <!-- No es gasto (no baja el resultado), pero sale del cajon: se ve aparte -->
+        <div v-if="summary.bankDepositsCount" class="deposit-row">
+          <dt><Landmark :size="16" :stroke-width="1.8" aria-hidden="true" /> Ingresado al banco (sale del cajón)</dt>
+          <dd>{{ formatPrice(summary.bankDepositsCents) }}</dd>
+        </div>
       </dl>
       <p v-if="summary.unknownMethodCents" class="muted hint">
         «Sin método»: pedidos para llevar o web entregados antes de que se pidiera el método de pago al entregar.
@@ -68,7 +73,7 @@
                 {{ EXPENSE_METHOD_LABELS[e.method] }} · {{ formatDateTime(e.spentAt) }} · {{ e.staffName }}
               </span>
             </div>
-            <span class="expense-amount" :class="{ cash: e.method === 'CAJA' }">− {{ formatPrice(e.amountCents) }}</span>
+            <span class="expense-amount" :class="{ cash: e.method === 'CAJA' && e.category !== BANK_DEPOSIT, deposit: e.category === BANK_DEPOSIT }">− {{ formatPrice(e.amountCents) }}</span>
             <div class="expense-actions">
               <button
                 v-if="e.receiptUrl"
@@ -114,6 +119,7 @@
       <dl v-if="pending.length" class="totals expenses-totals">
         <div><dt>Pagado de la caja</dt><dd>{{ formatPrice(summary.expensesCashCents) }}</dd></div>
         <div><dt>Otros métodos</dt><dd>{{ formatPrice(summary.expensesOtherCents) }}</dd></div>
+        <div v-if="summary.bankDepositsCount"><dt>Ingresado al banco (no es gasto)</dt><dd>{{ formatPrice(summary.bankDepositsCents) }}</dd></div>
       </dl>
     </div>
 
@@ -131,7 +137,10 @@
 
       <dl class="totals">
         <div>
-          <dt>Debería haber (fondo + efectivo cobrado{{ summary.expensesCashCents ? " − gastos de la caja" : "" }})</dt>
+          <dt>
+            Debería haber (fondo + efectivo cobrado{{ summary.expensesCashCents ? " − gastos de la caja" : ""
+            }}{{ summary.bankDepositsCents ? " − ingresado al banco" : "" }})
+          </dt>
           <dd>{{ formatPrice(expectedInDrawer) }}</dd>
         </div>
         <div v-if="countedValid" class="difference" :class="differenceClass(difference)">
@@ -244,13 +253,14 @@
         {{ c.discountsByReason.map((d) => `${DISCOUNT_REASON_LABELS[d.reason]} ${formatPrice(d.amountCents)}`).join(" · ") }}
       </p>
       <p v-if="c.expensesCount" class="closing-figures">Neto {{ formatPrice(c.netCents) }}</p>
+      <p v-if="c.bankDepositsCount" class="closing-figures">Ingresado al banco {{ formatPrice(c.bankDepositsCents) }}</p>
       <p class="muted">
         Fondo {{ formatPrice(c.openingFloatCents) }} · Debería haber {{ formatPrice(c.expectedCashInDrawerCents) }} ·
         Contado {{ formatPrice(c.countedCashCents) }}
       </p>
       <p v-if="c.note" class="muted note">Nota: {{ c.note }}</p>
-      <button v-if="c.expensesCount" type="button" class="link-button" @click="toggleClosingExpenses(c.id)">
-        {{ openClosingId === c.id ? "Ocultar detalle" : `Ver detalle y gastos (${c.expensesCount})` }}
+      <button v-if="c.expensesCount || c.bankDepositsCount" type="button" class="link-button" @click="toggleClosingExpenses(c.id)">
+        {{ openClosingId === c.id ? "Ocultar detalle" : `Ver detalle y gastos (${c.expensesCount + c.bankDepositsCount})` }}
       </button>
       <BalanceTable v-if="openClosingId === c.id" :balances="c.balances" :format="formatPrice" />
       <ul v-if="openClosingId === c.id" class="expense-list closed">
@@ -262,7 +272,7 @@
               {{ EXPENSE_METHOD_LABELS[e.method] }} · {{ formatDateTime(e.spentAt) }} · {{ e.staffName }}
             </span>
           </div>
-          <span class="expense-amount" :class="{ cash: e.method === 'CAJA' }">− {{ formatPrice(e.amountCents) }}</span>
+          <span class="expense-amount" :class="{ cash: e.method === 'CAJA' && e.category !== BANK_DEPOSIT, deposit: e.category === BANK_DEPOSIT }">− {{ formatPrice(e.amountCents) }}</span>
           <div class="expense-actions">
             <button
               v-if="e.receiptUrl"
@@ -289,13 +299,13 @@
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
-import { Archive, Banknote, Check, CircleHelp, CreditCard, ImageIcon, Lock, Pencil, Plus, Receipt, Smartphone, Trash2 } from "lucide-vue-next";
+import { Archive, Banknote, Check, CircleHelp, CreditCard, ImageIcon, Landmark, Lock, Pencil, Plus, Receipt, Smartphone, Trash2 } from "lucide-vue-next";
 import { useStoreTime } from "~/composables/useStoreTime";
 import { useStaffAuth } from "~/composables/useAuth";
 import { useLightbox } from "~/composables/useLightbox";
 import { useImageUrl } from "~/composables/useImageUrl";
 import { DISCOUNT_REASON_LABELS, type DiscountReason } from "~/composables/useStaffOrders";
-import { EXPENSE_CATEGORY_LABELS, EXPENSE_FIELDS, EXPENSE_METHOD_LABELS, type Expense } from "~/composables/useExpenses";
+import { BANK_DEPOSIT, EXPENSE_CATEGORY_LABELS, EXPENSE_FIELDS, EXPENSE_METHOD_LABELS, type Expense } from "~/composables/useExpenses";
 import ExpenseForm from "~/components/ExpenseForm.vue";
 import ExpenseItemsBlock from "~/components/ExpenseItemsBlock.vue";
 import CashTrendChart from "~/components/CashTrendChart.vue";
@@ -318,6 +328,8 @@ interface CashSummary {
   expensesCashCents: number;
   expensesOtherCents: number;
   expensesTotalCents: number;
+  bankDepositsCount: number;
+  bankDepositsCents: number;
   netCents: number;
   balances: MethodBalance[];
 }
@@ -333,7 +345,7 @@ interface CashClosing extends CashSummary {
 
 const SUMMARY_FIELDS = `periodStart periodEnd ordersCount totalCents cashCents cardCents transferCents unknownMethodCents
   discountsCount discountsCents discountsByReason { reason count amountCents }
-  expensesCount expensesCashCents expensesOtherCents expensesTotalCents netCents
+  expensesCount expensesCashCents expensesOtherCents expensesTotalCents netCents bankDepositsCount bankDepositsCents
   balances { method inCents outCents balanceCents }`;
 const CASH_QUERY = gql`
   query CashClosingData {
@@ -480,7 +492,8 @@ const expectedInDrawer = computed(
   () =>
     (floatValid.value ? (openingFloat.value as number) : 0) +
     (summary.value?.cashCents ?? 0) -
-    (summary.value?.expensesCashCents ?? 0)
+    (summary.value?.expensesCashCents ?? 0) -
+    (summary.value?.bankDepositsCents ?? 0)
 );
 const difference = computed(() => (countedValid.value ? (countedCash.value as number) - expectedInDrawer.value : 0));
 
@@ -613,6 +626,7 @@ async function closeRegister() {
 .expense-main .muted { font-size: 13px; }
 .expense-amount { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .expense-amount.cash { color: var(--danger); }
+.expense-amount.deposit { color: var(--accent); }
 .expense-actions { display: flex; gap: 4px; }
 .icon-btn {
   width: 34px;

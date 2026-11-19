@@ -3,6 +3,7 @@ import { GraphQLContext, requireStaff } from "../../graphql/context";
 import { StaffUser } from "../users/model";
 import { UPLOAD_DIR } from "../uploads/router";
 import {
+  BANK_DEPOSIT,
   EXPENSE_CATEGORIES,
   EXPENSE_METHODS,
   Expense,
@@ -48,6 +49,9 @@ function clean(input: ExpenseInput) {
   }
   if (!EXPENSE_METHODS.includes(input.method)) throw new Error("Metodo de pago no valido");
   if (!EXPENSE_CATEGORIES.includes(input.category)) throw new Error("Categoria no valida");
+  if (input.category === BANK_DEPOSIT && input.method !== "CAJA") {
+    throw new Error("Un ingreso al banco sale del efectivo de la caja");
+  }
   const description = input.description.trim();
   if (!description) throw new Error("Escribe en que se gasto");
   if (description.length > 200) throw new Error("La descripcion es demasiado larga");
