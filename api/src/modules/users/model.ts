@@ -25,6 +25,7 @@ export interface UserDoc {
   _id: Types.ObjectId;
   name: string;
   email?: string;
+  emailKey?: string; // buzon del email, para detectar cuentas repetidas (ver emailKey.ts)
   phone?: string;
   customerCode: string; // codigo corto que el cliente enseña en el mostrador
   avatar?: string; // ver avatar.ts
@@ -41,6 +42,8 @@ export interface UserDoc {
 const userSchema = new Schema<UserDoc>({
   name: { type: String, required: true, trim: true },
   email: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
+  // Sin unique: puede haber cuentas repetidas de antes de este campo (entra en la mas antigua).
+  emailKey: { type: String, index: true },
   phone: { type: String, unique: true, sparse: true, trim: true },
   customerCode: { type: String, required: true, unique: true },
   avatar: { type: String },

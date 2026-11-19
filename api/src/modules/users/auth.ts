@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { emailKey } from "./emailKey";
 import bcrypt from "bcryptjs";
 import { randomInt } from "crypto";
 import { env } from "../../config/env";
@@ -59,13 +60,13 @@ export function verifyToken(token: string): AuthTokenPayload | null {
 }
 
 function otpKey(email: string) {
-  return `otp:${email}`;
+  return `otp:${emailKey(email)}`;
 }
 
 // Intentos con el codigo vigente de ese email: contador aparte (INCR, atomico) para que muchas
 // peticiones a la vez no se salten el limite.
 function otpAttemptsKey(email: string) {
-  return `otp-attempts:${email}`;
+  return `otp-attempts:${emailKey(email)}`;
 }
 
 /**
@@ -100,9 +101,16 @@ function normalizeEmail(identifier: string) {
   return email;
 }
 
-/** Cliente con ese identificador, si existe (para no volver a pedir nombre ni autorizacion). */
+/**
+ * Cliente de ese buzon, si existe (para no volver a pedir nombre ni autorizacion): con otra
+ * etiqueta "+..." o, en Gmail, otros puntos, es la misma cuenta. Si hay varias de antes, la mas antigua.
+ */
+function customerByEmail(email: string) {
+  return User.findOne({ $or: [{ emailKey: emailKey(email) }, { email }] }).sort({ createdAt: 1 });
+}
+
 export async function findExistingCustomer(identifier: string) {
-  return User.findOne({ email: normalizeEmail(identifier) }).select("_id privacyConsent").lean();
+  return customerByEmail(normalizeEmail(identifier)).select("_id privacyConsent").lean();
 }
 
 /**
@@ -133,7 +141,7 @@ export async function requestOtp(identifier: string, clientIp: string | null = n
   if (clientIp && (await overLimit(`rl:otp-request:ip:${clientIp}`, OTP_REQUESTS_PER_IP, IP_WINDOW_SECONDS))) {
     throw new Error("Demasiadas solicitudes de código desde esta conexión. Espera unos minutos.");
   }
-  if (await overLimit(`rl:otp-request:email:${email}`, OTP_PER_EMAIL_PER_HOUR, 60 * 60)) {
+  if (await overLimit(`rl:otp-request:email:${emailKey(email)}`, OTP_PER_EMAIL_PER_HOUR, 60 * 60)) {
     throw new Error("Has pedido demasiados códigos. Vuelve a intentarlo dentro de un rato.");
   }
 
@@ -191,7 +199,7 @@ export async function verifyOtpAndIssueToken(
     throw await fail();
   }
 
-  let user = await User.findOne({ email });
+  let user = await customerByEmail(email);
 
   // Sin autorizacion expresa no se crea la cuenta (ni se deja entrar a quien la tiene de una
   // version anterior de la politica). El codigo no se consume, para poder reintentar.
@@ -206,6 +214,7 @@ export async function verifyOtpAndIssueToken(
   if (!user) {
     user = await User.create({
       email,
+      emailKey: emailKey(email),
       name: name?.trim() || "Cliente La Quinta",
       customerCode: generateCustomerCode(),
       privacyConsent: consent,

@@ -1,4 +1,5 @@
 import { Types } from "mongoose";
+import { emailKey } from "./emailKey";
 import { GraphQLContext, isActingCandidate, requireCustomer, requireOwnStaffSession, requireStaff } from "../../graphql/context";
 import { User, StaffUser, DEFAULT_WEEKLY_HOURS } from "./model";
 import { requestOtp, verifyOtpAndIssueToken, loginStaff, loginStaffById, hashPassword, signStaffToken, requestStaffPasswordReset, resetStaffPassword, sessionsCutoff, loginRequirementsFor } from "./auth";
@@ -38,7 +39,7 @@ const MAX_NAME_MATCHES = 8;
 function exactCustomerFilter(query: string) {
   const byCode = /^(lq-?)?\d{4}$/i.test(query) ? `LQ-${query.replace(/\D/g, "")}` : null;
   if (byCode) return [{ customerCode: byCode }];
-  if (query.includes("@")) return [{ email: query.toLowerCase() }];
+  if (query.includes("@")) return [{ email: query.toLowerCase() }, { emailKey: emailKey(query) }];
   return [{ phone: query }, { phone: query.replace(/[\s-]/g, "") }];
 }
 

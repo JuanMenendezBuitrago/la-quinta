@@ -18,6 +18,7 @@ import { registerSheetsListeners } from "./modules/sheets/listeners";
 import { backfillCompletedOrders, backfillOrderCodes, backfillRedemptions, backfillStatusHistory } from "./modules/orders/model";
 import { markInterruptedCampaigns } from "./modules/newsletter/model";
 import { seedHeroSlidesOnce } from "./modules/hero/model";
+import { backfillEmailKeys } from "./modules/users/emailKey";
 import { ensureCoffeeProcesses } from "./modules/coffee/model";
 import { uploadsRouter, UPLOAD_DIR } from "./modules/uploads/router";
 
@@ -27,6 +28,7 @@ async function main() {
   await backfillCompletedOrders();
   await backfillStatusHistory();
   await backfillRedemptions();
+  await backfillEmailKeys();
   await markInterruptedCampaigns();
   await seedHeroSlidesOnce();
   await ensureCoffeeProcesses();
