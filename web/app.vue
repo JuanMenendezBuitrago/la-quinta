@@ -30,9 +30,18 @@
           <ShoppingBag :size="22" :stroke-width="1.7" />
           <span v-if="cartCount" class="badge" aria-hidden="true">{{ cartCount }}</span>
         </NuxtLink>
-        <NuxtLink to="/cuenta" aria-label="Mi cuenta" title="Mi cuenta">
+        <NuxtLink
+          to="/cuenta"
+          :aria-label="customer ? 'Mi cuenta' : 'Entra o regístrate'"
+          :title="customer ? 'Mi cuenta' : 'Entra o regístrate'"
+          :class="{ 'signup-link': !customer }"
+        >
           <UserAvatar v-if="customer" :avatar="customer.avatar" :name="customer.name" :size="26" />
-          <User v-else :size="22" :stroke-width="1.7" />
+          <template v-else>
+            <!-- Sin sesion: invitacion a crear cuenta junto al icono (en movil, solo «Regístrate») -->
+            <span class="signup-text" aria-hidden="true"><span class="signup-long">Entra o </span>regístrate</span>
+            <User :size="22" :stroke-width="1.7" />
+          </template>
         </NuxtLink>
       </nav>
       </div>
@@ -171,6 +180,13 @@ nav a.router-link-exact-active {
 /* Iconos del cliente: mas juntos que los textos, con el contador del carrito sobre el icono */
 .icon-nav { gap: 18px; }
 .icon-nav a { padding: 4px 2px; }
+/* Sin sesion: el texto «Entra o regístrate» a la izquierda del icono de cuenta */
+.icon-nav a.signup-link { gap: 7px; }
+.signup-text { white-space: nowrap; }
+@media (max-width: 760px) {
+  .signup-long { display: none; }
+  .icon-nav a.signup-link { font-size: 11px; letter-spacing: 0.04em; }
+}
 .icon-nav .badge {
   position: absolute;
   top: -4px;
