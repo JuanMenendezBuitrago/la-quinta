@@ -40,7 +40,13 @@ export default defineNuxtConfig({
   },
 
   pwa: {
-    registerType: "autoUpdate",
+    // "prompt": la version nueva espera a que se recargue (aviso en UpdateBanner, que tambien
+    // recarga sola si la pantalla esta sin usar). Con "autoUpdate" recargaba sin avisar, incluso
+    // a mitad de un pedido.
+    registerType: "prompt",
+    // Una SPA abierta todo el dia no navega y el navegador no buscaria el service worker nuevo:
+    // se pregunta cada 5 minutos (en segundos).
+    client: { periodicSyncForUpdates: 300 },
     manifest: {
       name: "La Quinta",
       short_name: "La Quinta",

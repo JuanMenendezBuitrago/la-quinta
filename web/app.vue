@@ -43,6 +43,8 @@
     <!-- El pie (direccion, horarios, redes) es para el cliente: no en el panel de personal -->
     <SiteFooter v-if="!inStaff" />
     <StaffQuickBar v-if="inStaff && staff" />
+    <!-- Aviso de version nueva tras un despliegue (solo en el navegador: depende del service worker) -->
+    <ClientOnly><UpdateBanner /></ClientOnly>
   </div>
 </template>
 
@@ -56,6 +58,7 @@ import StaffNav from "~/components/StaffNav.vue";
 import StaffActingSwitcher from "~/components/StaffActingSwitcher.vue";
 import StaffQuickBar from "~/components/StaffQuickBar.vue";
 import UserAvatar from "~/components/UserAvatar.vue";
+import UpdateBanner from "~/components/UpdateBanner.vue";
 
 const { cartCount, clear: clearCart } = useCart();
 // Si se activa "solo el personal crea pedidos", el carrito deja de existir para el cliente.
