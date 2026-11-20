@@ -1,8 +1,9 @@
 import { withFilter } from "graphql-subscriptions";
 import { Types } from "mongoose";
 import { GraphQLContext, requireCustomer, requireStaff, wsSessionStillValid } from "../../graphql/context";
-import { ALLOWED_FROM, AWAITING_PAYMENT, CUSTOMER_TABLES, OPEN_ORDER, checkCashReceived, isTakeaway, Order, OrderDiscountDoc, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
+import { ALLOWED_FROM, AWAITING_PAYMENT, CUSTOMER_TABLES, NO_PARTIAL_PAYMENTS, OPEN_ORDER, checkCashReceived, isTakeaway, Order, OrderDiscountDoc, OrderStatus, PAYMENT_METHODS, PaymentMethod, STATUS_LABELS, ServiceType } from "./model";
 import { tryComplete } from "./complete";
+import { nextPartAmount, paidCents, paidUnits, remainingCents } from "./split";
 import { buildOrderLines, createWithUniqueCode, type OrderLineRequest } from "./create";
 import { buildDiscount, buildRedemption, rebaseDiscount, type OrderDiscountInput, type OrderRedemptionInput } from "./discount";
 import { assertRewardAvailable, redeemForOrder, refundOrderRedemption } from "../loyalty/redemption";
@@ -89,10 +90,10 @@ export const ordersResolvers = {
         return new Types.ObjectId(value);
       };
       // Quien lo tomo, le cambio el estado en algun momento (el alta del personal tambien queda ahi)
-      // o lo cobro (al cobrar una mesa no cambia el estado). Ya hay un $or: van juntos en un $and.
+      // o lo cobro, entero o una parte (al cobrar una mesa no cambia el estado). Ya hay un $or: van juntos en un $and.
       if (args.staffId) {
         const staffId = id(args.staffId);
-        filter.$and = [{ $or: [{ "statusHistory.staffId": staffId }, { paidByStaffId: staffId }] }];
+        filter.$and = [{ $or: [{ "statusHistory.staffId": staffId }, { paidByStaffId: staffId }, { "payments.staffId": staffId }] }];
       }
       if (args.customerId) filter.customerId = id(args.customerId);
       const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
@@ -147,6 +148,11 @@ export const ordersResolvers = {
     paidByAvatar: async (doc: any) => (await paidBy(doc))?.avatar ?? null,
     cashReceivedCents: (doc: any) => doc.cashReceivedCents ?? null,
     changeCents: (doc: any) => (doc.cashReceivedCents != null ? doc.cashReceivedCents - doc.totalCents : null),
+    payments: (doc: any) => doc.payments ?? [],
+    paidCents: (doc: any) => paidCents(doc),
+    remainingCents: (doc: any) => (doc.paidAt ? 0 : remainingCents(doc)),
+    paidUnits: (doc: any) => paidUnits(doc),
+    split: (doc: any) => (doc.payments?.length && doc.split ? { mode: doc.split.mode, parts: doc.split.parts ?? null } : null),
     awaitingPayment: (doc: any) =>
       doc.serviceType === "MESA" && !doc.paidAt && !doc.completedAt && doc.status !== "CANCELADO",
   },
@@ -157,6 +163,13 @@ export const ordersResolvers = {
   },
   OrderRedemption: {
     staffName: (r: any) => staffNameOf(r.staffId),
+  },
+  OrderPayment: {
+    at: (p: any) => new Date(p.at).toISOString(),
+    cashReceivedCents: (p: any) => p.cashReceivedCents ?? null,
+    changeCents: (p: any) => (p.cashReceivedCents != null ? p.cashReceivedCents - p.amountCents : null),
+    units: (p: any) => p.units ?? [],
+    staffName: (p: any) => staffNameOf(p.staffId),
   },
   OrderLine: {
     // Pedidos anteriores a las personalizaciones: sin opciones.
@@ -354,14 +367,16 @@ export const ordersResolvers = {
     ) => {
       const staff = requireStaff(ctx, ["barra", "gestion"]);
       // Solo antes de cobrarlo: lo cobrado ya cuenta en la caja tal cual.
-      const unpaid = { paidAt: { $exists: false }, completedAt: { $exists: false }, status: { $ne: "CANCELADO" } };
+      // Ni con partes ya cobradas: cambiaria lo que le toca a cada uno.
+      const unpaid = { paidAt: { $exists: false }, completedAt: { $exists: false }, status: { $ne: "CANCELADO" }, ...NO_PARTIAL_PAYMENTS };
       const current = await Order.findOne({ _id: args.id, ...unpaid })
         .select("totalCents discount redemption customerId items")
         .lean();
       if (!current) {
-        const order = await Order.findById(args.id).select("code status").lean();
+        const order = await Order.findById(args.id).select("code status paidAt payments").lean();
         if (!order) throw new Error("Pedido no encontrado");
         if (order.status === "CANCELADO") throw new Error(`El pedido ${order.code} esta cancelado`);
+        if (!order.paidAt && order.payments?.length) throw new Error("Ya hay partes cobradas: deshazlas para cambiar el descuento");
         throw new Error(`El pedido ${order.code} ya esta cobrado: no se puede cambiar el descuento`);
       }
       // Lo que vale el pedido sin canje ni descuento (el total guardado ya los lleva restados).
@@ -443,6 +458,7 @@ export const ordersResolvers = {
           serviceType: "MESA",
           paidAt: { $exists: false },
           status: { $ne: "CANCELADO" },
+          ...NO_PARTIAL_PAYMENTS,
           ...(cashReceivedCents !== null ? { totalCents: { $lte: cashReceivedCents } } : {}),
         },
         {
@@ -457,16 +473,103 @@ export const ordersResolvers = {
         { new: true }
       );
       if (!order) {
-        const current = await Order.findById(args.id).select("code serviceType paidAt status totalCents").lean();
+        const current = await Order.findById(args.id).select("code serviceType paidAt status totalCents payments").lean();
         if (!current) throw new Error("Pedido no encontrado");
         if (current.serviceType !== "MESA") throw new Error("Solo los pedidos de mesa o barra se cobran aparte");
         if (current.paidAt) throw new Error(`El pedido ${current.code} ya esta cobrado`);
         if (current.status === "CANCELADO") throw new Error(`El pedido ${current.code} esta cancelado`);
+        if (current.payments?.length) throw new Error("La cuenta se esta cobrando por partes: cobra lo que falta como una parte mas");
         throw new Error("Lo recibido no cubre el total del pedido");
       }
 
       await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
       await tryComplete(order._id.toString());
+      return order;
+    },
+
+    addOrderPayment: async (
+      _: unknown,
+      args: {
+        id: string;
+        method: PaymentMethod;
+        cashReceivedCents?: number | null;
+        units?: { lineIndex: number; quantity: number }[] | null;
+        parts?: number | null;
+      },
+      ctx: GraphQLContext
+    ) => {
+      const staff = requireStaff(ctx, ["barra", "gestion"]);
+      if (!PAYMENT_METHODS.includes(args.method)) throw new Error("Metodo de pago no valido");
+      if (args.units?.length && args.parts) throw new Error("Divide por productos o a partes iguales, no las dos");
+      const cashReceivedCents = checkCashReceived(args.method, args.cashReceivedCents);
+      if (!Types.ObjectId.isValid(args.id)) throw new Error("Pedido no encontrado");
+
+      const current = await Order.findById(args.id).select("code serviceType paidAt status totalCents items redemption payments split").lean();
+      if (!current) throw new Error("Pedido no encontrado");
+      if (current.serviceType !== "MESA") throw new Error("Solo los pedidos de mesa o barra se cobran por partes");
+      if (current.paidAt) throw new Error(`El pedido ${current.code} ya esta cobrado`);
+      if (current.status === "CANCELADO") throw new Error(`El pedido ${current.code} esta cancelado`);
+
+      const { amountCents, completes, mode } = nextPartAmount(current, args);
+      if (cashReceivedCents !== null && cashReceivedCents < amountCents) throw new Error("Lo recibido no cubre esta parte");
+
+      const now = new Date();
+      const done = current.payments?.length ?? 0;
+      const payment = {
+        amountCents,
+        method: args.method,
+        staffId: staff.id,
+        at: now,
+        ...(cashReceivedCents !== null ? { cashReceivedCents } : {}),
+        ...(mode === "PRODUCTOS" ? { units: args.units!.map((u) => ({ lineIndex: u.lineIndex, quantity: u.quantity })) } : {}),
+      };
+      // Con la ultima parte queda cobrado, como con markOrderPaid; el metodo, si todas usaron el mismo.
+      const methods = new Set([...(current.payments ?? []).map((p) => p.method), args.method]);
+      // Atomico: solo si nadie cobro otra parte ni cambio el total entretanto (las cifras serian viejas).
+      const order = await Order.findOneAndUpdate(
+        {
+          _id: args.id,
+          paidAt: { $exists: false },
+          status: { $ne: "CANCELADO" },
+          totalCents: current.totalCents,
+          ...(done ? { payments: { $size: done } } : NO_PARTIAL_PAYMENTS),
+        },
+        {
+          $push: { payments: payment },
+          $set: {
+            split: { mode, ...(mode === "IGUALES" ? { parts: args.parts! } : {}) },
+            updatedAt: now,
+            ...(completes ? { paidAt: now, paidByStaffId: staff.id, ...(methods.size === 1 ? { paymentMethod: args.method } : {}) } : {}),
+          },
+        },
+        { new: true }
+      );
+      if (!order) throw new Error("El pedido acaba de cambiar: vuelve a intentarlo");
+
+      await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
+      if (completes) await tryComplete(order._id.toString());
+      return order;
+    },
+
+    undoOrderPayment: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["barra", "gestion"]);
+      if (!Types.ObjectId.isValid(args.id)) throw new Error("Pedido no encontrado");
+      const current = await Order.findById(args.id).select("code paidAt payments").lean();
+      if (!current) throw new Error("Pedido no encontrado");
+      if (current.paidAt) throw new Error(`El pedido ${current.code} ya esta cobrado entero`);
+      const done = current.payments?.length ?? 0;
+      if (!done) throw new Error("No hay ninguna parte cobrada");
+
+      // La ultima; al quitar la unica, la cuenta deja de estar dividida.
+      const order = await Order.findOneAndUpdate(
+        { _id: args.id, paidAt: { $exists: false }, payments: { $size: done } },
+        done === 1
+          ? { $unset: { payments: 1, split: 1 }, $set: { updatedAt: new Date() } }
+          : { $pop: { payments: 1 }, $set: { updatedAt: new Date() } },
+        { new: true }
+      );
+      if (!order) throw new Error("El pedido acaba de cambiar: vuelve a intentarlo");
+      await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
       return order;
     },
 
@@ -492,6 +595,8 @@ export const ordersResolvers = {
         // Ademas de lo activo, lo servido en mesa sin cobrar (p. ej. se fue sin pagar).
         delete filter.status;
         filter.$or = [{ status: { $in: ALLOWED_FROM.CANCELADO } }, AWAITING_PAYMENT];
+        // Con partes cobradas ese dinero ya esta en la caja: primero hay que deshacerlas.
+        Object.assign(filter, NO_PARTIAL_PAYMENTS);
       }
       // Los de mesa se cobran aparte (markOrderPaid), antes o despues de entregar.
       if (paidOnDelivery) filter.serviceType = { $ne: "MESA" };
@@ -512,8 +617,11 @@ export const ordersResolvers = {
         { new: true }
       );
       if (!order) {
-        const current = await Order.findById(args.id).select("status code serviceType totalCents").lean();
+        const current = await Order.findById(args.id).select("status code serviceType totalCents payments").lean();
         if (!current) throw new Error("Pedido no encontrado");
+        if (args.status === "CANCELADO" && current.payments?.length) {
+          throw new Error(`El pedido ${current.code} tiene partes cobradas: deshazlas antes de cancelarlo`);
+        }
         if (paidOnDelivery && current.serviceType === "MESA") {
           throw new Error(`El pedido ${current.code} es de mesa: se cobra aparte`);
         }

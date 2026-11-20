@@ -157,6 +157,9 @@ export interface TicketOrder {
   paymentMethod?: keyof typeof PAYMENT_LABELS | null;
   cashReceivedCents?: number | null;
   changeCents?: number | null;
+  // Cuenta dividida: cada parte con su metodo (vacio si se cobro de una vez).
+  payments?: { amountCents: number; method: keyof typeof PAYMENT_LABELS; cashReceivedCents?: number | null; changeCents?: number | null; units?: { lineIndex: number; quantity: number }[]; at?: string }[] | null;
+  split?: { mode: "PRODUCTOS" | "IGUALES"; parts?: number | null } | null;
   totalCents: number;
   packagingCents?: number | null;
   items: {
@@ -233,7 +236,12 @@ export function useTicketPrinter() {
     }
 
     p.bold(true).double(true).line(cols("TOTAL", `$${money(order.totalCents)}`, COLS_DOUBLE)).double(false).bold(false);
-    if (order.paidAt && order.paymentMethod) {
+    if (order.payments?.length) {
+      // Cuenta dividida: cada parte, y lo que falta si aun no esta todo.
+      order.payments.forEach((pay, i) => p.line(cols(`Parte ${i + 1}: ${PAYMENT_LABELS[pay.method]}`, `$${money(pay.amountCents)}`)));
+      const paid = order.payments.reduce((n, pay) => n + pay.amountCents, 0);
+      if (paid < order.totalCents) p.bold(true).line(cols("Pendiente de pago", `$${money(order.totalCents - paid)}`)).bold(false);
+    } else if (order.paidAt && order.paymentMethod) {
       p.line(cols("Pagado con", PAYMENT_LABELS[order.paymentMethod]));
       if (order.cashReceivedCents != null) {
         p.line(cols("Recibido", `$${money(order.cashReceivedCents)}`));
@@ -259,6 +267,62 @@ export function useTicketPrinter() {
     p.bold(true).line("¡Gracias por tu visita!").bold(false);
     const hours = (s?.schedule ?? []).map((l) => `${l.label} ${l.hours}`).join(" · ");
     for (const l of wrap(hours, COLS)) p.line(l);
+    p.line("Este documento no es una factura");
+    p.align("left").feed(3).cut();
+    return p.toBase64();
+  }
+
+  /**
+   * Ticket de una parte de una cuenta dividida (la persona que acaba de pagar la suya): lo que paga,
+   * con que, el cambio y lo que queda del pedido. Por productos, sus productos; a partes iguales, el
+   * total entre las personas.
+   */
+  async function buildPart(order: TicketOrder, index: number) {
+    const s = result.value?.siteSettings;
+    const pay = order.payments?.[index];
+    if (!pay) throw new Error("Esa parte no existe");
+    const p = new EscPos();
+
+    p.align("center");
+    const logo = await loadLogo();
+    if (logo) p.image(logo.width, logo.height, logo.dots);
+    p.bold(true).line(STORE_NAME).bold(false);
+    for (const l of (s?.address ?? "").split("\n").map((x) => x.trim()).filter(Boolean)) p.line(l);
+    p.align("left").line(rule());
+
+    const parts = order.split?.mode === "IGUALES" && order.split.parts ? ` de ${order.split.parts}` : "";
+    p.bold(true).line(cols(`Pedido ${order.code}`, where(order))).bold(false);
+    p.line(cols(dateText(pay.at ?? new Date().toISOString()), `Parte ${index + 1}${parts}`));
+    p.line(rule());
+
+    if (pay.units?.length) {
+      for (const u of pay.units) {
+        const it = order.items[u.lineIndex];
+        if (!it) continue;
+        const [first, ...rest] = wrap(`${u.quantity} x ${it.name}`, COLS - 12);
+        p.line(cols(first, money(it.priceCents * u.quantity)));
+        for (const r of rest) p.line(`    ${r}`);
+      }
+      if (order.redemption || order.discount || order.packagingCents) p.line("Descuento y empaque repartidos en proporción");
+    } else {
+      p.line(cols("Total del pedido", `$${money(order.totalCents)}`));
+      if (order.split?.parts) p.line(cols(`Dividido entre ${order.split.parts} personas`, ""));
+    }
+    p.line(rule());
+
+    p.bold(true).double(true).line(cols("PAGA", `$${money(pay.amountCents)}`, COLS_DOUBLE)).double(false).bold(false);
+    p.line(cols("Pagado con", PAYMENT_LABELS[pay.method]));
+    if (pay.cashReceivedCents != null) {
+      p.line(cols("Recibido", `$${money(pay.cashReceivedCents)}`));
+      p.bold(true).line(cols("Cambio", `$${money(pay.changeCents ?? 0)}`)).bold(false);
+    }
+    const paidSoFar = order.payments!.slice(0, index + 1).reduce((n, x) => n + x.amountCents, 0);
+    p.line(rule());
+    p.line(cols("Pagado del pedido", `$${money(paidSoFar)} de $${money(order.totalCents)}`));
+    if (paidSoFar < order.totalCents) p.bold(true).line(cols("Falta", `$${money(order.totalCents - paidSoFar)}`)).bold(false);
+
+    p.align("center").feed(1);
+    p.bold(true).line("¡Gracias por tu visita!").bold(false);
     p.line("Este documento no es una factura");
     p.align("left").feed(3).cut();
     return p.toBase64();
@@ -303,10 +367,16 @@ export function useTicketPrinter() {
     return sendToRawBT(await build(order));
   }
 
+  /** Ticket de la parte `index` de una cuenta dividida. */
+  async function printPartTicket(order: TicketOrder, index: number): Promise<string | null> {
+    if (!isAndroid) return sendToRawBT("");
+    return sendToRawBT(await buildPart(order, index));
+  }
+
   async function printTestTicket(): Promise<string | null> {
     if (!isAndroid) return sendToRawBT("");
     return sendToRawBT(await buildTest());
   }
 
-  return { enabled, printTicket, printTestTicket, buildTicket: build };
+  return { enabled, printTicket, printPartTicket, printTestTicket, buildTicket: build };
 }

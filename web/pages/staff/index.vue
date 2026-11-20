@@ -149,7 +149,7 @@
                   </button>
                   <!-- Cancelar: una x en la esquina; pide confirmacion abajo, en la tarjeta -->
                   <button
-                    v-if="group.status !== 'COBRADO'"
+                    v-if="group.status !== 'COBRADO' && !order.payments?.length"
                     class="card-cancel"
                     type="button"
                     :aria-label="`Cancelar el pedido ${order.code}`"
@@ -195,7 +195,7 @@
                 Descuento · {{ discountLabel(order.discount) }}: − {{ formatPrice(order.discount.amountCents) }}
               </p>
               <!-- Como en el ticket de tomar pedido: que no se olvide el producto gratis antes de cobrar. -->
-              <div v-if="order.customer?.rewardAvailable && !order.paidAt && !order.redemption" class="reward-alert" role="status">
+              <div v-if="order.customer?.rewardAvailable && !order.paidAt && !order.redemption && !order.payments?.length" class="reward-alert" role="status">
                 <Stamp :size="18" :stroke-width="1.8" aria-hidden="true" />
                 <span>Tiene un <strong>canje de sellos</strong> disponible.</span>
                 <button class="link-button" type="button" :disabled="busyOrderId === order.id" @click="openDiscount(order, true)">
@@ -212,6 +212,14 @@
               <p v-if="order.paidAt && group.status !== 'COBRADO'" class="paid-note">
                 <Check :size="14" :stroke-width="2.2" aria-hidden="true" />
                 <span>Cobrado · {{ paymentDetail(order) }}{{ order.paidByName ? ` · ${order.paidByName}` : "" }}</span>
+              </p>
+              <!-- Cuenta dividida a medias: lo que ya pagaron y lo que falta -->
+              <p v-else-if="order.payments?.length && group.status !== 'COBRADO'" class="paid-note partial-note">
+                <Split :size="14" :stroke-width="2.2" aria-hidden="true" />
+                <span>
+                  Pagado {{ formatPrice(order.paidCents) }} de {{ formatPrice(order.totalCents) }} ({{ order.payments.length }}
+                  {{ order.payments.length === 1 ? "parte" : "partes" }}) · <strong>falta {{ formatPrice(order.remainingCents) }}</strong>
+                </span>
               </p>
             </div>
             <!-- Últimos cobrados: el importe, destacado abajo a la derecha -->
@@ -260,6 +268,11 @@
                 </button>
               </div>
               <div class="pay-extra">
+                <!-- Mesa y barra: cada persona paga su parte (por productos o a partes iguales) -->
+                <button v-if="order.awaitingPayment" class="button secondary" type="button" :disabled="busyOrderId === order.id" @click="openSplit(order)">
+                  <Split :size="16" :stroke-width="1.8" aria-hidden="true" />
+                  Dividir cuenta
+                </button>
                 <button class="button secondary" type="button" :disabled="busyOrderId === order.id" @click="openDiscount(order)">
                   <Percent :size="16" :stroke-width="1.8" aria-hidden="true" />
                   {{ order.discount || order.redemption ? "Cambiar descuento" : "Descuento" }}
@@ -273,10 +286,10 @@
                 :class="group.status === 'POR_COBRAR' ? 'button' : 'button secondary'"
                 type="button"
                 :disabled="busyOrderId === order.id"
-                @click="payingId = order.id"
+                @click="order.payments?.length ? openSplit(order) : (payingId = order.id)"
               >
                 <Banknote :size="16" :stroke-width="1.8" aria-hidden="true" />
-                Cobrar
+                {{ order.payments?.length ? "Cobrar resto" : "Cobrar" }}
               </button>
               <button
                 v-if="nextStatus(order.status)"
@@ -467,9 +480,20 @@
     />
     <CashChangeDialog
       ref="cashDialog"
-      :total-cents="cashOrder?.totalCents ?? 0"
-      :busy="!!cashOrder && busyOrderId === cashOrder.id"
+      :total-cents="splitCashPart ? splitCashPart.amountCents : cashOrder?.totalCents ?? 0"
+      :busy="splitCashPart ? !!splitOrder && busyOrderId === splitOrder.id : !!cashOrder && busyOrderId === cashOrder.id"
       @confirm="payCash"
+    />
+    <SplitBillDialog
+      ref="splitDialog"
+      :order="splitOrder"
+      :busy="!!splitOrder && busyOrderId === splitOrder.id"
+      :error="splitError"
+      :can-reprint="ticketPrintingEnabled"
+      @pay="onSplitPay"
+      @undo="undoSplitPart"
+      @reprint="reprintSplitPart"
+      @closed="splitOrderId = ''"
     />
     <DiscountDialog
       ref="discountDialog"
@@ -490,7 +514,7 @@
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
-import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, Percent, Pencil, Printer, SearchX, Stamp, Trash2, UserPlus, X } from "lucide-vue-next";
+import { Banknote, Bell, BellOff, BellRing, Check, ChevronLeft, History, Inbox, Percent, Pencil, Printer, SearchX, Split, Stamp, Trash2, UserPlus, X } from "lucide-vue-next";
 import { useStaffAuth } from "~/composables/useAuth";
 import {
   PAYMENT_LABELS,
@@ -521,6 +545,7 @@ import SiteSettingsAdmin from "~/components/SiteSettingsAdmin.vue";
 import CustomersAdmin from "~/components/CustomersAdmin.vue";
 import StaffOrderTaker from "~/components/StaffOrderTaker.vue";
 import CashChangeDialog from "~/components/CashChangeDialog.vue";
+import SplitBillDialog, { type SplitPart } from "~/components/SplitBillDialog.vue";
 import StaffActingPicker from "~/components/StaffActingPicker.vue";
 import DiscountDialog from "~/components/DiscountDialog.vue";
 import HeroAdmin from "~/components/HeroAdmin.vue";
@@ -568,6 +593,8 @@ const {
   deleteError,
   assignCustomer,
   markPaid,
+  addPayment,
+  undoPayment,
   setDiscounts,
   busyOrderId,
   actionError,
@@ -645,7 +672,7 @@ async function doPay(order: any, method: PaymentMethod, cashReceivedCents: numbe
   if (done) payingId.value = "";
 }
 // Ticket en la impresora termica (RawBT), si esta activado en Configuración.
-const { enabled: ticketPrintingEnabled, printTicket } = useTicketPrinter();
+const { enabled: ticketPrintingEnabled, printTicket, printPartTicket } = useTicketPrinter();
 const printNotice = ref("");
 // Modificar un pedido sin cobrar: se abre en "Tomar pedido" con sus productos (ver StaffOrderTaker).
 const editingOrder = useEditingOrder();
@@ -665,12 +692,67 @@ async function printOrderTicket(order: any) {
 const cashDialog = ref<InstanceType<typeof CashChangeDialog> | null>(null);
 const cashOrder = ref<any>(null);
 function openCash(order: any) {
+  splitCashPart.value = null;
   cashOrder.value = order;
   cashDialog.value?.open();
 }
 async function payCash(cashReceivedCents: number) {
-  if (cashOrder.value) await doPay(cashOrder.value, "EFECTIVO", cashReceivedCents);
+  if (splitCashPart.value) {
+    const part = splitCashPart.value;
+    await paySplitPart(part, cashReceivedCents);
+    splitCashPart.value = null;
+  } else if (cashOrder.value) await doPay(cashOrder.value, "EFECTIVO", cashReceivedCents);
   cashDialog.value?.close();
+}
+
+// Cuenta dividida (mesa y barra): cada persona paga su parte. Quien cobra se elige una vez, al
+// abrirlo, y vale para todas las partes. El pedido se sigue en vivo desde la cola.
+const splitDialog = ref<InstanceType<typeof SplitBillDialog> | null>(null);
+const splitOrderId = ref("");
+const splitOrder = computed(() => (splitOrderId.value ? groupedQueue.value.flatMap((g: any) => g.orders).find((o: any) => o.id === splitOrderId.value) ?? null : null));
+const splitError = ref<string | null>(null);
+// Parte en efectivo esperando lo que entrega el cliente (modal del cambio).
+const splitCashPart = ref<SplitPart | null>(null);
+function openSplit(order: any) {
+  askWhoPays(async () => {
+    splitOrderId.value = order.id;
+    splitError.value = null;
+    payingId.value = "";
+    await nextTick();
+    splitDialog.value?.open();
+  });
+}
+function onSplitPay(part: SplitPart) {
+  splitError.value = null;
+  if (part.method === "EFECTIVO") {
+    splitCashPart.value = part;
+    cashDialog.value?.open();
+  } else paySplitPart(part, null);
+}
+async function paySplitPart(part: SplitPart, cashReceivedCents: number | null) {
+  if (!splitOrder.value) return;
+  const { order, error } = await addPayment(splitOrder.value, { method: part.method, units: part.units, parts: part.parts, cashReceivedCents });
+  if (error || !order) {
+    splitError.value = error;
+    return;
+  }
+  splitDialog.value?.partDone();
+  // Ticket de esta persona (si la impresion esta activada).
+  if (ticketPrintingEnabled.value) printNotice.value = (await printPartTicket(order, order.payments.length - 1)) ?? "";
+  // Ya esta todo: el pedido queda cobrado (y, si estaba servido, sale de la cola).
+  if (order.paidAt) splitDialog.value?.close();
+}
+// Si otra tablet cobra lo que faltaba (o lo cancela), el pedido sale de la cola: el modal se cierra.
+watch(splitOrder, (order) => {
+  if (splitOrderId.value && (!order || order.paidAt)) splitDialog.value?.close();
+});
+async function undoSplitPart() {
+  if (!splitOrder.value) return;
+  const { error } = await undoPayment(splitOrder.value);
+  splitError.value = error;
+}
+async function reprintSplitPart(index: number) {
+  if (splitOrder.value) printNotice.value = (await printPartTicket(splitOrder.value, index)) ?? "";
 }
 // Descuento al cobrar: se guarda en el pedido (con motivo) y el importe a cobrar baja al momento.
 const discountDialog = ref<InstanceType<typeof DiscountDialog> | null>(null);
@@ -911,6 +993,7 @@ watchEffect(() => {
   line-height: 1.35;
 }
 .paid-note svg { flex: none; margin-top: 2px; color: var(--accent); }
+.partial-note strong { color: var(--accent); }
 .pay-box { display: flex; flex-direction: column; gap: 8px; }
 .pay-methods { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .pay-methods .button { min-height: 44px; }

@@ -134,6 +134,35 @@ export interface OrderStatusChangeDoc {
   staffId?: Types.ObjectId;
 }
 
+/** Unidades de una linea que paga una persona al dividir por productos. */
+export interface OrderPaymentUnitsDoc {
+  lineIndex: number;
+  quantity: number;
+}
+
+/**
+ * Una parte de un cobro dividido (ver orders/split.ts): cada persona paga lo suyo con su metodo.
+ * El pedido queda cobrado (paidAt) cuando las partes suman el total.
+ */
+export interface OrderPaymentDoc {
+  amountCents: number;
+  method: PaymentMethod;
+  // Solo en efectivo: lo que entrego esa persona (el cambio es la diferencia con amountCents).
+  cashReceivedCents?: number;
+  // Solo al dividir por productos: lo que paga.
+  units?: OrderPaymentUnitsDoc[];
+  staffId: Types.ObjectId;
+  at: Date;
+}
+
+export type SplitMode = "PRODUCTOS" | "IGUALES";
+/** Como se esta dividiendo la cuenta; se fija con la primera parte y se quita al deshacerlas todas. */
+export interface OrderSplitDoc {
+  mode: SplitMode;
+  // Solo a partes iguales: entre cuantas personas.
+  parts?: number;
+}
+
 export interface OrderDoc {
   _id: Types.ObjectId;
   code: string; // codigo corto y unico para identificar el pedido en el mostrador
@@ -165,6 +194,10 @@ export interface OrderDoc {
   // diferencia con totalCents). Para el tiquet y para reimprimirlo con las mismas cifras.
   cashReceivedCents?: number;
   paidByStaffId?: Types.ObjectId;
+  // Cobro dividido: las partes cobradas. Con ellas, paymentMethod solo se guarda si todas usaron el
+  // mismo metodo, paidByStaffId es quien cobro la ultima y cashReceivedCents no se usa.
+  payments?: OrderPaymentDoc[];
+  split?: OrderSplitDoc | null;
   // Cierre: entregado y, si es de mesa, cobrado. Es lo que suma sellos y escribe la fila en la hoja.
   completedAt?: Date;
   // Ultima modificacion de productos, mesa o nota antes de cobrarlo (ver orders/update.ts).
@@ -220,6 +253,21 @@ const orderStatusChangeSchema = new Schema<OrderStatusChangeDoc>(
   { _id: false }
 );
 
+const orderPaymentSchema = new Schema<OrderPaymentDoc>(
+  {
+    amountCents: { type: Number, required: true, min: 1 },
+    method: { type: String, enum: PAYMENT_METHODS, required: true },
+    cashReceivedCents: { type: Number, min: 0 },
+    units: {
+      type: [new Schema<OrderPaymentUnitsDoc>({ lineIndex: { type: Number, required: true, min: 0 }, quantity: { type: Number, required: true, min: 1 } }, { _id: false })],
+      default: undefined,
+    },
+    staffId: { type: Schema.Types.ObjectId, ref: "StaffUser", required: true },
+    at: { type: Date, required: true },
+  },
+  { _id: false }
+);
+
 const orderLineSchema = new Schema<OrderLineDoc>(
   {
     menuItemId: { type: Schema.Types.ObjectId, ref: "MenuItem", required: true },
@@ -258,6 +306,11 @@ const orderSchema = new Schema<OrderDoc>({
   paymentMethod: { type: String, enum: PAYMENT_METHODS },
   cashReceivedCents: { type: Number, min: 0 },
   paidByStaffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
+  payments: { type: [orderPaymentSchema], default: undefined },
+  split: {
+    type: new Schema<OrderSplitDoc>({ mode: { type: String, enum: ["PRODUCTOS", "IGUALES"], required: true }, parts: { type: Number, min: 2 } }, { _id: false }),
+    default: undefined,
+  },
   completedAt: { type: Date },
   editedAt: { type: Date },
   editedByStaffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
@@ -377,6 +430,9 @@ export async function backfillRedemptions() {
 /** Va empaquetado: lo marcado al crearlo o, en pedidos anteriores, "para llevar" o web sin mesa. */
 const ACTIVE_STATUSES: OrderStatus[] = ["NUEVO", "EN_PREPARACION", "LISTO"];
 // De mesa o barra, ya servido pero sin cobrar: sigue en la cola, en "Por cobrar".
+/** Sin partes cobradas (filtro): modificar, descontar, cancelar o cobrar entero solo asi. */
+export const NO_PARTIAL_PAYMENTS = { "payments.0": { $exists: false } };
+
 export const AWAITING_PAYMENT = {
   status: "ENTREGADO",
   serviceType: "MESA",

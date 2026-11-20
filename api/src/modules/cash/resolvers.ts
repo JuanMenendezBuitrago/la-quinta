@@ -1,6 +1,6 @@
 import { GraphQLContext, requireStaff } from "../../graphql/context";
 import { env } from "../../config/env";
-import { DISCOUNT_REASONS, Order } from "../orders/model";
+import { DISCOUNT_REASONS, NO_PARTIAL_PAYMENTS, Order } from "../orders/model";
 import { StaffUser } from "../users/model";
 import { CashClosing, CashClosingDoc } from "./model";
 import { BANK_DEPOSIT, Expense } from "../expenses/model";
@@ -37,11 +37,12 @@ async function dailyStats(days: number, now: Date) {
   // Sin horario de verano en el local: cada dia son 24 h exactas.
   const start = new Date(todayStart.getTime() - (days - 1) * 86_400_000);
   const tz = env.storeTimeZone;
-  const [income, expenses] = await Promise.all([
+  const [whole, parts, expenses] = await Promise.all([
     Order.aggregate<{ _id: string; cents: number; count: number }>([
       {
         $match: {
           status: { $ne: "CANCELADO" },
+          ...NO_PARTIAL_PAYMENTS,
           $or: [
             { paidAt: { $gte: start, $lte: now } },
             { paidAt: { $exists: false }, serviceType: { $ne: "MESA" }, status: "ENTREGADO", deliveredAt: { $gte: start, $lte: now } },
@@ -50,13 +51,24 @@ async function dailyStats(days: number, now: Date) {
       },
       { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: { $ifNull: ["$paidAt", "$deliveredAt"] }, timezone: tz } }, cents: { $sum: "$totalCents" }, count: { $sum: 1 } } },
     ]),
+    // Cuentas divididas: cada parte el dia que se cobro (el pedido cuenta una vez por dia).
+    Order.aggregate<{ _id: string; cents: number; orders: unknown[] }>([
+      { $match: { status: { $ne: "CANCELADO" }, payments: { $elemMatch: { at: { $gte: start, $lte: now } } } } },
+      { $unwind: "$payments" },
+      { $match: { "payments.at": { $gte: start, $lte: now } } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$payments.at", timezone: tz } }, cents: { $sum: "$payments.amountCents" }, orders: { $addToSet: "$_id" } } },
+    ]),
     Expense.aggregate<{ _id: string; cents: number }>([
       // Los ingresos al banco no son gasto: el dinero sigue siendo del local.
       { $match: { spentAt: { $gte: start, $lte: now }, category: { $ne: BANK_DEPOSIT } } },
       { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$spentAt", timezone: tz } }, cents: { $sum: "$amountCents" } } },
     ]),
   ]);
-  const incomeByDay = new Map(income.map((r) => [r._id, r]));
+  const incomeByDay = new Map(whole.map((r) => [r._id, { cents: r.cents, count: r.count }]));
+  for (const r of parts) {
+    const day = incomeByDay.get(r._id) ?? { cents: 0, count: 0 };
+    incomeByDay.set(r._id, { cents: day.cents + r.cents, count: day.count + r.orders.length });
+  }
   const expensesByDay = new Map(expenses.map((r) => [r._id, r.cents]));
   return Array.from({ length: days }, (_, i) => {
     // Mediodia de cada dia: lejos de los bordes, da la fecha correcta en la zona del local.
@@ -81,26 +93,36 @@ async function currentPeriodStart(now: Date) {
  * rato antes de que se pidiera el metodo al entregar. Los cancelados no cuentan.
  */
 async function summarize(start: Date, end: Date) {
+  const range = { $gte: start, $lt: end };
   const orders = await Order.find({
     status: { $ne: "CANCELADO" },
     $or: [
-      { paidAt: { $gte: start, $lt: end } },
-      { paidAt: { $exists: false }, serviceType: { $ne: "MESA" }, status: "ENTREGADO", deliveredAt: { $gte: start, $lt: end } },
+      { paidAt: range },
+      { paidAt: { $exists: false }, serviceType: { $ne: "MESA" }, status: "ENTREGADO", deliveredAt: range },
+      // Cuenta dividida: las partes cobradas en este rato, aunque falte alguna por cobrar.
+      { payments: { $elemMatch: { at: range } } },
     ],
   })
-    .select("totalCents paymentMethod paidAt discount redemption")
+    .select("totalCents paymentMethod paidAt discount redemption payments")
     .lean();
 
   const sum = { cashCents: 0, cardCents: 0, transferCents: 0, unknownMethodCents: 0 };
+  const add = (method: string | null | undefined, cents: number) => {
+    if (method === "EFECTIVO") sum.cashCents += cents;
+    else if (method === "TARJETA") sum.cardCents += cents;
+    else if (method === "TRANSFERENCIA") sum.transferCents += cents;
+    else sum.unknownMethodCents += cents;
+  };
+  const inRange = (d: Date | null | undefined) => !!d && d >= start && d < end;
   for (const o of orders) {
-    if (!o.paidAt) sum.unknownMethodCents += o.totalCents;
-    else if (o.paymentMethod === "EFECTIVO") sum.cashCents += o.totalCents;
-    else if (o.paymentMethod === "TARJETA") sum.cardCents += o.totalCents;
-    else if (o.paymentMethod === "TRANSFERENCIA") sum.transferCents += o.totalCents;
-    else sum.unknownMethodCents += o.totalCents;
+    if (o.payments?.length) {
+      for (const p of o.payments) if (inRange(p.at)) add(p.method, p.amountCents);
+    } else add(o.paidAt ? o.paymentMethod : null, o.totalCents);
   }
+  // Pedidos y descuentos: los cobrados del todo en este rato (una cuenta dividida, en el cierre de su ultima parte).
+  const settled = orders.filter((o) => !o.payments?.length || inRange(o.paidAt));
   const totalCents = sum.cashCents + sum.cardCents + sum.transferCents + sum.unknownMethodCents;
-  return { ordersCount: orders.length, totalCents, ...sum, ...summarizeDiscounts(orders), ...(await summarizeExpenses(end)) };
+  return { ordersCount: settled.length, totalCents, ...sum, ...summarizeDiscounts(settled), ...(await summarizeExpenses(end)) };
 }
 
 /**

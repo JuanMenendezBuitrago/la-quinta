@@ -97,6 +97,44 @@ export const ordersTypeDefs = /* GraphQL */ `
     lineIndex: Int
   }
 
+  """Unidades de una linea del pedido (posicion en items) que paga una persona."""
+  type OrderPaymentUnits {
+    lineIndex: Int!
+    quantity: Int!
+  }
+
+  input OrderPaymentUnitsInput {
+    lineIndex: Int!
+    quantity: Int!
+  }
+
+  enum SplitMode {
+    """Cada persona paga lo que tomo."""
+    PRODUCTOS
+    """El total entre N personas."""
+    IGUALES
+  }
+
+  """Como se esta dividiendo la cuenta (fijo mientras haya partes cobradas)."""
+  type OrderSplit {
+    mode: SplitMode!
+    """Solo a partes iguales: entre cuantas personas."""
+    parts: Int
+  }
+
+  """Una parte de un cobro dividido."""
+  type OrderPayment {
+    amountCents: Int!
+    method: PaymentMethod!
+    """Solo en efectivo: lo que entrego esa persona."""
+    cashReceivedCents: Int
+    changeCents: Int
+    """Solo por productos: lo que pago esa persona."""
+    units: [OrderPaymentUnits!]!
+    staffName: String
+    at: String!
+  }
+
   """Un cambio de estado del pedido."""
   type OrderStatusChange {
     status: OrderStatus!
@@ -142,6 +180,16 @@ export const ordersTypeDefs = /* GraphQL */ `
     cashReceivedCents: Int
     """El cambio que se devolvio (cashReceivedCents - totalCents); null si no se anoto lo recibido."""
     changeCents: Int
+    """Cobro dividido: las partes cobradas, en orden. Vacio si se cobro de una vez."""
+    payments: [OrderPayment!]!
+    """Suma de las partes cobradas."""
+    paidCents: Int!
+    """Lo que falta por cobrar (0 si ya esta cobrado)."""
+    remainingCents: Int!
+    """Unidades ya pagadas de cada linea (misma posicion que items), al dividir por productos."""
+    paidUnits: [Int!]!
+    """Como se divide la cuenta; null si no hay partes cobradas."""
+    split: OrderSplit
     """De mesa o barra, sin cobrar y no cancelado."""
     awaitingPayment: Boolean!
     createdAt: String!
@@ -218,6 +266,12 @@ export const ordersTypeDefs = /* GraphQL */ `
     setOrderStatus(id: ID!, status: OrderStatus!, paymentMethod: PaymentMethod, cashReceivedCents: Int): Order!
     """Personal: cobra un pedido de mesa o barra (antes o despues de entregarlo)."""
     markOrderPaid(id: ID!, method: PaymentMethod!, cashReceivedCents: Int): Order!
+    """Personal: cobra una parte de un pedido de mesa o barra (cuenta dividida). Por productos (units:
+    lo que paga esa persona) o a partes iguales (parts: entre cuantas). El importe lo calcula el
+    servidor; con la ultima parte el pedido queda cobrado."""
+    addOrderPayment(id: ID!, method: PaymentMethod!, cashReceivedCents: Int, units: [OrderPaymentUnitsInput!], parts: Int): Order!
+    """Personal: deshace la ultima parte cobrada de un pedido aun sin cobrar del todo."""
+    undoOrderPayment(id: ID!): Order!
     """Personal: pedido tomado en el local (mesero o barra). La recogida es ahora."""
     createStaffOrder(input: StaffOrderInput!): Order!
     """Personal: fija el canje de sellos y el descuento de un pedido aun sin cobrar (null: sin el).

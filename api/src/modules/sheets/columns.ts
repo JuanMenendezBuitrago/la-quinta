@@ -43,6 +43,13 @@ const PAYMENT_LABELS: Record<string, string> = {
   TRANSFERENCIA: "Transferencia/Nequi",
 };
 
+const pesos = (cents: number) => `$${cents.toLocaleString("es-CO")}`;
+/** "Efectivo", o en una cuenta dividida "Dividido: Efectivo $12.000 + Tarjeta $9.500". */
+function paymentLabel(p: OrderClosedPayload): string {
+  if (p.payments?.length) return `Dividido: ${p.payments.map((x) => `${PAYMENT_LABELS[x.method] ?? x.method} ${pesos(x.amountCents)}`).join(" + ")}`;
+  return p.paymentMethod ? PAYMENT_LABELS[p.paymentMethod] ?? "" : "";
+}
+
 const CLOSED_AT_TITLE: Record<SheetsExportKind, string> = {
   ENTREGADO: "Entregado",
   CANCELADO: "Cancelado",
@@ -61,7 +68,7 @@ export function sheetColumns(kind: SheetsExportKind): Column[] {
     { title: CLOSED_AT_TITLE[kind], value: (p) => (p.closedAt ? dateFormatter.format(new Date(p.closedAt)) : "") },
     // Solo mesa y barra se cobran aparte; en web y para llevar quedan vacias.
     { title: "Cobrado", value: (p) => (p.paidAt ? dateFormatter.format(new Date(p.paidAt)) : "") },
-    { title: "Método de pago", value: (p) => (p.paymentMethod ? PAYMENT_LABELS[p.paymentMethod] ?? "" : "") },
+    { title: "Método de pago", value: paymentLabel },
     { title: "Recogida", value: (p) => dateFormatter.format(new Date(p.pickupSlot)) },
     { title: "Origen", value: originLabel },
     { title: "Cliente", value: (p) => text(p.customerName) },

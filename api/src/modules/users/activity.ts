@@ -7,6 +7,26 @@ import { LoyaltyTransaction } from "../loyalty/model";
 import { Shift } from "../shifts/model";
 import { DEFAULT_WEEKLY_HOURS, StaffUserDoc } from "./model";
 
+/**
+ * Lo que cobro alguien en el rango: los pedidos cobrados de una vez a su nombre y, en las cuentas
+ * divididas, sus partes (cada una cuenta como un cobro).
+ */
+async function chargedBy(id: Types.ObjectId, range: { $gte: Date; $lt: Date }) {
+  const [[whole], [parts]] = await Promise.all([
+    Order.aggregate([
+      { $match: { paidByStaffId: id, paidAt: range, status: { $ne: "CANCELADO" }, "payments.0": { $exists: false } } },
+      { $group: { _id: null, count: { $sum: 1 }, cents: { $sum: "$totalCents" } } },
+    ]),
+    Order.aggregate([
+      { $match: { status: { $ne: "CANCELADO" }, payments: { $elemMatch: { staffId: id, at: range } } } },
+      { $unwind: "$payments" },
+      { $match: { "payments.staffId": id, "payments.at": range } },
+      { $group: { _id: null, count: { $sum: 1 }, cents: { $sum: "$payments.amountCents" } } },
+    ]),
+  ]);
+  return { count: (whole?.count ?? 0) + (parts?.count ?? 0), cents: (whole?.cents ?? 0) + (parts?.cents ?? 0) };
+}
+
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_RANGE_DAYS = 366;
 
@@ -138,7 +158,7 @@ export async function staffActivity(member: StaffUserDoc, from: string, to: stri
   };
   const [taken, charged, discounts, cancelled, closings, expenses, stampMoves] = await Promise.all([
     sum(Order, { createdByStaffId: id, createdAt: range, status: { $ne: "CANCELADO" } }, "totalCents"),
-    sum(Order, { paidByStaffId: id, paidAt: range, status: { $ne: "CANCELADO" } }, "totalCents"),
+    chargedBy(id, range),
     sum(Order, { "discount.staffId": id, "discount.at": range, status: { $ne: "CANCELADO" } }, "discount.amountCents"),
     Order.countDocuments({ status: "CANCELADO", statusHistory: { $elemMatch: { status: "CANCELADO", staffId: id, at: range } } }),
     CashClosing.countDocuments({ staffId: id, createdAt: range }),

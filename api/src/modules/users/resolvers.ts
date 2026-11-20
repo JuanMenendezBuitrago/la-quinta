@@ -22,7 +22,7 @@ import { staffActivity } from "./activity";
 async function staffRecords(staffId: string) {
   const id = new Types.ObjectId(staffId);
   const checks: [string, Promise<unknown>][] = [
-    ["pedidos", Order.exists({ $or: [{ createdByStaffId: id }, { paidByStaffId: id }, { "statusHistory.staffId": id }] })],
+    ["pedidos", Order.exists({ $or: [{ createdByStaffId: id }, { paidByStaffId: id }, { "payments.staffId": id }, { "statusHistory.staffId": id }] })],
     ["cierres de caja", CashClosing.exists({ staffId: id })],
     ["gastos", Expense.exists({ staffId: id })],
     ["movimientos de sellos", LoyaltyTransaction.exists({ staffId: id })],

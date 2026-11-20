@@ -10,7 +10,7 @@ import { DISCOUNT_REASON_LABELS, isTakeaway, type OrderDoc } from "./model";
 export async function buildClosedPayload<S extends OrderClosedPayload["status"]>(
   order: Pick<
     OrderDoc,
-    "_id" | "code" | "customerId" | "items" | "totalCents" | "packagingCents" | "discount" | "redemption" | "takeaway" | "pickupSlot" | "source" | "serviceType" | "table" | "paidAt" | "paymentMethod"
+    "_id" | "code" | "customerId" | "items" | "totalCents" | "packagingCents" | "discount" | "redemption" | "takeaway" | "pickupSlot" | "source" | "serviceType" | "table" | "paidAt" | "paymentMethod" | "payments"
   >,
   status: S,
   closedAt: Date | null
@@ -52,5 +52,6 @@ export async function buildClosedPayload<S extends OrderClosedPayload["status"]>
     closedAt: closedAt?.toISOString() ?? null,
     paidAt: order.paidAt?.toISOString() ?? null,
     paymentMethod: order.paymentMethod ?? null,
+    payments: (order.payments ?? []).map((p) => ({ amountCents: p.amountCents, method: p.method })),
   };
 }

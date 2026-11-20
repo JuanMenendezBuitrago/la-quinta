@@ -95,8 +95,29 @@ export function discountProblem(d: DiscountInput, grossCents: number, role: stri
   return null;
 }
 
-/** "Efectivo · recibido $100.000, cambio $23.500" (o solo el metodo si no se anoto lo recibido). */
-export function paymentDetail(order: { paymentMethod?: PaymentMethod | null; cashReceivedCents?: number | null; changeCents?: number | null }) {
+/** Una parte de una cuenta dividida (Order.payments). */
+export interface OrderPayment {
+  amountCents: number;
+  method: PaymentMethod;
+  cashReceivedCents?: number | null;
+  changeCents?: number | null;
+  units: { lineIndex: number; quantity: number }[];
+  staffName?: string | null;
+  at: string;
+}
+
+/** "Efectivo · recibido $100.000, cambio $23.500" (o solo el metodo si no se anoto lo recibido).
+ *  Cuenta dividida: "Dividido en 3: Efectivo $12.000 + Transferencia $9.500 + …". */
+export function paymentDetail(order: {
+  paymentMethod?: PaymentMethod | null;
+  cashReceivedCents?: number | null;
+  changeCents?: number | null;
+  payments?: OrderPayment[] | null;
+}) {
+  if (order.payments?.length) {
+    const fmt = (n: number) => n.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+    return `Dividido en ${order.payments.length}: ${order.payments.map((p) => `${PAYMENT_LABELS[p.method]} ${fmt(p.amountCents)}`).join(" + ")}`;
+  }
   const method = order.paymentMethod ? PAYMENT_LABELS[order.paymentMethod] : "sin método";
   if (order.cashReceivedCents == null) return method;
   const fmt = (n: number) => n.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
@@ -120,7 +141,7 @@ export function useEditingOrder() {
 
 /** Se puede modificar: sin cobrar y con mesa o para llevar (los web para recoger, no). */
 export function canEditOrder(order: any) {
-  return !!order.serviceType && !order.paidAt && order.status !== "CANCELADO";
+  return !!order.serviceType && !order.paidAt && order.status !== "CANCELADO" && !order.payments?.length;
 }
 
 export interface CustomerMatch {
@@ -171,6 +192,25 @@ export const ORDER_FIELDS = `
   paidByAvatar
   cashReceivedCents
   changeCents
+  payments {
+    amountCents
+    method
+    cashReceivedCents
+    changeCents
+    units {
+      lineIndex
+      quantity
+    }
+    staffName
+    at
+  }
+  paidCents
+  remainingCents
+  paidUnits
+  split {
+    mode
+    parts
+  }
   awaitingPayment
   editedAt
   editedByName
@@ -245,6 +285,17 @@ const MARK_PAID = gql`
       changeCents
       awaitingPayment
     }
+  }
+`;
+
+const ADD_PAYMENT = gql`
+  mutation AddOrderPayment($id: ID!, $method: PaymentMethod!, $cashReceivedCents: Int, $units: [OrderPaymentUnitsInput!], $parts: Int) {
+    addOrderPayment(id: $id, method: $method, cashReceivedCents: $cashReceivedCents, units: $units, parts: $parts) { ${ORDER_FIELDS} }
+  }
+`;
+const UNDO_PAYMENT = gql`
+  mutation UndoOrderPayment($id: ID!) {
+    undoOrderPayment(id: $id) { ${ORDER_FIELDS} }
   }
 `;
 
@@ -607,6 +658,37 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     }
   }
 
+  // Cuenta dividida: cobra la parte de una persona (por productos o a partes iguales) o deshace la
+  // ultima. Devuelven el pedido actualizado (para el ticket de la parte) o el error para el modal.
+  const { mutate: addPaymentMutation } = useMutation(ADD_PAYMENT);
+  const { mutate: undoPaymentMutation } = useMutation(UNDO_PAYMENT);
+  async function runPaymentAction(order: any, action: () => Promise<any>, fallback: string): Promise<{ order: any | null; error: string | null }> {
+    if (busyOrderId.value) return { order: null, error: "Espera a que termine la acción en curso" };
+    busyOrderId.value = order.id;
+    try {
+      return { order: await action(), error: null };
+    } catch (err: any) {
+      await refetchQueue()?.catch(() => {});
+      return { order: null, error: err?.message ?? fallback };
+    } finally {
+      busyOrderId.value = "";
+    }
+  }
+  function addPayment(
+    order: any,
+    part: { method: PaymentMethod; cashReceivedCents?: number | null; units?: { lineIndex: number; quantity: number }[] | null; parts?: number | null }
+  ) {
+    return runPaymentAction(
+      order,
+      async () =>
+        (await addPaymentMutation({ id: order.id, method: part.method, cashReceivedCents: part.cashReceivedCents ?? null, units: part.units ?? null, parts: part.parts ?? null }))?.data?.addOrderPayment ?? null,
+      "No se pudo cobrar esta parte"
+    );
+  }
+  function undoPayment(order: any) {
+    return runPaymentAction(order, async () => (await undoPaymentMutation({ id: order.id }))?.data?.undoOrderPayment ?? null, "No se pudo deshacer la parte");
+  }
+
   /** Donde va el pedido: mesa (la pida el personal o el cliente desde el local), para llevar o recogida. */
   function serviceLabel(order: any) {
     if (order.serviceType === "MESA") {
@@ -637,6 +719,8 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     deleteError,
     assignCustomer,
     markPaid,
+    addPayment,
+    undoPayment,
     setDiscounts,
     busyOrderId,
     actionError,

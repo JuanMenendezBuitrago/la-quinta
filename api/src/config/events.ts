@@ -67,6 +67,8 @@ export interface OrderClosedPayload {
   closedAt: string | null; // hora de entrega o cancelacion; null si no se conoce (pedidos antiguos)
   paidAt?: string | null; // solo pedidos de mesa y barra
   paymentMethod?: "EFECTIVO" | "TARJETA" | "TRANSFERENCIA" | null;
+  // Cuenta dividida: lo que pago cada persona y con que (vacio si se cobro de una vez).
+  payments?: { amountCents: number; method: "EFECTIVO" | "TARJETA" | "TRANSFERENCIA" }[];
 }
 
 export type OrderDeliveredPayload = OrderClosedPayload & { status: "ENTREGADO" };

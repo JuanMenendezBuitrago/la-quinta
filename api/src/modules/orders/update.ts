@@ -8,7 +8,7 @@ import type { StaffRole } from "../users/model";
 import { buildClosedPayload } from "./closed";
 import { buildOrderLines, type OrderLineRequest } from "./create";
 import { buildDiscount, buildRedemption, rebaseDiscount, type OrderDiscountInput, type OrderRedemptionInput } from "./discount";
-import { isTakeaway, Order, type OrderDiscountDoc, type ServiceType } from "./model";
+import { isTakeaway, NO_PARTIAL_PAYMENTS, Order, type OrderDiscountDoc, type ServiceType } from "./model";
 
 export interface StaffOrderUpdateInput {
   items: OrderLineRequest[];
@@ -46,12 +46,14 @@ export async function updateStaffOrder(
   staff: { id: string; role: StaffRole }
 ) {
   if (!Types.ObjectId.isValid(id)) throw new Error("Pedido no encontrado");
-  const unpaid = { paidAt: { $exists: false }, completedAt: { $exists: false }, status: { $ne: "CANCELADO" } };
+  // Ni con partes ya cobradas (cuenta dividida): cambiaria lo que le toca a cada uno.
+  const unpaid = { paidAt: { $exists: false }, completedAt: { $exists: false }, status: { $ne: "CANCELADO" }, ...NO_PARTIAL_PAYMENTS };
   const current = await Order.findOne({ _id: id, ...unpaid }).lean();
   if (!current) {
-    const order = await Order.findById(id).select("code status").lean();
+    const order = await Order.findById(id).select("code status paidAt payments").lean();
     if (!order) throw new Error("Pedido no encontrado");
     if (order.status === "CANCELADO") throw new Error(`El pedido ${order.code} esta cancelado`);
+    if (!order.paidAt && order.payments?.length) throw new Error("Ya hay partes cobradas: deshazlas para modificar el pedido");
     throw new Error(`El pedido ${order.code} ya esta cobrado: no se puede modificar`);
   }
   if (!current.serviceType) throw new Error("Los pedidos web para recoger no se pueden modificar desde el panel");
