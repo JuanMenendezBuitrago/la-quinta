@@ -1,7 +1,8 @@
 <template>
-  <!-- Cuenta dividida: cada persona paga su parte, por productos (lo que tomo) o a partes iguales.
+  <!-- Cuenta dividida: cada persona paga su parte, por productos (lo que tomo), a partes iguales o la
+       cantidad que diga (libre: p. ej. una parte en efectivo y el resto con tarjeta).
        Se abre con open() sobre un pedido de mesa o barra (`order`, el de la cola, que se actualiza en
-       vivo). Al tocar un metodo emite pay({ method, units | parts, amountCents }): quien lo usa cobra
+       vivo). Al tocar un metodo emite pay({ mode, method, units | parts, amountCents }): quien lo usa cobra
        la parte (en efectivo, antes pasa por el modal del cambio) y, si falla, lo dice con `error`.
        "Deshacer última" emite undo. El importe que vale es el que calcula la API; aqui, vista previa. -->
   <dialog ref="dialog" class="split-dialog" aria-labelledby="split-dialog-title" @click.self="close" @close="emit('closed')">
@@ -53,6 +54,27 @@
         </ul>
       </template>
 
+      <template v-else-if="mode === 'LIBRE'">
+        <label class="free">
+          <span>Paga</span>
+          <input
+            ref="freeInput"
+            :value="freeText"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            placeholder="Cantidad"
+            aria-label="Cantidad que paga esta persona"
+            @input="onFreeInput"
+          />
+        </label>
+        <div class="quick" aria-label="Cantidades rápidas">
+          <button v-for="q in freeQuick" :key="q.label" type="button" class="quick-btn" :class="{ active: free === q.value }" @click="free = q.value">
+            {{ q.label }}
+          </button>
+        </div>
+      </template>
+
       <template v-else>
         <div class="people">
           <span>Entre</span>
@@ -69,6 +91,7 @@
         <span>{{ partLabel }}</span>
         <strong>{{ formatPrice(amount) }}</strong>
       </p>
+      <p v-if="freeTooMuch" class="error" role="alert">Es más de lo que falta ({{ formatPrice(remaining) }})</p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
 
       <div class="methods">
@@ -84,8 +107,9 @@
 <script setup lang="ts">
 import { PAYMENT_LABELS, PAYMENT_OPTIONS, type OrderPayment, type PaymentMethod } from "~/composables/useStaffOrders";
 
-type Mode = "PRODUCTOS" | "IGUALES";
+type Mode = "PRODUCTOS" | "IGUALES" | "LIBRE";
 export interface SplitPart {
+  mode: Mode;
   method: PaymentMethod;
   units: { lineIndex: number; quantity: number }[] | null;
   parts: number | null;
@@ -98,6 +122,7 @@ const emit = defineEmits<{ pay: [part: SplitPart]; undo: []; reprint: [index: nu
 const MODE_OPTIONS: { value: Mode; label: string }[] = [
   { value: "PRODUCTOS", label: "Por productos" },
   { value: "IGUALES", label: "A partes iguales" },
+  { value: "LIBRE", label: "Cantidad libre" },
 ];
 const MAX_PARTS = 12; // como MAX_SPLIT_PARTS en la API
 
@@ -106,12 +131,31 @@ const mode = ref<Mode>("PRODUCTOS");
 const parts = ref(2);
 // Unidades elegidas de cada linea (por posicion en items).
 const selected = ref<Record<number, number>>({});
+// Cantidad libre, en pesos; null mientras no se ha escrito nada.
+const free = ref<number | null>(null);
+const freeInput = ref<HTMLInputElement | null>(null);
+const freeText = computed(() => (free.value === null ? "" : free.value.toLocaleString("es-CO")));
 
 const payments = computed<OrderPayment[]>(() => props.order?.payments ?? []);
 const paid = computed(() => payments.value.reduce((n, p) => n + p.amountCents, 0));
 const remaining = computed(() => Math.max((props.order?.totalCents ?? 0) - paid.value, 0));
 const paidUnits = computed<number[]>(() => props.order?.paidUnits ?? []);
 const minParts = computed(() => Math.max(2, payments.value.length + 1));
+
+// Solo cifras (se aceptan los puntos de miles que se escriban o peguen).
+function onFreeInput(event: Event) {
+  const el = event.target as HTMLInputElement;
+  const digits = el.value.replace(/\D/g, "");
+  free.value = digits ? Number(digits) : null;
+  el.value = freeText.value;
+}
+const freeTooMuch = computed(() => mode.value === "LIBRE" && free.value !== null && free.value > remaining.value);
+// Atajos: lo que falta y la mitad (redondeada a 100).
+const freeQuick = computed(() => {
+  const r = remaining.value;
+  const half = Math.round(r / 2 / 100) * 100;
+  return [{ label: "Lo que falta", value: r }, ...(half > 0 && half < r ? [{ label: `Mitad · ${formatPrice(half)}`, value: half }] : [])];
+});
 
 function left(i: number) {
   return (props.order?.items[i]?.quantity ?? 0) - (paidUnits.value[i] ?? 0);
@@ -120,6 +164,13 @@ function step(i: number, delta: number) {
   const next = Math.min(Math.max((selected.value[i] ?? 0) + delta, 0), left(i));
   selected.value = { ...selected.value, [i]: next };
 }
+
+// Al elegir cantidad libre, el teclado numerico sale ya.
+watch(mode, async (m) => {
+  if (m !== "LIBRE") return;
+  await nextTick();
+  freeInput.value?.focus();
+});
 
 // Si llega otra parte (otra tablet) o se deshace, lo elegido puede no caber: se ajusta.
 watch(
@@ -141,6 +192,7 @@ watch(
 const amount = computed(() => {
   const order = props.order;
   if (!order) return 0;
+  if (mode.value === "LIBRE") return free.value && !freeTooMuch.value ? free.value : 0;
   if (mode.value === "IGUALES") {
     const leftParts = parts.value - payments.value.length;
     if (leftParts < 1) return 0;
@@ -175,6 +227,7 @@ function pay(method: PaymentMethod) {
     .filter(([, q]) => q > 0)
     .map(([i, q]) => ({ lineIndex: +i, quantity: q }));
   emit("pay", {
+    mode: mode.value,
     method,
     units: mode.value === "PRODUCTOS" ? units : null,
     parts: mode.value === "IGUALES" ? parts.value : null,
@@ -184,10 +237,12 @@ function pay(method: PaymentMethod) {
 /** Tras cobrar una parte: lo elegido se vacia para la siguiente persona. */
 function partDone() {
   selected.value = {};
+  free.value = null;
 }
 
 function open() {
   selected.value = {};
+  free.value = null;
   mode.value = props.order?.split?.mode ?? "PRODUCTOS";
   parts.value = Math.max(props.order?.split?.parts ?? 2, minParts.value);
   if (!dialog.value?.open) dialog.value?.showModal();
@@ -268,6 +323,21 @@ function formatPrice(priceCents: number) {
 .stepper button:disabled { opacity: 0.35; cursor: not-allowed; }
 .count { min-width: 28px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 .people { display: flex; align-items: center; gap: 10px; }
+.free { display: flex; align-items: center; gap: 10px; }
+.free input { flex: 1; min-width: 0; min-height: 44px; font-size: 22px; font-variant-numeric: tabular-nums; }
+.quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-btn {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.quick-btn.active { background: var(--accent); color: var(--bg); }
 .part-amount {
   display: flex;
   align-items: baseline;

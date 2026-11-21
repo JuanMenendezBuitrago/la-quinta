@@ -17,7 +17,13 @@
       <div class="sent-text">
         <p>
           Pedido <strong class="code">{{ lastCode }}</strong>
-          {{ lastPaidWith ? `guardado y cobrado (${PAYMENT_LABELS[lastPaidWith].toLowerCase()}).` : "enviado a la cola." }}
+          {{
+            lastPaidWith
+              ? `guardado y cobrado (${PAYMENT_LABELS[lastPaidWith].toLowerCase()}).`
+              : lastSplit
+                ? "guardado: se cobra por partes (si queda algo, sigue en la cola)."
+                : "enviado a la cola."
+          }}
         </p>
         <p v-if="printNotice" class="print-notice" role="alert">{{ printNotice }}</p>
       </div>
@@ -241,6 +247,17 @@
                 >
                   {{ submitting ? "Guardando…" : PAYMENT_LABELS[method] }}
                 </button>
+                <!-- Mesa y barra: se guarda servido y se abre «Dividir cuenta» (cada uno paga lo suyo) -->
+                <button
+                  v-if="place && place !== 'LLEVAR'"
+                  class="button secondary"
+                  type="button"
+                  :disabled="!canSubmit"
+                  @click="askWho(() => submit(null, null, true))"
+                >
+                  <Split :size="16" :stroke-width="1.8" aria-hidden="true" />
+                  Dividir
+                </button>
                 <button class="button secondary" type="button" :disabled="submitting" @click="choosingPayment = false">Volver</button>
               </div>
               <button v-else key="pay" class="button" type="button" :disabled="!canSubmit" @click="choosingPayment = true">
@@ -278,7 +295,7 @@
 </template>
 
 <script setup lang="ts">
-import { Banknote, Percent, Printer, Receipt, Search, SearchX, Stamp } from "lucide-vue-next";
+import { Banknote, Percent, Printer, Receipt, Search, SearchX, Split, Stamp } from "lucide-vue-next";
 import { useTicketPrinter } from "~/composables/useTicketPrinter";
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
@@ -526,6 +543,9 @@ const submitting = ref(false);
 const submitError = ref("");
 const lastCode = ref("");
 const lastPaidWith = ref<PaymentMethod | null>(null);
+// El ultimo se guardo para cobrarlo por partes: quien usa este componente abre «Dividir cuenta».
+const lastSplit = ref(false);
+const emit = defineEmits<{ split: [order: any] }>();
 // El ultimo pedido guardado, para imprimir su ticket desde el aviso (sin pasar por la cola).
 const lastOrder = ref<any>(null);
 const { enabled: ticketPrintingEnabled, printTicket } = useTicketPrinter();
@@ -576,7 +596,8 @@ async function payCash(cashReceivedCents: number) {
 
 // Con metodo de pago: guardar y pagar (nace entregado y cobrado).
 // cashReceivedCents: en efectivo, lo que entrego el cliente (si se anoto en el modal).
-async function submit(paymentMethod: PaymentMethod | null = null, cashReceivedCents: number | null = null) {
+// splitPayment: guardar servido (mesa o barra) y cobrarlo por partes.
+async function submit(paymentMethod: PaymentMethod | null = null, cashReceivedCents: number | null = null, splitPayment = false) {
   if (!canSubmit.value) return;
   submitting.value = true;
   submitError.value = "";
@@ -592,6 +613,7 @@ async function submit(paymentMethod: PaymentMethod | null = null, cashReceivedCe
         note: note.value.trim() || null,
         paymentMethod,
         cashReceivedCents,
+        splitPayment: splitPayment || null,
         redemption: redemption.value,
         discount: discount.value,
       },
@@ -600,8 +622,10 @@ async function submit(paymentMethod: PaymentMethod | null = null, cashReceivedCe
     lastOrder.value = res?.data?.createStaffOrder ?? null;
     printNotice.value = "";
     lastPaidWith.value = paymentMethod;
+    lastSplit.value = splitPayment;
     reset();
     window.scrollTo({ top: 0, behavior: "smooth" });
+    if (splitPayment && lastOrder.value) emit("split", lastOrder.value);
   } catch (err: any) {
     submitError.value = err?.message ?? "No se pudo enviar el pedido";
   } finally {

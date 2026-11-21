@@ -268,7 +268,7 @@
                 </button>
               </div>
               <div class="pay-extra">
-                <!-- Mesa y barra: cada persona paga su parte (por productos o a partes iguales) -->
+                <!-- Mesa y barra: cada persona paga su parte (por productos, a partes iguales o cantidad libre) -->
                 <button v-if="order.awaitingPayment" class="button secondary" type="button" :disabled="busyOrderId === order.id" @click="openSplit(order)">
                   <Split :size="16" :stroke-width="1.8" aria-hidden="true" />
                   Dividir cuenta
@@ -313,7 +313,7 @@
 
       <!-- Tomar pedido (mesero / barra) -->
       <section v-else-if="activeTab === 'tomar'">
-        <StaffOrderTaker />
+        <StaffOrderTaker @split="openSplitNow" />
       </section>
 
       <!-- Historial -->
@@ -709,18 +709,28 @@ async function payCash(cashReceivedCents: number) {
 // abrirlo, y vale para todas las partes. El pedido se sigue en vivo desde la cola.
 const splitDialog = ref<InstanceType<typeof SplitBillDialog> | null>(null);
 const splitOrderId = ref("");
-const splitOrder = computed(() => (splitOrderId.value ? groupedQueue.value.flatMap((g: any) => g.orders).find((o: any) => o.id === splitOrderId.value) ?? null : null));
+// Recien guardado desde «Tomar pedido», el pedido puede no haber llegado aun a la cola: mientras
+// tanto vale el que devolvio la API (y despues, el que devuelve cada parte cobrada).
+const splitFallback = ref<any>(null);
+const splitOrder = computed(() => {
+  if (!splitOrderId.value) return null;
+  const inQueue = groupedQueue.value.flatMap((g: any) => g.orders).find((o: any) => o.id === splitOrderId.value);
+  return inQueue ?? (splitFallback.value?.id === splitOrderId.value ? splitFallback.value : null);
+});
 const splitError = ref<string | null>(null);
 // Parte en efectivo esperando lo que entrega el cliente (modal del cambio).
 const splitCashPart = ref<SplitPart | null>(null);
 function openSplit(order: any) {
-  askWhoPays(async () => {
-    splitOrderId.value = order.id;
-    splitError.value = null;
-    payingId.value = "";
-    await nextTick();
-    splitDialog.value?.open();
-  });
+  askWhoPays(() => openSplitNow(order));
+}
+// Desde «Tomar pedido» ya se pregunto quien lo toma: esa misma persona cobra las partes.
+async function openSplitNow(order: any) {
+  splitFallback.value = order;
+  splitOrderId.value = order.id;
+  splitError.value = null;
+  payingId.value = "";
+  await nextTick();
+  splitDialog.value?.open();
 }
 function onSplitPay(part: SplitPart) {
   splitError.value = null;
@@ -731,11 +741,18 @@ function onSplitPay(part: SplitPart) {
 }
 async function paySplitPart(part: SplitPart, cashReceivedCents: number | null) {
   if (!splitOrder.value) return;
-  const { order, error } = await addPayment(splitOrder.value, { method: part.method, units: part.units, parts: part.parts, cashReceivedCents });
+  const { order, error } = await addPayment(splitOrder.value, {
+    method: part.method,
+    units: part.units,
+    parts: part.parts,
+    amountCents: part.mode === "LIBRE" ? part.amountCents : null,
+    cashReceivedCents,
+  });
   if (error || !order) {
     splitError.value = error;
     return;
   }
+  splitFallback.value = order;
   splitDialog.value?.partDone();
   // Ticket de esta persona (si la impresion esta activada).
   if (ticketPrintingEnabled.value) printNotice.value = (await printPartTicket(order, order.payments.length - 1)) ?? "";
@@ -748,7 +765,8 @@ watch(splitOrder, (order) => {
 });
 async function undoSplitPart() {
   if (!splitOrder.value) return;
-  const { error } = await undoPayment(splitOrder.value);
+  const { order, error } = await undoPayment(splitOrder.value);
+  if (order) splitFallback.value = order;
   splitError.value = error;
 }
 async function reprintSplitPart(index: number) {

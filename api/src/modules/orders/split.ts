@@ -1,7 +1,8 @@
 import type { OrderDoc, OrderPaymentUnitsDoc, SplitMode } from "./model";
 
 /**
- * Cobro dividido: cada persona paga su parte, por productos (lo que tomo) o a partes iguales.
+ * Cobro dividido: cada persona paga su parte, por productos (lo que tomo), a partes iguales o la
+ * cantidad que diga (libre).
  * Calculos puros, sin base de datos; la cola del personal (web/composables/useSplitBill.ts) repite
  * los mismos para la vista previa, pero el importe que vale es el de aqui.
  */
@@ -73,14 +74,35 @@ export function equalAmount(order: SplitOrder, parts: number) {
 
 export const MAX_SPLIT_PARTS = 12;
 
-/** Lo que paga la siguiente persona, segun el modo elegido (que no cambia con partes ya cobradas). */
-export function nextPartAmount(order: SplitOrder, input: { units?: OrderPaymentUnitsDoc[] | null; parts?: number | null }) {
-  const mode: SplitMode = input.units?.length ? "PRODUCTOS" : "IGUALES";
-  if (mode === "IGUALES" && !input.parts) throw new Error("Elige lo que paga esta persona o entre cuantas se divide");
-  if (order.payments?.length && order.split && order.split.mode !== mode) {
-    throw new Error(order.split.mode === "PRODUCTOS" ? "La cuenta ya se esta dividiendo por productos" : "La cuenta ya se esta dividiendo a partes iguales");
+/** Cantidad libre: lo que diga esa persona, sin pasar de lo que falta (si es justo eso, es la ultima). */
+export function freeAmount(order: SplitOrder, amountCents: number) {
+  const remaining = remainingCents(order);
+  if (!Number.isInteger(amountCents) || amountCents < 1) throw new Error("Escribe cuánto paga esta persona");
+  if (amountCents > remaining) throw new Error("Esa cantidad es más de lo que falta");
+  if ((order.payments?.length ?? 0) + 1 >= MAX_SPLIT_PARTS && amountCents < remaining) {
+    throw new Error(`Como mucho ${MAX_SPLIT_PARTS} partes: esta tiene que ser lo que falta`);
   }
-  const result = mode === "PRODUCTOS" ? unitsAmount(order, input.units!) : equalAmount(order, input.parts!);
+  return { amountCents, completes: amountCents === remaining };
+}
+
+const MODE_TAKEN: Record<SplitMode, string> = {
+  PRODUCTOS: "La cuenta ya se esta dividiendo por productos",
+  IGUALES: "La cuenta ya se esta dividiendo a partes iguales",
+  LIBRE: "La cuenta ya se esta dividiendo por cantidades",
+};
+
+/** Lo que paga la siguiente persona, segun el modo elegido (que no cambia con partes ya cobradas). */
+export function nextPartAmount(
+  order: SplitOrder,
+  input: { units?: OrderPaymentUnitsDoc[] | null; parts?: number | null; amountCents?: number | null }
+) {
+  const given = [!!input.units?.length, input.parts != null, input.amountCents != null].filter(Boolean).length;
+  if (given > 1) throw new Error("Divide por productos, a partes iguales o por cantidad, solo una");
+  if (!given) throw new Error("Elige lo que paga esta persona, entre cuantas se divide o cuanto paga");
+  const mode: SplitMode = input.units?.length ? "PRODUCTOS" : input.parts != null ? "IGUALES" : "LIBRE";
+  if (order.payments?.length && order.split && order.split.mode !== mode) throw new Error(MODE_TAKEN[order.split.mode]);
+  const result =
+    mode === "PRODUCTOS" ? unitsAmount(order, input.units!) : mode === "IGUALES" ? equalAmount(order, input.parts!) : freeAmount(order, input.amountCents!);
   if (result.amountCents < 1) throw new Error("Esa parte no tiene nada que pagar: añádela a la de otra persona");
   return { ...result, mode };
 }

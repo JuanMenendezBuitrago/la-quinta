@@ -159,7 +159,7 @@ export interface TicketOrder {
   changeCents?: number | null;
   // Cuenta dividida: cada parte con su metodo (vacio si se cobro de una vez).
   payments?: { amountCents: number; method: keyof typeof PAYMENT_LABELS; cashReceivedCents?: number | null; changeCents?: number | null; units?: { lineIndex: number; quantity: number }[]; at?: string }[] | null;
-  split?: { mode: "PRODUCTOS" | "IGUALES"; parts?: number | null } | null;
+  split?: { mode: "PRODUCTOS" | "IGUALES" | "LIBRE"; parts?: number | null } | null;
   totalCents: number;
   packagingCents?: number | null;
   items: {

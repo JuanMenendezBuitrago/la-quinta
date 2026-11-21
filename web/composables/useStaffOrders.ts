@@ -289,8 +289,8 @@ const MARK_PAID = gql`
 `;
 
 const ADD_PAYMENT = gql`
-  mutation AddOrderPayment($id: ID!, $method: PaymentMethod!, $cashReceivedCents: Int, $units: [OrderPaymentUnitsInput!], $parts: Int) {
-    addOrderPayment(id: $id, method: $method, cashReceivedCents: $cashReceivedCents, units: $units, parts: $parts) { ${ORDER_FIELDS} }
+  mutation AddOrderPayment($id: ID!, $method: PaymentMethod!, $cashReceivedCents: Int, $units: [OrderPaymentUnitsInput!], $parts: Int, $amountCents: Int) {
+    addOrderPayment(id: $id, method: $method, cashReceivedCents: $cashReceivedCents, units: $units, parts: $parts, amountCents: $amountCents) { ${ORDER_FIELDS} }
   }
 `;
 const UNDO_PAYMENT = gql`
@@ -658,7 +658,7 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
     }
   }
 
-  // Cuenta dividida: cobra la parte de una persona (por productos o a partes iguales) o deshace la
+  // Cuenta dividida: cobra la parte de una persona (por productos, a partes iguales o cantidad libre) o deshace la
   // ultima. Devuelven el pedido actualizado (para el ticket de la parte) o el error para el modal.
   const { mutate: addPaymentMutation } = useMutation(ADD_PAYMENT);
   const { mutate: undoPaymentMutation } = useMutation(UNDO_PAYMENT);
@@ -676,12 +676,12 @@ export function useStaffOrders(enabled: Ref<boolean> | ComputedRef<boolean>) {
   }
   function addPayment(
     order: any,
-    part: { method: PaymentMethod; cashReceivedCents?: number | null; units?: { lineIndex: number; quantity: number }[] | null; parts?: number | null }
+    part: { method: PaymentMethod; cashReceivedCents?: number | null; units?: { lineIndex: number; quantity: number }[] | null; parts?: number | null; amountCents?: number | null }
   ) {
     return runPaymentAction(
       order,
       async () =>
-        (await addPaymentMutation({ id: order.id, method: part.method, cashReceivedCents: part.cashReceivedCents ?? null, units: part.units ?? null, parts: part.parts ?? null }))?.data?.addOrderPayment ?? null,
+        (await addPaymentMutation({ id: order.id, method: part.method, cashReceivedCents: part.cashReceivedCents ?? null, units: part.units ?? null, parts: part.parts ?? null, amountCents: part.amountCents ?? null }))?.data?.addOrderPayment ?? null,
       "No se pudo cobrar esta parte"
     );
   }

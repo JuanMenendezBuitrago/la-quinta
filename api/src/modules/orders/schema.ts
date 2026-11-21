@@ -113,6 +113,8 @@ export const ordersTypeDefs = /* GraphQL */ `
     PRODUCTOS
     """El total entre N personas."""
     IGUALES
+    """Cada persona paga la cantidad que diga (p. ej. una parte en efectivo y el resto con tarjeta)."""
+    LIBRE
   }
 
   """Como se esta dividiendo la cuenta (fijo mientras haya partes cobradas)."""
@@ -233,6 +235,9 @@ export const ordersTypeDefs = /* GraphQL */ `
     paymentMethod: PaymentMethod
     """Solo con paymentMethod EFECTIVO: lo que entrega el cliente (debe cubrir el total)."""
     cashReceivedCents: Int
+    """Guardar y dividir (solo mesa o barra, sin paymentMethod): ya se entrego y se cobra por
+    partes con addOrderPayment. Queda servido sin cobrar hasta la ultima parte."""
+    splitPayment: Boolean
     """Canje de sellos (ver OrderRedemptionInput)."""
     redemption: OrderRedemptionInput
     """Descuento con su motivo (ver OrderDiscountInput)."""
@@ -267,9 +272,10 @@ export const ordersTypeDefs = /* GraphQL */ `
     """Personal: cobra un pedido de mesa o barra (antes o despues de entregarlo)."""
     markOrderPaid(id: ID!, method: PaymentMethod!, cashReceivedCents: Int): Order!
     """Personal: cobra una parte de un pedido de mesa o barra (cuenta dividida). Por productos (units:
-    lo que paga esa persona) o a partes iguales (parts: entre cuantas). El importe lo calcula el
-    servidor; con la ultima parte el pedido queda cobrado."""
-    addOrderPayment(id: ID!, method: PaymentMethod!, cashReceivedCents: Int, units: [OrderPaymentUnitsInput!], parts: Int): Order!
+    lo que paga esa persona), a partes iguales (parts: entre cuantas; el importe lo calcula el
+    servidor) o por cantidad libre (amountCents, hasta lo que falta). Con la ultima parte el pedido
+    queda cobrado."""
+    addOrderPayment(id: ID!, method: PaymentMethod!, cashReceivedCents: Int, units: [OrderPaymentUnitsInput!], parts: Int, amountCents: Int): Order!
     """Personal: deshace la ultima parte cobrada de un pedido aun sin cobrar del todo."""
     undoOrderPayment(id: ID!): Order!
     """Personal: pedido tomado en el local (mesero o barra). La recogida es ahora."""

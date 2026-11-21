@@ -155,7 +155,7 @@ export interface OrderPaymentDoc {
   at: Date;
 }
 
-export type SplitMode = "PRODUCTOS" | "IGUALES";
+export type SplitMode = "PRODUCTOS" | "IGUALES" | "LIBRE";
 /** Como se esta dividiendo la cuenta; se fija con la primera parte y se quita al deshacerlas todas. */
 export interface OrderSplitDoc {
   mode: SplitMode;
@@ -308,7 +308,7 @@ const orderSchema = new Schema<OrderDoc>({
   paidByStaffId: { type: Schema.Types.ObjectId, ref: "StaffUser" },
   payments: { type: [orderPaymentSchema], default: undefined },
   split: {
-    type: new Schema<OrderSplitDoc>({ mode: { type: String, enum: ["PRODUCTOS", "IGUALES"], required: true }, parts: { type: Number, min: 2 } }, { _id: false }),
+    type: new Schema<OrderSplitDoc>({ mode: { type: String, enum: ["PRODUCTOS", "IGUALES", "LIBRE"], required: true }, parts: { type: Number, min: 2 } }, { _id: false }),
     default: undefined,
   },
   completedAt: { type: Date },

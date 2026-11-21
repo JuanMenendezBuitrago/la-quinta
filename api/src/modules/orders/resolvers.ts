@@ -257,6 +257,7 @@ export const ordersResolvers = {
           takeaway?: boolean | null;
           paymentMethod?: PaymentMethod | null;
           cashReceivedCents?: number | null;
+          splitPayment?: boolean | null;
           redemption?: OrderRedemptionInput | null;
           discount?: OrderDiscountInput | null;
         };
@@ -272,7 +273,12 @@ export const ordersResolvers = {
       const paidNow = !!input.paymentMethod;
       if (paidNow && !PAYMENT_METHODS.includes(input.paymentMethod!)) throw new Error("Metodo de pago no valido");
       const cashReceivedCents = checkCashReceived(input.paymentMethod, input.cashReceivedCents);
-      if (!paidNow && !(await orderQueueEnabled())) {
+      // Guardar y dividir: se sirvio sin pasar por la cola y se cobra por partes (addOrderPayment).
+      const splitNow = input.splitPayment === true;
+      if (splitNow && paidNow) throw new Error("Cobra entero o divide la cuenta, no las dos");
+      if (splitNow && input.serviceType !== "MESA") throw new Error("Solo los pedidos de mesa o barra se dividen");
+      const servedNow = paidNow || splitNow;
+      if (!servedNow && !(await orderQueueEnabled())) {
         throw new Error("La cola de pedidos esta desactivada: usa \"Guardar y pagar\"");
       }
 
@@ -309,9 +315,11 @@ export const ordersResolvers = {
         ...(discount ? { discount } : {}),
         takeaway,
         pickupSlot: now,
-        // Guardar y pagar: creado, entregado, cobrado y cerrado en el mismo instante.
+        // Guardar y pagar: creado, entregado, cobrado y cerrado en el mismo instante. Guardar y
+        // dividir: creado y entregado; queda en "servidos sin cobrar" hasta la ultima parte.
         createdAt: now,
-        status: paidNow ? "ENTREGADO" : "NUEVO",
+        status: servedNow ? "ENTREGADO" : "NUEVO",
+        ...(splitNow ? { deliveredAt: now } : {}),
         ...(paidNow
           ? {
               deliveredAt: now,
@@ -327,9 +335,9 @@ export const ordersResolvers = {
       if (redeems) await redeemForOrder(input.customerId!, order._id.toString(), staff.id);
       await ctx.pubsub.publish(EVENTS.ORDER_QUEUE_UPDATED, { orderQueueUpdated: order });
       // Como al entregarlo desde la cola: sale la mercancia y, ya cobrado, se cierra (sellos y hoja).
-      if (paidNow) {
+      if (servedNow) {
         internalEvents.emit(INTERNAL_EVENTS.ORDER_DELIVERED, await buildClosedPayload(order, "ENTREGADO", now));
-        await tryComplete(order._id.toString(), now);
+        if (paidNow) await tryComplete(order._id.toString(), now);
       }
       return order;
     },
@@ -495,12 +503,12 @@ export const ordersResolvers = {
         cashReceivedCents?: number | null;
         units?: { lineIndex: number; quantity: number }[] | null;
         parts?: number | null;
+        amountCents?: number | null;
       },
       ctx: GraphQLContext
     ) => {
       const staff = requireStaff(ctx, ["barra", "gestion"]);
       if (!PAYMENT_METHODS.includes(args.method)) throw new Error("Metodo de pago no valido");
-      if (args.units?.length && args.parts) throw new Error("Divide por productos o a partes iguales, no las dos");
       const cashReceivedCents = checkCashReceived(args.method, args.cashReceivedCents);
       if (!Types.ObjectId.isValid(args.id)) throw new Error("Pedido no encontrado");
 
