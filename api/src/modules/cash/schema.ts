@@ -113,6 +113,10 @@ export const cashTypeDefs = /* GraphQL */ `
   extend type Query {
     """Personal: lo cobrado desde el ultimo cierre hasta ahora (lo que cerraria un cierre ahora)."""
     cashSummary: CashSummary!
+    """Personal: lo cobrado un dia (YYYY-MM-DD, en la zona del local), con los gastos de esa fecha."""
+    cashDay(date: String!): CashSummary!
+    """Personal: un cierre pasado dia a dia (recalculado ahora; las cifras del cierre son las guardadas)."""
+    cashClosingDays(id: ID!): [CashSummaryDay!]!
     """Personal: aun no se ha anotado el fondo inicial del periodo actual (para avisar en la barra)."""
     cashOpeningPending: Boolean!
     """Personal: cierres anteriores, el mas reciente primero."""

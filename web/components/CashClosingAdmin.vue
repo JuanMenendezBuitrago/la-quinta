@@ -34,14 +34,27 @@
 
     <!-- Lo cobrado desde el ultimo cierre -->
     <div v-if="summary" class="card">
-      <h2 class="card-title">Cobrado desde {{ lastClosing ? "el último cierre" : "el primer pedido (aún no hay cierres)" }}</h2>
-      <p class="muted period">
-        {{ formatDateTime(summary.periodStart) }} → ahora · {{ summary.ordersCount }}
-        {{ summary.ordersCount === 1 ? "pedido" : "pedidos" }}
+      <!-- Navegar: por cierres (el periodo en curso y los anteriores) o dia a dia -->
+      <div class="browse">
+        <button type="button" class="browse-arrow" :disabled="!canOlder || browseLoading" aria-label="Anterior" @click="older">
+          <ChevronLeft :size="20" :stroke-width="2" aria-hidden="true" />
+        </button>
+        <SegmentedControl v-model="browseMode" :options="BROWSE_MODES" aria-label="Navegar por" />
+        <button type="button" class="browse-arrow" :disabled="!canNewer || browseLoading" aria-label="Siguiente" @click="newer">
+          <ChevronRight :size="20" :stroke-width="2" aria-hidden="true" />
+        </button>
+      </div>
+      <h2 class="card-title">{{ shownTitle }}</h2>
+      <p v-if="shown" class="muted period">
+        <template v-if="shownRange">{{ shownRange }} · </template>{{ shown.ordersCount }}
+        {{ shown.ordersCount === 1 ? "pedido" : "pedidos" }}
       </p>
-      <!-- El total o el detalle dia a dia -->
-      <SegmentedControl v-model="periodView" :options="PERIOD_VIEWS" aria-label="Cómo ver lo cobrado" class="period-view" />
-      <div v-if="periodView === 'DIAS'" class="days-wrap">
+      <p v-if="browseError" class="muted error" role="alert">{{ browseError }}</p>
+      <p v-else-if="!shown" class="muted">Cargando…</p>
+      <template v-if="shown">
+      <!-- Un periodo (en curso o cerrado): el total o el detalle dia a dia -->
+      <SegmentedControl v-if="browseMode === 'CIERRES'" v-model="periodView" :options="PERIOD_VIEWS" aria-label="Cómo ver lo cobrado" class="period-view" />
+      <div v-if="browseMode === 'CIERRES' && periodView === 'DIAS'" class="days-wrap">
         <table class="days">
           <thead>
             <tr>
@@ -49,16 +62,19 @@
               <th scope="col">Efectivo</th>
               <th scope="col">Tarjeta</th>
               <th scope="col">Transf.</th>
-              <th v-if="summary.unknownMethodCents" scope="col">Sin método</th>
+              <th v-if="shown.unknownMethodCents" scope="col">Sin método</th>
               <th scope="col">Total</th>
-              <th v-if="summary.expensesCount" scope="col">Gastos</th>
+              <th v-if="shown.expensesCount" scope="col">Gastos</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-if="!summary.days.length">
-              <td class="muted no-days" :colspan="5 + (summary.unknownMethodCents ? 1 : 0) + (summary.expensesCount ? 1 : 0)">Aún no hay cobros en este periodo</td>
+            <tr v-if="shownDays === null">
+              <td class="muted no-days" colspan="5">Cargando…</td>
             </tr>
-            <tr v-for="d in summary.days" :key="d.date">
+            <tr v-else-if="!shownDays.length">
+              <td class="muted no-days" :colspan="5 + (shown.unknownMethodCents ? 1 : 0) + (shown.expensesCount ? 1 : 0)">Aún no hay cobros en este periodo</td>
+            </tr>
+            <tr v-for="d in shownDays ?? []" :key="d.date">
               <th scope="row">
                 {{ formatDay(d.date) }}
                 <span class="muted day-orders">{{ d.ordersCount }} {{ d.ordersCount === 1 ? "pedido" : "pedidos" }}</span>
@@ -66,46 +82,47 @@
               <td>{{ formatPrice(d.cashCents) }}</td>
               <td>{{ formatPrice(d.cardCents) }}</td>
               <td>{{ formatPrice(d.transferCents) }}</td>
-              <td v-if="summary.unknownMethodCents">{{ formatPrice(d.unknownMethodCents) }}</td>
+              <td v-if="shown.unknownMethodCents">{{ formatPrice(d.unknownMethodCents) }}</td>
               <td class="day-total">{{ formatPrice(d.totalCents) }}</td>
-              <td v-if="summary.expensesCount">{{ d.expensesCents ? `− ${formatPrice(d.expensesCents)}` : formatPrice(0) }}</td>
+              <td v-if="shown.expensesCount">{{ d.expensesCents ? `− ${formatPrice(d.expensesCents)}` : formatPrice(0) }}</td>
             </tr>
           </tbody>
           <tfoot>
             <tr>
               <th scope="row">Periodo</th>
-              <td>{{ formatPrice(summary.cashCents) }}</td>
-              <td>{{ formatPrice(summary.cardCents) }}</td>
-              <td>{{ formatPrice(summary.transferCents) }}</td>
-              <td v-if="summary.unknownMethodCents">{{ formatPrice(summary.unknownMethodCents) }}</td>
-              <td>{{ formatPrice(summary.totalCents) }}</td>
-              <td v-if="summary.expensesCount">− {{ formatPrice(summary.expensesTotalCents) }}</td>
+              <td>{{ formatPrice(shown.cashCents) }}</td>
+              <td>{{ formatPrice(shown.cardCents) }}</td>
+              <td>{{ formatPrice(shown.transferCents) }}</td>
+              <td v-if="shown.unknownMethodCents">{{ formatPrice(shown.unknownMethodCents) }}</td>
+              <td>{{ formatPrice(shown.totalCents) }}</td>
+              <td v-if="shown.expensesCount">− {{ formatPrice(shown.expensesTotalCents) }}</td>
             </tr>
           </tfoot>
         </table>
       </div>
       <template v-else>
       <dl class="totals">
-        <div><dt><Banknote :size="16" :stroke-width="1.8" aria-hidden="true" /> Efectivo</dt><dd>{{ formatPrice(summary.cashCents) }}</dd></div>
-        <div><dt><CreditCard :size="16" :stroke-width="1.8" aria-hidden="true" /> Tarjeta</dt><dd>{{ formatPrice(summary.cardCents) }}</dd></div>
-        <div><dt><Smartphone :size="16" :stroke-width="1.8" aria-hidden="true" /> Transferencia</dt><dd>{{ formatPrice(summary.transferCents) }}</dd></div>
-        <div v-if="summary.unknownMethodCents">
+        <div><dt><Banknote :size="16" :stroke-width="1.8" aria-hidden="true" /> Efectivo</dt><dd>{{ formatPrice(shown.cashCents) }}</dd></div>
+        <div><dt><CreditCard :size="16" :stroke-width="1.8" aria-hidden="true" /> Tarjeta</dt><dd>{{ formatPrice(shown.cardCents) }}</dd></div>
+        <div><dt><Smartphone :size="16" :stroke-width="1.8" aria-hidden="true" /> Transferencia</dt><dd>{{ formatPrice(shown.transferCents) }}</dd></div>
+        <div v-if="shown.unknownMethodCents">
           <dt><CircleHelp :size="16" :stroke-width="1.8" aria-hidden="true" /> Sin método</dt>
-          <dd>{{ formatPrice(summary.unknownMethodCents) }}</dd>
+          <dd>{{ formatPrice(shown.unknownMethodCents) }}</dd>
         </div>
-        <div class="total"><dt>Total cobrado</dt><dd>{{ formatPrice(summary.totalCents) }}</dd></div>
-        <div v-if="summary.expensesCount"><dt><Receipt :size="16" :stroke-width="1.8" aria-hidden="true" /> Gastos</dt><dd>− {{ formatPrice(summary.expensesTotalCents) }}</dd></div>
-        <div v-if="summary.expensesCount" class="total"><dt>Resultado neto</dt><dd>{{ formatPrice(summary.netCents) }}</dd></div>
+        <div class="total"><dt>Total cobrado</dt><dd>{{ formatPrice(shown.totalCents) }}</dd></div>
+        <div v-if="shown.expensesCount"><dt><Receipt :size="16" :stroke-width="1.8" aria-hidden="true" /> Gastos</dt><dd>− {{ formatPrice(shown.expensesTotalCents) }}</dd></div>
+        <div v-if="shown.expensesCount" class="total"><dt>Resultado neto</dt><dd>{{ formatPrice(shown.netCents) }}</dd></div>
         <!-- No es gasto (no baja el resultado), pero sale del cajon: se ve aparte -->
-        <div v-if="summary.bankDepositsCount" class="deposit-row">
+        <div v-if="shown.bankDepositsCount" class="deposit-row">
           <dt><Landmark :size="16" :stroke-width="1.8" aria-hidden="true" /> Ingresado al banco (sale del cajón)</dt>
-          <dd>{{ formatPrice(summary.bankDepositsCents) }}</dd>
+          <dd>{{ formatPrice(shown.bankDepositsCents) }}</dd>
         </div>
       </dl>
-      <p v-if="summary.unknownMethodCents" class="muted hint">
+      <p v-if="shown.unknownMethodCents" class="muted hint">
         «Sin método»: pedidos para llevar o web entregados antes de que se pidiera el método de pago al entregar.
       </p>
-      <BalanceTable :balances="summary.balances" :format="formatPrice" />
+      <BalanceTable :balances="shown.balances" :format="formatPrice" />
+      </template>
       </template>
     </div>
 
@@ -373,7 +390,7 @@
 <script setup lang="ts">
 import EmptyState from "~/components/EmptyState.vue";
 import { gql } from "graphql-tag";
-import { Archive, Banknote, Check, CircleHelp, CreditCard, ImageIcon, Landmark, Lock, Pencil, Plus, Receipt, Smartphone, Trash2 } from "lucide-vue-next";
+import { Archive, Banknote, Check, ChevronLeft, ChevronRight, CircleHelp, CreditCard, ImageIcon, Landmark, Lock, Pencil, Plus, Receipt, Smartphone, Trash2 } from "lucide-vue-next";
 import { useStoreTime } from "~/composables/useStoreTime";
 import { useStaffAuth } from "~/composables/useAuth";
 import { useLightbox } from "~/composables/useLightbox";
@@ -409,7 +426,7 @@ interface CashSummary {
   openingFloatCents?: number | null;
   openingFloatStaffName?: string | null;
   openingFloatAt?: string | null;
-  days: CashSummaryDay[];
+  days?: CashSummaryDay[];
 }
 interface CashSummaryDay {
   date: string;
@@ -460,7 +477,7 @@ const SET_FLOAT = gql`
   }
 `;
 
-const { formatDateTime } = useStoreTime();
+const { formatDateTime, timeZone } = useStoreTime();
 const CLOSING_EXPENSES = gql`
   query ClosingExpenses($closingId: ID!) {
     closingExpenses(closingId: $closingId) { ${EXPENSE_FIELDS} }
@@ -516,6 +533,111 @@ const PERIOD_VIEWS = [
   { value: "DIAS" as const, label: "Por día" },
 ];
 const periodView = ref<"TOTAL" | "DIAS">("TOTAL");
+
+// --- Navegar por lo cobrado: por cierres (0 = el periodo en curso, 1 = el ultimo cierre...) o por dias ---
+const BROWSE_MODES = [
+  { value: "CIERRES" as const, label: "Cierres" },
+  { value: "DIAS" as const, label: "Días" },
+];
+const browseMode = ref<"CIERRES" | "DIAS">("CIERRES");
+const closingIndex = ref(0);
+/** "YYYY-MM-DD" de hoy en la zona del local. */
+function todayKey() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+function shiftDay(date: string, delta: number) {
+  const d = new Date(`${date}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+const dayDate = ref(todayKey());
+const browseError = ref("");
+const browseLoading = ref(false);
+
+const shownClosing = computed(() => (browseMode.value === "CIERRES" && closingIndex.value > 0 ? closings.value[closingIndex.value - 1] ?? null : null));
+const canOlder = computed(() => (browseMode.value === "CIERRES" ? closingIndex.value < closings.value.length : true));
+const canNewer = computed(() => (browseMode.value === "CIERRES" ? closingIndex.value > 0 : dayDate.value < todayKey()));
+function older() {
+  if (!canOlder.value) return;
+  if (browseMode.value === "CIERRES") closingIndex.value++;
+  else dayDate.value = shiftDay(dayDate.value, -1);
+}
+function newer() {
+  if (!canNewer.value) return;
+  if (browseMode.value === "CIERRES") closingIndex.value--;
+  else dayDate.value = shiftDay(dayDate.value, 1);
+}
+// Al cambiar de modo se vuelve a lo de ahora (el periodo en curso, o hoy).
+watch(browseMode, () => {
+  closingIndex.value = 0;
+  dayDate.value = todayKey();
+  browseError.value = "";
+});
+// Tras cerrar la caja, la lista de cierres cambia: se vuelve al periodo en curso.
+watch(() => closings.value[0]?.id, () => (closingIndex.value = 0));
+
+const CASH_DAY = gql`
+  query CashDay($date: String!) {
+    cashDay(date: $date) { ${SUMMARY_FIELDS} ${DAY_FIELDS} }
+  }
+`;
+const CLOSING_DAYS = gql`
+  query CashClosingDays($id: ID!) {
+    cashClosingDays(id: $id) { date ordersCount totalCents cashCents cardCents transferCents unknownMethodCents expensesCents }
+  }
+`;
+const daySummary = ref<CashSummary | null>(null);
+const closingDays = ref<Record<string, CashSummaryDay[]>>({});
+const apollo = () => useNuxtApp().$apollo.defaultClient;
+async function loadDay(date: string) {
+  daySummary.value = null;
+  browseError.value = "";
+  browseLoading.value = true;
+  try {
+    const { data } = await apollo().query({ query: CASH_DAY, variables: { date }, fetchPolicy: "network-only" });
+    if (dayDate.value === date) daySummary.value = data?.cashDay ?? null;
+  } catch (err: any) {
+    browseError.value = err?.message ?? "No se pudo cargar ese día";
+  } finally {
+    browseLoading.value = false;
+  }
+}
+watch([browseMode, dayDate], ([mode, date]) => {
+  if (mode === "DIAS") loadDay(date);
+});
+async function loadClosingDays(id: string) {
+  if (closingDays.value[id]) return;
+  try {
+    const { data } = await apollo().query({ query: CLOSING_DAYS, variables: { id }, fetchPolicy: "network-only" });
+    closingDays.value = { ...closingDays.value, [id]: data?.cashClosingDays ?? [] };
+  } catch (err: any) {
+    browseError.value = err?.message ?? "No se pudo cargar el detalle por día";
+  }
+}
+watch([shownClosing, periodView], ([c, view]) => {
+  if (c && view === "DIAS") loadClosingDays(c.id);
+});
+
+/** Lo que se ve en la tarjeta: el periodo en curso, un cierre pasado o un dia. */
+const shown = computed<CashSummary | CashClosing | null>(() => {
+  if (browseMode.value === "DIAS") return daySummary.value;
+  return shownClosing.value ?? summary.value;
+});
+const shownDays = computed<CashSummaryDay[] | null>(() => {
+  if (shownClosing.value) return closingDays.value[shownClosing.value.id] ?? null;
+  return summary.value?.days ?? [];
+});
+const shownTitle = computed(() => {
+  if (browseMode.value === "DIAS") return dayDate.value === todayKey() ? "Cobrado hoy" : `Cobrado el ${formatDay(dayDate.value)}`;
+  if (shownClosing.value) return `Cierre de ${shownClosing.value.staffName}`;
+  return `Cobrado desde ${lastClosing.value ? "el último cierre" : "el primer pedido (aún no hay cierres)"}`;
+});
+const shownRange = computed(() => {
+  const s = shown.value;
+  if (!s) return "";
+  if (browseMode.value === "DIAS") return "";
+  return `${formatDateTime(s.periodStart)} → ${shownClosing.value ? formatDateTime(s.periodEnd) : "ahora"}`;
+});
 /** "sáb 21 nov" de un "YYYY-MM-DD" (es la fecha del local: se lee en UTC para no moverla). */
 function formatDay(date: string) {
   return new Date(`${date}T12:00:00Z`).toLocaleDateString("es-ES", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" });
@@ -725,6 +847,20 @@ async function closeRegister() {
 .confirm p { margin: 0 0 10px; font-size: 14px; }
 .form-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .period-view { margin-bottom: 12px; }
+.browse { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.browse-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.browse-arrow:disabled { opacity: 0.35; cursor: not-allowed; }
 .days-wrap { overflow-x: auto; }
 .days { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
 .days th, .days td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--field-border); white-space: nowrap; }

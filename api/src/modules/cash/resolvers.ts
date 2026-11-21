@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import { GraphQLContext, requireStaff } from "../../graphql/context";
 import { env } from "../../config/env";
 import { DISCOUNT_REASONS, NO_PARTIAL_PAYMENTS, Order } from "../orders/model";
@@ -99,7 +100,9 @@ async function currentPeriodStart(now: Date) {
  * los demas al entregarlos con metodo) y, sin metodo, los que no son de mesa entregados en ese
  * rato antes de que se pidiera el metodo al entregar. Los cancelados no cuentan.
  */
-async function summarize(start: Date, end: Date) {
+// expensesFilter: que gastos cuentan. Por defecto, los pendientes (los que se llevaria un cierre
+// ahora); para un dia, los de esa fecha; para un cierre pasado, los suyos.
+async function summarize(start: Date, end: Date, expensesFilter: Record<string, unknown> = pendingExpensesFilter(end)) {
   const range = { $gte: start, $lt: end };
   const orders = await Order.find({
     status: { $ne: "CANCELADO" },
@@ -143,7 +146,7 @@ async function summarize(start: Date, end: Date) {
   const settled = orders.filter((o) => !o.payments?.length || inRange(o.paidAt));
   for (const o of settled) dayOf((o.paidAt ?? o.deliveredAt)!).ordersCount += 1;
   const totalCents = sum.cashCents + sum.cardCents + sum.transferCents + sum.unknownMethodCents;
-  const expenses = await summarizeExpenses(end);
+  const expenses = await summarizeExpenses(expensesFilter);
   for (const e of expenses.expenseDays) dayOf(e.spentAt).expensesCents += e.amountCents;
   const { expenseDays: _days, ...expenseTotals } = expenses;
   // El mas reciente primero.
@@ -186,8 +189,8 @@ function summarizeDiscounts(
 function pendingExpensesFilter(end: Date) {
   return { closingId: null, createdAt: { $lt: end } };
 }
-async function summarizeExpenses(end: Date) {
-  const all = await Expense.find(pendingExpensesFilter(end)).select("_id amountCents method category spentAt").lean();
+async function summarizeExpenses(filter: Record<string, unknown>) {
+  const all = await Expense.find(filter).select("_id amountCents method category spentAt").lean();
   // Los ingresos al banco van aparte: salen del cajon (arqueo), pero no son gasto.
   const deposits = all.filter((e) => e.category === BANK_DEPOSIT);
   const expenses = all.filter((e) => e.category !== BANK_DEPOSIT);
@@ -259,6 +262,14 @@ async function liveSummary() {
   };
 }
 
+/** Inicio y fin ([start, end)) de un dia "YYYY-MM-DD" en la zona horaria del local. */
+function storeDayRange(date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00Z`))) throw new Error("Fecha no valida");
+  // Mediodia UTC cae ese mismo dia en el local (Colombia, sin horario de verano): su inicio de dia.
+  const start = startOfTodayInStore(new Date(`${date}T12:00:00Z`));
+  return { start, end: new Date(start.getTime() + 86_400_000) };
+}
+
 function validAmount(value: number, label: string) {
   if (!Number.isInteger(value) || value < 0 || value > MAX_AMOUNT_CENTS) throw new Error(`${label} no valido`);
   return value;
@@ -294,6 +305,23 @@ export const cashResolvers = {
     cashSummary: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireStaff(ctx, ["barra", "gestion"]);
       return liveSummary();
+    },
+    cashDay: async (_: unknown, args: { date: string }, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["barra", "gestion"]);
+      const { start, end } = storeDayRange(args.date);
+      const now = new Date();
+      if (start > now) throw new Error("Ese dia aun no ha llegado");
+      const until = end < now ? end : now;
+      // Los gastos, por su fecha (cerrados o no).
+      const { expenseIds: _ids, ...summary } = await summarize(start, until, { spentAt: { $gte: start, $lt: end } });
+      return { periodStart: start.toISOString(), periodEnd: until.toISOString(), ...withTotals(summary) };
+    },
+    cashClosingDays: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["barra", "gestion"]);
+      if (!Types.ObjectId.isValid(args.id)) throw new Error("Cierre no encontrado");
+      const closing = await CashClosing.findById(args.id).select("periodStart periodEnd").lean();
+      if (!closing) throw new Error("Cierre no encontrado");
+      return (await summarize(closing.periodStart, closing.periodEnd, { closingId: closing._id })).days;
     },
     cashOpeningPending: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireStaff(ctx, ["barra", "gestion"]);
