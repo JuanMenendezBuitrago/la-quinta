@@ -39,9 +39,9 @@
         {{ formatDateTime(summary.periodStart) }} → ahora · {{ summary.ordersCount }}
         {{ summary.ordersCount === 1 ? "pedido" : "pedidos" }}
       </p>
-      <!-- Con mas de un dia en el periodo: el total o el detalle dia a dia -->
-      <SegmentedControl v-if="summary.days.length > 1" v-model="periodView" :options="PERIOD_VIEWS" aria-label="Cómo ver lo cobrado" class="period-view" />
-      <div v-if="periodView === 'DIAS' && summary.days.length > 1" class="days-wrap">
+      <!-- El total o el detalle dia a dia -->
+      <SegmentedControl v-model="periodView" :options="PERIOD_VIEWS" aria-label="Cómo ver lo cobrado" class="period-view" />
+      <div v-if="periodView === 'DIAS'" class="days-wrap">
         <table class="days">
           <thead>
             <tr>
@@ -55,6 +55,9 @@
             </tr>
           </thead>
           <tbody>
+            <tr v-if="!summary.days.length">
+              <td class="muted no-days" :colspan="5 + (summary.unknownMethodCents ? 1 : 0) + (summary.expensesCount ? 1 : 0)">Aún no hay cobros en este periodo</td>
+            </tr>
             <tr v-for="d in summary.days" :key="d.date">
               <th scope="row">
                 {{ formatDay(d.date) }}
@@ -728,6 +731,7 @@ async function closeRegister() {
 .days thead th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 600; }
 .days th[scope="row"] { text-align: left; font-weight: 600; }
 .days thead th:first-child { text-align: left; }
+.days td.no-days { text-align: left; }
 .day-orders { display: block; font-size: 12px; font-weight: 400; }
 .day-total, .days tfoot th, .days tfoot td { font-weight: 700; }
 .days tfoot th, .days tfoot td { border-bottom: none; }
