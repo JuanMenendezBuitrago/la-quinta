@@ -14,6 +14,8 @@ export const cashTypeDefs = /* GraphQL */ `
     openingFloatCents: Int
     openingFloatStaffName: String
     openingFloatAt: String
+    """Lo cobrado en dias anteriores a hoy que aun no se ha cerrado (null si no hay nada): para avisar al abrir la caja."""
+    previousDays: PendingPreviousDays
     """Lo mismo dia a dia (en la zona horaria del local), el mas reciente primero; solo los dias con algo."""
     days: [CashSummaryDay!]!
     periodEnd: String!
@@ -40,6 +42,24 @@ export const cashTypeDefs = /* GraphQL */ `
     balances: [MethodBalance!]!
     """Cobrado menos gastos."""
     netCents: Int!
+  }
+
+"""Lo pendiente de cierre desde el ultimo cierre hasta el inicio de hoy (en la zona del local)."""
+  type PendingPreviousDays {
+    periodStart: String!
+    """Inicio de hoy: hasta ahi llegaria el cierre de lo pendiente."""
+    periodEnd: String!
+    ordersCount: Int!
+    totalCents: Int!
+    cashCents: Int!
+    cardCents: Int!
+    transferCents: Int!
+    unknownMethodCents: Int!
+    expensesCount: Int!
+    expensesCashCents: Int!
+    bankDepositsCents: Int!
+    """Fondo anotado para ese periodo antes de hoy (null si no se anoto o si se anoto hoy: entonces es el de hoy)."""
+    openingFloatCents: Int
   }
 
 """Saldo de un metodo en el periodo. EFECTIVO: cobrado en efectivo y gastos pagados de la caja.
@@ -126,8 +146,9 @@ export const cashTypeDefs = /* GraphQL */ `
   }
 
   extend type Mutation {
-    """Personal: cierra la caja desde el ultimo cierre hasta ahora con el arqueo del efectivo."""
-    closeCashRegister(openingFloatCents: Int, countedCashCents: Int!, note: String): CashClosing!
+    """Personal: cierra la caja desde el ultimo cierre hasta ahora con el arqueo del efectivo. Con
+    previousDays, solo hasta el inicio de hoy (lo que quedo sin cerrar de dias anteriores)."""
+    closeCashRegister(openingFloatCents: Int, countedCashCents: Int!, note: String, previousDays: Boolean): CashClosing!
     """Personal: anota (o corrige) el fondo inicial del periodo actual, al abrir la caja."""
     setOpeningFloat(amountCents: Int!): CashSummary!
   }

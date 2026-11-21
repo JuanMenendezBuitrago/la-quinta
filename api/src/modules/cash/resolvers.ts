@@ -247,12 +247,47 @@ async function openingFor(start: Date) {
   return CashOpening.findOne({ periodStart: start }).lean();
 }
 
+/**
+ * Un fondo anotado hoy (desde `cutoff`, el inicio del dia) es el de hoy aunque el periodo empezara
+ * antes: se abrio la caja sin cerrar lo de dias anteriores.
+ */
+function isTodaysOpening(opening: { updatedAt: Date } | null, cutoff: Date) {
+  return !!opening && opening.updatedAt >= cutoff;
+}
+
+/**
+ * Lo que quedo sin cerrar de dias anteriores: del inicio del periodo al inicio de hoy. null si el
+ * periodo empezo hoy o si en esos dias no se cobro ni se gasto nada.
+ */
+async function previousDaysPending(start: Date, now: Date, opening: { amountCents: number; updatedAt: Date } | null) {
+  const cutoff = startOfTodayInStore(now);
+  if (start >= cutoff) return null;
+  const { expenseIds, days: _days, ...s } = await summarize(start, cutoff);
+  if (!s.ordersCount && !s.totalCents && !expenseIds.length) return null;
+  return {
+    periodStart: start.toISOString(),
+    periodEnd: cutoff.toISOString(),
+    ordersCount: s.ordersCount,
+    totalCents: s.totalCents,
+    cashCents: s.cashCents,
+    cardCents: s.cardCents,
+    transferCents: s.transferCents,
+    unknownMethodCents: s.unknownMethodCents,
+    expensesCount: s.expensesCount,
+    expensesCashCents: s.expensesCashCents,
+    bankDepositsCents: s.bankDepositsCents,
+    openingFloatCents: opening && !isTodaysOpening(opening, cutoff) ? opening.amountCents : null,
+  };
+}
+
 /** Resumen en vivo del periodo actual, con el fondo inicial si ya se anoto. */
 async function liveSummary() {
   const now = new Date();
   const start = await currentPeriodStart(now);
   const [{ expenseIds: _ids, ...summary }, opening] = await Promise.all([summarize(start, now), openingFor(start)]);
+  const previousDays = await previousDaysPending(start, now, opening);
   return {
+    previousDays,
     periodStart: start.toISOString(),
     periodEnd: now.toISOString(),
     ...withTotals(summary),
@@ -350,7 +385,7 @@ export const cashResolvers = {
 
     closeCashRegister: async (
       _: unknown,
-      args: { openingFloatCents?: number | null; countedCashCents: number; note?: string | null },
+      args: { openingFloatCents?: number | null; countedCashCents: number; note?: string | null; previousDays?: boolean | null },
       ctx: GraphQLContext
     ) => {
       const staff = requireStaff(ctx, ["barra", "gestion"]);
@@ -361,19 +396,24 @@ export const cashResolvers = {
       // puede haber cambiado si entretanto se cobro otro pedido.
       const now = new Date();
       const periodStart = await currentPeriodStart(now);
-      // El fondo: el que llega con el cierre o, si no, el que se anoto al abrir la caja.
+      // Lo de dias anteriores se cierra hasta el inicio de hoy; lo de hoy queda para el siguiente.
+      const periodEnd = args.previousDays ? startOfTodayInStore(now) : now;
+      if (periodStart >= periodEnd) throw new Error("No hay nada de días anteriores sin cerrar. Recarga la caja.");
+      // El fondo: el que llega con el cierre o, si no, el que se anoto al abrir la caja. Al cerrar
+      // dias anteriores, un fondo anotado hoy es el de hoy: no es de ese periodo y pasa al siguiente.
       const opening = await openingFor(periodStart);
-      const floatInput = args.openingFloatCents ?? opening?.amountCents;
+      const movesOpening = !!args.previousDays && isTodaysOpening(opening, periodEnd);
+      const floatInput = args.openingFloatCents ?? (movesOpening ? undefined : opening?.amountCents);
       if (floatInput == null) throw new Error("Indica el fondo inicial");
       const openingFloatCents = validAmount(floatInput, "Fondo inicial");
-      const { expenseIds, days: _days, ...summary } = await summarize(periodStart, now);
+      const { expenseIds, days: _days, ...summary } = await summarize(periodStart, periodEnd);
       const member = await StaffUser.findById(staff.id).select("name").lean();
 
       let closing;
       try {
         closing = await CashClosing.create({
           periodStart,
-          periodEnd: now,
+          periodEnd,
           staffId: staff.id,
           staffName: member?.name ?? "Personal",
           ...summary,
@@ -390,6 +430,8 @@ export const cashResolvers = {
       // Justo los gastos sumados pasan a este cierre y quedan bloqueados (uno registrado mientras
       // tanto se queda para el siguiente).
       await Expense.updateMany({ _id: { $in: expenseIds }, closingId: null }, { $set: { closingId: closing._id } });
+      // El fondo anotado hoy pasa al periodo nuevo, que empieza donde acaba este cierre.
+      if (movesOpening) await CashOpening.updateOne({ _id: opening!._id }, { $set: { periodStart: periodEnd } });
       return closing;
     },
   },

@@ -8,7 +8,18 @@
     <!-- Apertura: el fondo inicial se anota al empezar el dia y queda guardado para el cierre -->
     <form v-if="summary" class="card opening" @submit.prevent="saveFloat">
       <h2 class="card-title">Apertura de caja</h2>
-      <template v-if="summary.openingFloatCents != null && !editingFloat">
+      <CashPreviousDays
+        v-if="showPreviousDays"
+        :key="summary.previousDays!.periodStart"
+        :pending="summary.previousDays!"
+        :last-counted-cents="lastClosing?.countedCashCents ?? null"
+        :today-cash-cents="todayCashCents"
+        :format="formatPrice"
+        @closed="onPreviousDaysClosed"
+        @dismiss="previousDaysDismissed = summary.previousDays!.periodStart"
+      />
+      <template v-if="showPreviousDays" />
+      <template v-else-if="summary.openingFloatCents != null && !editingFloat">
         <p class="opening-saved">
           <span>Fondo inicial <strong>{{ formatPrice(summary.openingFloatCents) }}</strong></span>
           <button type="button" class="link-button" @click="startEditFloat">Cambiar</button>
@@ -52,9 +63,9 @@
       <p v-if="browseError" class="muted error" role="alert">{{ browseError }}</p>
       <p v-else-if="!shown" class="muted">Cargando…</p>
       <template v-if="shown">
-      <!-- Un periodo (en curso o cerrado): el total o el detalle dia a dia -->
-      <SegmentedControl v-if="browseMode === 'CIERRES'" v-model="periodView" :options="PERIOD_VIEWS" aria-label="Cómo ver lo cobrado" class="period-view" />
-      <div v-if="browseMode === 'CIERRES' && periodView === 'DIAS'" class="days-wrap">
+      <!-- Un periodo (en curso o cerrado) de mas de un dia: el total o el detalle dia a dia -->
+      <SegmentedControl v-if="periodSpansDays" v-model="periodView" :options="PERIOD_VIEWS" aria-label="Cómo ver lo cobrado" class="period-view" />
+      <div v-if="periodSpansDays && periodView === 'DIAS'" class="days-wrap">
         <table class="days">
           <thead>
             <tr>
@@ -402,6 +413,7 @@ import ExpenseItemsBlock from "~/components/ExpenseItemsBlock.vue";
 import CashTrendChart from "~/components/CashTrendChart.vue";
 import ImageLightbox from "~/components/ImageLightbox.vue";
 import BalanceTable, { type MethodBalance } from "~/components/CashBalanceTable.vue";
+import CashPreviousDays, { PREVIOUS_DAYS_FIELDS, type PendingPreviousDays } from "~/components/CashPreviousDays.vue";
 
 interface CashSummary {
   periodStart: string;
@@ -427,6 +439,7 @@ interface CashSummary {
   openingFloatStaffName?: string | null;
   openingFloatAt?: string | null;
   days?: CashSummaryDay[];
+  previousDays?: PendingPreviousDays | null;
 }
 interface CashSummaryDay {
   date: string;
@@ -455,7 +468,7 @@ const SUMMARY_FIELDS = `periodStart periodEnd ordersCount totalCents cashCents c
   balances { method inCents outCents balanceCents }`;
 const CASH_QUERY = gql`
   query CashClosingData {
-    cashSummary { ${SUMMARY_FIELDS} openingFloatCents openingFloatStaffName openingFloatAt ${DAY_FIELDS} }
+    cashSummary { ${SUMMARY_FIELDS} openingFloatCents openingFloatStaffName openingFloatAt ${DAY_FIELDS} ${PREVIOUS_DAYS_FIELDS} }
     pendingExpenses { ${EXPENSE_FIELDS} }
     expensesToItemize { ${EXPENSE_FIELDS} }
     cashClosings(limit: 30) {
@@ -473,7 +486,7 @@ const CLOSE_CASH = gql`
 
 const SET_FLOAT = gql`
   mutation SetOpeningFloat($amountCents: Int!) {
-    setOpeningFloat(amountCents: $amountCents) { ${SUMMARY_FIELDS} openingFloatCents openingFloatStaffName openingFloatAt ${DAY_FIELDS} }
+    setOpeningFloat(amountCents: $amountCents) { ${SUMMARY_FIELDS} openingFloatCents openingFloatStaffName openingFloatAt ${DAY_FIELDS} ${PREVIOUS_DAYS_FIELDS} }
   }
 `;
 
@@ -614,8 +627,16 @@ async function loadClosingDays(id: string) {
     browseError.value = err?.message ?? "No se pudo cargar el detalle por día";
   }
 }
-watch([shownClosing, periodView], ([c, view]) => {
-  if (c && view === "DIAS") loadClosingDays(c.id);
+/** "YYYY-MM-DD" de un instante en la zona del local. */
+function storeDayOf(iso: string) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+}
+// El desglose por dia solo tiene sentido si el periodo abarca mas de un dia.
+const periodSpansDays = computed(() => {
+  const s = shown.value;
+  if (browseMode.value !== "CIERRES" || !s) return false;
+  const end = shownClosing.value ? s.periodEnd : new Date().toISOString();
+  return storeDayOf(s.periodStart) !== storeDayOf(end);
 });
 
 /** Lo que se ve en la tarjeta: el periodo en curso, un cierre pasado o un dia. */
@@ -626,6 +647,9 @@ const shown = computed<CashSummary | CashClosing | null>(() => {
 const shownDays = computed<CashSummaryDay[] | null>(() => {
   if (shownClosing.value) return closingDays.value[shownClosing.value.id] ?? null;
   return summary.value?.days ?? [];
+});
+watch([shownClosing, periodView, periodSpansDays], ([c, view, spans]) => {
+  if (c && view === "DIAS" && spans) loadClosingDays(c.id);
 });
 const shownTitle = computed(() => {
   if (browseMode.value === "DIAS") return dayDate.value === todayKey() ? "Cobrado hoy" : `Cobrado el ${formatDay(dayDate.value)}`;
@@ -739,6 +763,19 @@ async function saveFloat() {
 }
 const countedCash = ref<number | "">("");
 const note = ref("");
+
+// Lo que quedo sin cerrar de dias anteriores: se avisa en la apertura (hasta cerrarlo o «Ahora no»,
+// que vale para ese periodo en esta pantalla) y el fondo de hoy se anota despues.
+const previousDaysDismissed = ref("");
+const showPreviousDays = computed(() => {
+  const pd = summary.value?.previousDays;
+  return !!pd && previousDaysDismissed.value !== pd.periodStart;
+});
+const todayCashCents = computed(() => summary.value?.days?.find((d) => d.date === todayKey())?.cashCents ?? 0);
+async function onPreviousDaysClosed() {
+  editingFloat.value = false;
+  await refetch();
+}
 
 const floatValid = computed(() => typeof openingFloat.value === "number" && openingFloat.value >= 0);
 const countedValid = computed(() => typeof countedCash.value === "number" && countedCash.value >= 0);
