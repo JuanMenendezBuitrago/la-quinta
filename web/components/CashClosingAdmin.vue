@@ -5,13 +5,83 @@
     <div class="cash-current">
     <p v-if="summaryError" class="muted error" role="alert">{{ summaryError }}</p>
 
+    <!-- Apertura: el fondo inicial se anota al empezar el dia y queda guardado para el cierre -->
+    <form v-if="summary" class="card opening" @submit.prevent="saveFloat">
+      <h2 class="card-title">Apertura de caja</h2>
+      <template v-if="summary.openingFloatCents != null && !editingFloat">
+        <p class="opening-saved">
+          <span>Fondo inicial <strong>{{ formatPrice(summary.openingFloatCents) }}</strong></span>
+          <button type="button" class="link-button" @click="startEditFloat">Cambiar</button>
+        </p>
+        <p class="muted period">
+          Anotado por {{ summary.openingFloatStaffName }}<template v-if="summary.openingFloatAt">, {{ formatDateTime(summary.openingFloatAt) }}</template>
+        </p>
+      </template>
+      <template v-else>
+        <label class="field">
+          <span class="muted">Fondo inicial (cambio con el que se abre la caja)</span>
+          <input v-model.number="openingFloat" type="number" min="0" step="50" inputmode="numeric" required />
+        </label>
+        <p v-if="floatError" class="muted error" role="alert">{{ floatError }}</p>
+        <div class="form-actions">
+          <button v-if="editingFloat" class="button secondary" type="button" :disabled="savingFloat" @click="editingFloat = false">Cancelar</button>
+          <button class="button" type="submit" :disabled="!floatValid || savingFloat">
+            {{ savingFloat ? "Guardando…" : "Guardar fondo" }}
+          </button>
+        </div>
+      </template>
+    </form>
+
     <!-- Lo cobrado desde el ultimo cierre -->
     <div v-if="summary" class="card">
-      <h2 class="card-title">Cobrado desde {{ lastClosing ? "el último cierre" : "el inicio del día" }}</h2>
+      <h2 class="card-title">Cobrado desde {{ lastClosing ? "el último cierre" : "el primer pedido (aún no hay cierres)" }}</h2>
       <p class="muted period">
         {{ formatDateTime(summary.periodStart) }} → ahora · {{ summary.ordersCount }}
         {{ summary.ordersCount === 1 ? "pedido" : "pedidos" }}
       </p>
+      <!-- Con mas de un dia en el periodo: el total o el detalle dia a dia -->
+      <SegmentedControl v-if="summary.days.length > 1" v-model="periodView" :options="PERIOD_VIEWS" aria-label="Cómo ver lo cobrado" class="period-view" />
+      <div v-if="periodView === 'DIAS' && summary.days.length > 1" class="days-wrap">
+        <table class="days">
+          <thead>
+            <tr>
+              <th scope="col">Día</th>
+              <th scope="col">Efectivo</th>
+              <th scope="col">Tarjeta</th>
+              <th scope="col">Transf.</th>
+              <th v-if="summary.unknownMethodCents" scope="col">Sin método</th>
+              <th scope="col">Total</th>
+              <th v-if="summary.expensesCount" scope="col">Gastos</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="d in summary.days" :key="d.date">
+              <th scope="row">
+                {{ formatDay(d.date) }}
+                <span class="muted day-orders">{{ d.ordersCount }} {{ d.ordersCount === 1 ? "pedido" : "pedidos" }}</span>
+              </th>
+              <td>{{ formatPrice(d.cashCents) }}</td>
+              <td>{{ formatPrice(d.cardCents) }}</td>
+              <td>{{ formatPrice(d.transferCents) }}</td>
+              <td v-if="summary.unknownMethodCents">{{ formatPrice(d.unknownMethodCents) }}</td>
+              <td class="day-total">{{ formatPrice(d.totalCents) }}</td>
+              <td v-if="summary.expensesCount">{{ d.expensesCents ? `− ${formatPrice(d.expensesCents)}` : formatPrice(0) }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Periodo</th>
+              <td>{{ formatPrice(summary.cashCents) }}</td>
+              <td>{{ formatPrice(summary.cardCents) }}</td>
+              <td>{{ formatPrice(summary.transferCents) }}</td>
+              <td v-if="summary.unknownMethodCents">{{ formatPrice(summary.unknownMethodCents) }}</td>
+              <td>{{ formatPrice(summary.totalCents) }}</td>
+              <td v-if="summary.expensesCount">− {{ formatPrice(summary.expensesTotalCents) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <template v-else>
       <dl class="totals">
         <div><dt><Banknote :size="16" :stroke-width="1.8" aria-hidden="true" /> Efectivo</dt><dd>{{ formatPrice(summary.cashCents) }}</dd></div>
         <div><dt><CreditCard :size="16" :stroke-width="1.8" aria-hidden="true" /> Tarjeta</dt><dd>{{ formatPrice(summary.cardCents) }}</dd></div>
@@ -33,6 +103,7 @@
         «Sin método»: pedidos para llevar o web entregados antes de que se pidiera el método de pago al entregar.
       </p>
       <BalanceTable :balances="summary.balances" :format="formatPrice" />
+      </template>
     </div>
 
     <!-- Descuentos del periodo: ya restados de lo cobrado; aqui, cuanto se dejo de cobrar y por que -->
@@ -126,10 +197,10 @@
     <!-- Arqueo del efectivo y cierre -->
     <form v-if="summary" class="card closing-form" @submit.prevent="confirming = true">
       <h2 class="card-title">Arqueo del efectivo</h2>
-      <label class="field">
-        <span class="muted">Fondo inicial (cambio con el que se abrió la caja)</span>
-        <input v-model.number="openingFloat" type="number" min="0" step="50" inputmode="numeric" required />
-      </label>
+      <p v-if="savedFloat != null" class="opening-saved">
+        <span>Fondo inicial <strong>{{ formatPrice(savedFloat) }}</strong></span>
+      </p>
+      <p v-else class="muted error">Anota primero el fondo inicial en «Apertura de caja».</p>
       <label class="field">
         <span class="muted">Efectivo contado en la caja</span>
         <input v-model.number="countedCash" type="number" min="0" step="50" inputmode="numeric" required />
@@ -169,7 +240,7 @@
           </button>
         </div>
       </div>
-      <button v-else class="button" type="submit" :disabled="!countedValid || !floatValid">
+      <button v-else class="button" type="submit" :disabled="!countedValid || savedFloat == null">
         <Lock :size="16" :stroke-width="1.8" aria-hidden="true" />
         Cerrar caja
       </button>
@@ -332,7 +403,22 @@ interface CashSummary {
   bankDepositsCents: number;
   netCents: number;
   balances: MethodBalance[];
+  openingFloatCents?: number | null;
+  openingFloatStaffName?: string | null;
+  openingFloatAt?: string | null;
+  days: CashSummaryDay[];
 }
+interface CashSummaryDay {
+  date: string;
+  ordersCount: number;
+  totalCents: number;
+  cashCents: number;
+  cardCents: number;
+  transferCents: number;
+  unknownMethodCents: number;
+  expensesCents: number;
+}
+const DAY_FIELDS = "days { date ordersCount totalCents cashCents cardCents transferCents unknownMethodCents expensesCents }";
 interface CashClosing extends CashSummary {
   id: string;
   staffName: string;
@@ -349,7 +435,7 @@ const SUMMARY_FIELDS = `periodStart periodEnd ordersCount totalCents cashCents c
   balances { method inCents outCents balanceCents }`;
 const CASH_QUERY = gql`
   query CashClosingData {
-    cashSummary { ${SUMMARY_FIELDS} }
+    cashSummary { ${SUMMARY_FIELDS} openingFloatCents openingFloatStaffName openingFloatAt ${DAY_FIELDS} }
     pendingExpenses { ${EXPENSE_FIELDS} }
     expensesToItemize { ${EXPENSE_FIELDS} }
     cashClosings(limit: 30) {
@@ -362,6 +448,12 @@ const CLOSE_CASH = gql`
     closeCashRegister(openingFloatCents: $openingFloatCents, countedCashCents: $countedCashCents, note: $note) {
       id
     }
+  }
+`;
+
+const SET_FLOAT = gql`
+  mutation SetOpeningFloat($amountCents: Int!) {
+    setOpeningFloat(amountCents: $amountCents) { ${SUMMARY_FIELDS} openingFloatCents openingFloatStaffName openingFloatAt ${DAY_FIELDS} }
   }
 `;
 
@@ -414,6 +506,17 @@ function expensesByMethod(c: { balances: MethodBalance[] }) {
   );
 }
 const lastClosing = computed(() => closings.value[0] ?? null);
+
+// Lo cobrado en el periodo: en total (por metodo) o dia a dia.
+const PERIOD_VIEWS = [
+  { value: "TOTAL" as const, label: "Total" },
+  { value: "DIAS" as const, label: "Por día" },
+];
+const periodView = ref<"TOTAL" | "DIAS">("TOTAL");
+/** "sáb 21 nov" de un "YYYY-MM-DD" (es la fecha del local: se lee en UTC para no moverla). */
+function formatDay(date: string) {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString("es-ES", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" });
+}
 const summaryError = computed(() => (error.value ? "No se pudo cargar la caja." : ""));
 const pending = computed(() => result.value?.pendingExpenses ?? []);
 const toItemize = computed(() => result.value?.expensesToItemize ?? []);
@@ -478,11 +581,37 @@ async function toggleClosingExpenses(closingId: string) {
   openClosingId.value = closingId;
 }
 
-// El fondo suele repetirse de un dia a otro: se propone el del ultimo cierre.
+// El fondo suele repetirse de un dia a otro: hasta anotarlo, se propone el del ultimo cierre.
 const openingFloat = ref<number | "">("");
 watch(lastClosing, (last) => {
   if (openingFloat.value === "" && last) openingFloat.value = last.openingFloatCents;
 }, { immediate: true });
+// El anotado al abrir la caja: es el que usa el arqueo y el cierre.
+const savedFloat = computed(() => summary.value?.openingFloatCents ?? null);
+const editingFloat = ref(false);
+const savingFloat = ref(false);
+const floatError = ref("");
+const { mutate: setFloat } = useMutation(SET_FLOAT);
+function startEditFloat() {
+  openingFloat.value = savedFloat.value ?? "";
+  floatError.value = "";
+  editingFloat.value = true;
+}
+async function saveFloat() {
+  if (!floatValid.value || savingFloat.value) return;
+  savingFloat.value = true;
+  floatError.value = "";
+  try {
+    // El aviso de la barra superior (CashFloatNotice) se actualiza al momento.
+    await setFloat({ amountCents: Math.round(openingFloat.value as number) }, { refetchQueries: ["CashOpeningPending"] });
+    editingFloat.value = false;
+    await refetch();
+  } catch (err: any) {
+    floatError.value = err?.message ?? "No se pudo guardar el fondo";
+  } finally {
+    savingFloat.value = false;
+  }
+}
 const countedCash = ref<number | "">("");
 const note = ref("");
 
@@ -490,7 +619,7 @@ const floatValid = computed(() => typeof openingFloat.value === "number" && open
 const countedValid = computed(() => typeof countedCash.value === "number" && countedCash.value >= 0);
 const expectedInDrawer = computed(
   () =>
-    (floatValid.value ? (openingFloat.value as number) : 0) +
+    (savedFloat.value ?? 0) +
     (summary.value?.cashCents ?? 0) -
     (summary.value?.expensesCashCents ?? 0) -
     (summary.value?.bankDepositsCents ?? 0)
@@ -513,15 +642,15 @@ const closeError = ref("");
 const justClosed = ref(false);
 
 async function closeRegister() {
-  if (!countedValid.value || !floatValid.value) return;
+  if (!countedValid.value || savedFloat.value == null) return;
   closing.value = true;
   closeError.value = "";
   try {
     await closeCash({
-      openingFloatCents: Math.round(openingFloat.value as number),
+      openingFloatCents: savedFloat.value,
       countedCashCents: Math.round(countedCash.value as number),
       note: note.value.trim() || null,
-    });
+    }, { refetchQueries: ["CashOpeningPending"] });
     countedCash.value = "";
     note.value = "";
     confirming.value = false;
@@ -592,6 +721,20 @@ async function closeRegister() {
 }
 .confirm p { margin: 0 0 10px; font-size: 14px; }
 .form-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.period-view { margin-bottom: 12px; }
+.days-wrap { overflow-x: auto; }
+.days { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.days th, .days td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--field-border); white-space: nowrap; }
+.days thead th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 600; }
+.days th[scope="row"] { text-align: left; font-weight: 600; }
+.days thead th:first-child { text-align: left; }
+.day-orders { display: block; font-size: 12px; font-weight: 400; }
+.day-total, .days tfoot th, .days tfoot td { font-weight: 700; }
+.days tfoot th, .days tfoot td { border-bottom: none; }
+.opening-saved { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 4px; }
+.opening-saved strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.opening .period { margin-bottom: 0; }
+.opening .field { margin-bottom: 12px; }
 .error { color: var(--danger); margin: 0; }
 .ok { color: var(--accent-strong); margin: 0; }
 

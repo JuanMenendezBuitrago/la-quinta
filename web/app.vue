@@ -14,6 +14,7 @@
       </div>
       <div class="topbar-end">
       <!-- En el panel de personal, su propio menu: carrito y "mi cuenta" son cosas del cliente -->
+      <CashFloatNotice v-if="inStaff && staff" />
       <StaffNav v-if="inStaff && staff" />
       <nav v-else-if="inStaff">
         <NuxtLink to="/">Ver carta</NuxtLink>
@@ -64,6 +65,7 @@ import { restoreSession, useAuth, useStaffAuth } from "~/composables/useAuth";
 import { TABLES, useCustomerTable } from "~/composables/useTables";
 import { useCustomerOrdering } from "~/composables/useSiteSettings";
 import StaffNav from "~/components/StaffNav.vue";
+import CashFloatNotice from "~/components/CashFloatNotice.vue";
 import StaffActingSwitcher from "~/components/StaffActingSwitcher.vue";
 import StaffQuickBar from "~/components/StaffQuickBar.vue";
 import UserAvatar from "~/components/UserAvatar.vue";

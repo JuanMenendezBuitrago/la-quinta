@@ -86,3 +86,26 @@ const cashClosingSchema = new Schema<CashClosingDoc>({
 cashClosingSchema.index({ periodEnd: -1 });
 
 export const CashClosing = model<CashClosingDoc>("CashClosing", cashClosingSchema);
+
+/**
+ * Fondo inicial del periodo en curso: se anota al abrir la caja (al empezar el dia), sin esperar
+ * al cierre. Uno por periodo (periodStart: el fin del ultimo cierre); el cierre lo usa y lo copia.
+ */
+export interface CashOpeningDoc {
+  _id: Types.ObjectId;
+  periodStart: Date;
+  amountCents: number;
+  staffId: Types.ObjectId;
+  staffName: string;
+  updatedAt: Date;
+}
+
+const cashOpeningSchema = new Schema<CashOpeningDoc>({
+  periodStart: { type: Date, required: true, unique: true },
+  amountCents: { type: Number, required: true, min: 0 },
+  staffId: { type: Schema.Types.ObjectId, ref: "StaffUser", required: true },
+  staffName: { type: String, required: true },
+  updatedAt: { type: Date, required: true },
+});
+
+export const CashOpening = model<CashOpeningDoc>("CashOpening", cashOpeningSchema);

@@ -2,7 +2,7 @@ import { GraphQLContext, requireStaff } from "../../graphql/context";
 import { env } from "../../config/env";
 import { DISCOUNT_REASONS, NO_PARTIAL_PAYMENTS, Order } from "../orders/model";
 import { StaffUser } from "../users/model";
-import { CashClosing, CashClosingDoc } from "./model";
+import { CashClosing, CashClosingDoc, CashOpening } from "./model";
 import { BANK_DEPOSIT, Expense } from "../expenses/model";
 
 // Tope de cordura para los importes que se escriben a mano (100 millones de pesos).
@@ -82,9 +82,16 @@ async function dailyStats(days: number, now: Date) {
   });
 }
 
+/**
+ * El periodo empieza donde acabo el ultimo cierre, aunque fuera otro dia: lo que se cobro despues
+ * y no se cerro sigue en la caja. Sin ningun cierre, desde el primer pedido (asi el primero lo
+ * cuenta todo); sin pedidos, desde ahora.
+ */
 async function currentPeriodStart(now: Date) {
   const last = await CashClosing.findOne().sort({ periodEnd: -1 }).select("periodEnd").lean();
-  return last?.periodEnd ?? startOfTodayInStore(now);
+  if (last) return last.periodEnd;
+  const first = await Order.findOne().sort({ createdAt: 1 }).select("createdAt").lean();
+  return first?.createdAt ?? now;
 }
 
 /**
@@ -103,26 +110,47 @@ async function summarize(start: Date, end: Date) {
       { payments: { $elemMatch: { at: range } } },
     ],
   })
-    .select("totalCents paymentMethod paidAt discount redemption payments")
+    .select("totalCents paymentMethod paidAt deliveredAt discount redemption payments")
     .lean();
 
-  const sum = { cashCents: 0, cardCents: 0, transferCents: 0, unknownMethodCents: 0 };
-  const add = (method: string | null | undefined, cents: number) => {
-    if (method === "EFECTIVO") sum.cashCents += cents;
-    else if (method === "TARJETA") sum.cardCents += cents;
-    else if (method === "TRANSFERENCIA") sum.transferCents += cents;
-    else sum.unknownMethodCents += cents;
+  type Sum = { cashCents: number; cardCents: number; transferCents: number; unknownMethodCents: number };
+  const emptySum = (): Sum => ({ cashCents: 0, cardCents: 0, transferCents: 0, unknownMethodCents: 0 });
+  const sum = emptySum();
+  // Lo mismo, por dia (en la zona del local): para ver el periodo dia a dia.
+  const byDay = new Map<string, Sum & { ordersCount: number; expensesCents: number }>();
+  const dayOf = (at: Date) => {
+    const key = storeDateKey(at);
+    if (!byDay.has(key)) byDay.set(key, { ...emptySum(), ordersCount: 0, expensesCents: 0 });
+    return byDay.get(key)!;
+  };
+  const addTo = (s: Sum, method: string | null | undefined, cents: number) => {
+    if (method === "EFECTIVO") s.cashCents += cents;
+    else if (method === "TARJETA") s.cardCents += cents;
+    else if (method === "TRANSFERENCIA") s.transferCents += cents;
+    else s.unknownMethodCents += cents;
+  };
+  const add = (at: Date, method: string | null | undefined, cents: number) => {
+    addTo(sum, method, cents);
+    addTo(dayOf(at), method, cents);
   };
   const inRange = (d: Date | null | undefined) => !!d && d >= start && d < end;
   for (const o of orders) {
     if (o.payments?.length) {
-      for (const p of o.payments) if (inRange(p.at)) add(p.method, p.amountCents);
-    } else add(o.paidAt ? o.paymentMethod : null, o.totalCents);
+      for (const p of o.payments) if (inRange(p.at)) add(p.at, p.method, p.amountCents);
+    } else add((o.paidAt ?? o.deliveredAt)!, o.paidAt ? o.paymentMethod : null, o.totalCents);
   }
   // Pedidos y descuentos: los cobrados del todo en este rato (una cuenta dividida, en el cierre de su ultima parte).
   const settled = orders.filter((o) => !o.payments?.length || inRange(o.paidAt));
+  for (const o of settled) dayOf((o.paidAt ?? o.deliveredAt)!).ordersCount += 1;
   const totalCents = sum.cashCents + sum.cardCents + sum.transferCents + sum.unknownMethodCents;
-  return { ordersCount: settled.length, totalCents, ...sum, ...summarizeDiscounts(settled), ...(await summarizeExpenses(end)) };
+  const expenses = await summarizeExpenses(end);
+  for (const e of expenses.expenseDays) dayOf(e.spentAt).expensesCents += e.amountCents;
+  const { expenseDays: _days, ...expenseTotals } = expenses;
+  // El mas reciente primero.
+  const days = [...byDay.entries()]
+    .sort(([a], [b]) => (a < b ? 1 : -1))
+    .map(([date, d]) => ({ date, ...d, totalCents: d.cashCents + d.cardCents + d.transferCents + d.unknownMethodCents }));
+  return { ordersCount: settled.length, totalCents, ...sum, ...summarizeDiscounts(settled), ...expenseTotals, days };
 }
 
 /**
@@ -159,7 +187,7 @@ function pendingExpensesFilter(end: Date) {
   return { closingId: null, createdAt: { $lt: end } };
 }
 async function summarizeExpenses(end: Date) {
-  const all = await Expense.find(pendingExpensesFilter(end)).select("_id amountCents method category").lean();
+  const all = await Expense.find(pendingExpensesFilter(end)).select("_id amountCents method category spentAt").lean();
   // Los ingresos al banco van aparte: salen del cajon (arqueo), pero no son gasto.
   const deposits = all.filter((e) => e.category === BANK_DEPOSIT);
   const expenses = all.filter((e) => e.category !== BANK_DEPOSIT);
@@ -176,6 +204,8 @@ async function summarizeExpenses(end: Date) {
     expensesOtherCents: by.TARJETA + by.TRANSFERENCIA + by.OTRO,
     // Todos, ingresos al banco incluidos, pasan a este cierre.
     expenseIds: all.map((e) => e._id),
+    // Para el detalle por dia (sin los ingresos al banco, que no son gasto).
+    expenseDays: expenses.map((e) => ({ spentAt: e.spentAt, amountCents: e.amountCents })),
   };
 }
 
@@ -207,6 +237,26 @@ function balances(s: Figures) {
 function withTotals<T extends Figures & { expensesCashCents: number; expensesOtherCents: number }>(s: T) {
   const expensesTotalCents = s.expensesCashCents + s.expensesOtherCents;
   return { ...s, expensesTotalCents, netCents: s.totalCents - expensesTotalCents, balances: balances(s) };
+}
+
+/** Fondo inicial anotado para el periodo que empieza en `start` (null si aun no se anoto). */
+async function openingFor(start: Date) {
+  return CashOpening.findOne({ periodStart: start }).lean();
+}
+
+/** Resumen en vivo del periodo actual, con el fondo inicial si ya se anoto. */
+async function liveSummary() {
+  const now = new Date();
+  const start = await currentPeriodStart(now);
+  const [{ expenseIds: _ids, ...summary }, opening] = await Promise.all([summarize(start, now), openingFor(start)]);
+  return {
+    periodStart: start.toISOString(),
+    periodEnd: now.toISOString(),
+    ...withTotals(summary),
+    openingFloatCents: opening?.amountCents ?? null,
+    openingFloatStaffName: opening?.staffName ?? null,
+    openingFloatAt: opening ? opening.updatedAt.toISOString() : null,
+  };
 }
 
 function validAmount(value: number, label: string) {
@@ -243,10 +293,11 @@ export const cashResolvers = {
     },
     cashSummary: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
       requireStaff(ctx, ["barra", "gestion"]);
-      const now = new Date();
-      const start = await currentPeriodStart(now);
-      const { expenseIds: _ids, ...summary } = await summarize(start, now);
-      return { periodStart: start.toISOString(), periodEnd: now.toISOString(), ...withTotals(summary) };
+      return liveSummary();
+    },
+    cashOpeningPending: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      requireStaff(ctx, ["barra", "gestion"]);
+      return !(await openingFor(await currentPeriodStart(new Date())));
     },
     cashClosings: async (_: unknown, args: { limit?: number }, ctx: GraphQLContext) => {
       requireStaff(ctx, ["barra", "gestion"]);
@@ -255,13 +306,26 @@ export const cashResolvers = {
     },
   },
   Mutation: {
+    setOpeningFloat: async (_: unknown, args: { amountCents: number }, ctx: GraphQLContext) => {
+      const staff = requireStaff(ctx, ["barra", "gestion"]);
+      const amountCents = validAmount(args.amountCents, "Fondo inicial");
+      const periodStart = await currentPeriodStart(new Date());
+      const member = await StaffUser.findById(staff.id).select("name").lean();
+      // Se puede corregir hasta el cierre: queda quien lo anoto por ultima vez.
+      await CashOpening.updateOne(
+        { periodStart },
+        { $set: { amountCents, staffId: staff.id, staffName: member?.name ?? "Personal", updatedAt: new Date() } },
+        { upsert: true }
+      );
+      return liveSummary();
+    },
+
     closeCashRegister: async (
       _: unknown,
-      args: { openingFloatCents: number; countedCashCents: number; note?: string | null },
+      args: { openingFloatCents?: number | null; countedCashCents: number; note?: string | null },
       ctx: GraphQLContext
     ) => {
       const staff = requireStaff(ctx, ["barra", "gestion"]);
-      const openingFloatCents = validAmount(args.openingFloatCents, "Fondo inicial");
       const countedCashCents = validAmount(args.countedCashCents, "Efectivo contado");
       const note = args.note?.trim().slice(0, 500) || undefined;
 
@@ -269,7 +333,12 @@ export const cashResolvers = {
       // puede haber cambiado si entretanto se cobro otro pedido.
       const now = new Date();
       const periodStart = await currentPeriodStart(now);
-      const { expenseIds, ...summary } = await summarize(periodStart, now);
+      // El fondo: el que llega con el cierre o, si no, el que se anoto al abrir la caja.
+      const opening = await openingFor(periodStart);
+      const floatInput = args.openingFloatCents ?? opening?.amountCents;
+      if (floatInput == null) throw new Error("Indica el fondo inicial");
+      const openingFloatCents = validAmount(floatInput, "Fondo inicial");
+      const { expenseIds, days: _days, ...summary } = await summarize(periodStart, now);
       const member = await StaffUser.findById(staff.id).select("name").lean();
 
       let closing;
