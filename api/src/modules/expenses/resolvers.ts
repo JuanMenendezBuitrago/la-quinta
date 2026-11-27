@@ -109,12 +109,12 @@ function toGraphql(e: ExpenseDoc) {
 export const expensesResolvers = {
   Query: {
     pendingExpenses: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      requireStaff(ctx, ["gestion"]);
       const list = await Expense.find({ closingId: null }).sort({ spentAt: -1 }).lean<ExpenseDoc[]>();
       return list.map(toGraphql);
     },
     expenseSuppliers: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      requireStaff(ctx, ["gestion"]);
       // Uno por nombre sin distinguir mayusculas, escrito como se escribio mas veces.
       const rows = await Expense.aggregate<{ name: string }>([
         { $match: { supplier: { $type: "string", $ne: "" } } },
@@ -127,7 +127,7 @@ export const expensesResolvers = {
       return rows.map((r) => r.name);
     },
     groupedExpensePresets: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      requireStaff(ctx, ["gestion"]);
       // Una por descripcion sin distinguir mayusculas, con la forma y la categoria de la ultima vez.
       const rows = await Expense.aggregate<{ description: string; category: ExpenseCategory }>([
         { $match: { grouped: true } },
@@ -147,7 +147,7 @@ export const expensesResolvers = {
       return rows.map((r) => ({ description: r.description, category: r.category }));
     },
     expensesToItemize: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      requireStaff(ctx, ["gestion"]);
       // Los aun sin cierre ya se ven en «Gastos del periodo»; aqui, los cerrados que se quedaron a medias.
       const list = await Expense.find({
         closingId: { $ne: null },
@@ -160,7 +160,7 @@ export const expensesResolvers = {
       return list.map(toGraphql);
     },
     closingExpenses: async (_: unknown, args: { closingId: string }, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      requireStaff(ctx, ["gestion"]);
       if (!Types.ObjectId.isValid(args.closingId)) return [];
       const list = await Expense.find({ closingId: args.closingId }).sort({ spentAt: -1 }).lean<ExpenseDoc[]>();
       return list.map(toGraphql);
@@ -168,7 +168,7 @@ export const expensesResolvers = {
   },
   Mutation: {
     createExpense: async (_: unknown, args: { input: ExpenseInput }, ctx: GraphQLContext) => {
-      const staff = requireStaff(ctx, ["barra", "gestion"]);
+      const staff = requireStaff(ctx, ["gestion"]);
       const data = clean(args.input);
       const member = await StaffUser.findById(staff.id).select("name").lean();
       const created = await Expense.create({ ...data, staffId: staff.id, staffName: member?.name ?? "Personal" });
@@ -220,7 +220,7 @@ export const expensesResolvers = {
       return true;
     },
     setExpenseItems: async (_: unknown, args: { id: string; items: ExpenseItemInput[] }, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      requireStaff(ctx, ["gestion"]);
       if (!Types.ObjectId.isValid(args.id)) throw new Error("Gasto no encontrado");
       const items = cleanItems(args.items);
       const total = itemsTotal(items);

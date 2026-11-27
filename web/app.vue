@@ -14,7 +14,7 @@
       </div>
       <div class="topbar-end">
       <!-- En el panel de personal, su propio menu: carrito y "mi cuenta" son cosas del cliente -->
-      <CashFloatNotice v-if="inStaff && staff" />
+      <CashFloatNotice v-if="inStaff && staff?.role === 'gestion'" />
       <StaffNav v-if="inStaff && staff" />
       <nav v-else-if="inStaff">
         <NuxtLink to="/">Ver carta</NuxtLink>

@@ -333,16 +333,16 @@ export const cashResolvers = {
   },
   Query: {
     cashDailyStats: async (_: unknown, args: { days?: number | null }, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      requireStaff(ctx, ["gestion"]);
       const days = Math.min(90, Math.max(1, Math.trunc(args.days ?? 30)));
       return dailyStats(days, new Date());
     },
     cashSummary: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      requireStaff(ctx, ["gestion"]);
       return liveSummary();
     },
     cashDay: async (_: unknown, args: { date: string }, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      requireStaff(ctx, ["gestion"]);
       const { start, end } = storeDayRange(args.date);
       const now = new Date();
       if (start > now) throw new Error("Ese dia aun no ha llegado");
@@ -352,25 +352,25 @@ export const cashResolvers = {
       return { periodStart: start.toISOString(), periodEnd: until.toISOString(), ...withTotals(summary) };
     },
     cashClosingDays: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      requireStaff(ctx, ["gestion"]);
       if (!Types.ObjectId.isValid(args.id)) throw new Error("Cierre no encontrado");
       const closing = await CashClosing.findById(args.id).select("periodStart periodEnd").lean();
       if (!closing) throw new Error("Cierre no encontrado");
       return (await summarize(closing.periodStart, closing.periodEnd, { closingId: closing._id })).days;
     },
     cashOpeningPending: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      requireStaff(ctx, ["gestion"]);
       return !(await openingFor(await currentPeriodStart(new Date())));
     },
     cashClosings: async (_: unknown, args: { limit?: number }, ctx: GraphQLContext) => {
-      requireStaff(ctx, ["barra", "gestion"]);
+      requireStaff(ctx, ["gestion"]);
       const limit = Math.min(Math.max(args.limit ?? 30, 1), 200);
       return CashClosing.find().sort({ periodEnd: -1 }).limit(limit).lean();
     },
   },
   Mutation: {
     setOpeningFloat: async (_: unknown, args: { amountCents: number }, ctx: GraphQLContext) => {
-      const staff = requireStaff(ctx, ["barra", "gestion"]);
+      const staff = requireStaff(ctx, ["gestion"]);
       const amountCents = validAmount(args.amountCents, "Fondo inicial");
       const periodStart = await currentPeriodStart(new Date());
       const member = await StaffUser.findById(staff.id).select("name").lean();
@@ -388,7 +388,7 @@ export const cashResolvers = {
       args: { openingFloatCents?: number | null; countedCashCents: number; note?: string | null; previousDays?: boolean | null },
       ctx: GraphQLContext
     ) => {
-      const staff = requireStaff(ctx, ["barra", "gestion"]);
+      const staff = requireStaff(ctx, ["gestion"]);
       const countedCashCents = validAmount(args.countedCashCents, "Efectivo contado");
       const note = args.note?.trim().slice(0, 500) || undefined;
 

@@ -131,25 +131,25 @@ export const cashTypeDefs = /* GraphQL */ `
   }
 
   extend type Query {
-    """Personal: lo cobrado desde el ultimo cierre hasta ahora (lo que cerraria un cierre ahora)."""
+    """Gestion: lo cobrado desde el ultimo cierre hasta ahora (lo que cerraria un cierre ahora)."""
     cashSummary: CashSummary!
-    """Personal: lo cobrado un dia (YYYY-MM-DD, en la zona del local), con los gastos de esa fecha."""
+    """Gestion: lo cobrado un dia (YYYY-MM-DD, en la zona del local), con los gastos de esa fecha."""
     cashDay(date: String!): CashSummary!
-    """Personal: un cierre pasado dia a dia (recalculado ahora; las cifras del cierre son las guardadas)."""
+    """Gestion: un cierre pasado dia a dia (recalculado ahora; las cifras del cierre son las guardadas)."""
     cashClosingDays(id: ID!): [CashSummaryDay!]!
-    """Personal: aun no se ha anotado el fondo inicial del periodo actual (para avisar en la barra)."""
+    """Gestion: aun no se ha anotado el fondo inicial del periodo actual (para avisar en la barra)."""
     cashOpeningPending: Boolean!
-    """Personal: cierres anteriores, el mas reciente primero."""
+    """Gestion: cierres anteriores, el mas reciente primero."""
     cashClosings(limit: Int): [CashClosing!]!
-    """Personal: los ultimos dias (30 por defecto, hasta 90), hoy incluido; los dias sin nada, a cero."""
+    """Gestion: los ultimos dias (30 por defecto, hasta 90), hoy incluido; los dias sin nada, a cero."""
     cashDailyStats(days: Int): [CashDay!]!
   }
 
   extend type Mutation {
-    """Personal: cierra la caja desde el ultimo cierre hasta ahora con el arqueo del efectivo. Con
+    """Gestion: cierra la caja desde el ultimo cierre hasta ahora con el arqueo del efectivo. Con
     previousDays, solo hasta el inicio de hoy (lo que quedo sin cerrar de dias anteriores)."""
     closeCashRegister(openingFloatCents: Int, countedCashCents: Int!, note: String, previousDays: Boolean): CashClosing!
-    """Personal: anota (o corrige) el fondo inicial del periodo actual, al abrir la caja."""
+    """Gestion: anota (o corrige) el fondo inicial del periodo actual, al abrir la caja."""
     setOpeningFloat(amountCents: Int!): CashSummary!
   }
 `;

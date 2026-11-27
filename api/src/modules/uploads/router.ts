@@ -202,7 +202,8 @@ const receiptUpload = multer({
 
 uploadsRouter.post("/receipt", async (req, res) => {
   const { staff } = await sessionOf(req);
-  if (!staff) {
+  // Los recibos son de los gastos, que van en el cierre de caja: solo gestion.
+  if (staff?.role !== "gestion") {
     res.status(401).json({ error: "No autorizado" });
     return;
   }

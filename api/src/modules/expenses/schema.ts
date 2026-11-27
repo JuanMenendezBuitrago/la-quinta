@@ -74,26 +74,26 @@ export const expensesTypeDefs = /* GraphQL */ `
   }
 
   extend type Query {
-    """Personal: gastos que aun no estan en ningun cierre (los del cierre que se haria ahora)."""
+    """Gestion: gastos que aun no estan en ningun cierre (los del cierre que se haria ahora)."""
     pendingExpenses: [Expense!]!
-    """Personal: gastos de un cierre del historial."""
+    """Gestion: gastos de un cierre del historial."""
     closingExpenses(closingId: ID!): [Expense!]!
-    """Personal: proveedores ya usados en gastos (los mas usados primero), para autocompletar."""
+    """Gestion: proveedores ya usados en gastos (los mas usados primero), para autocompletar."""
     expenseSuppliers: [String!]!
-    """Personal: gastos agrupados ya cerrados que aun no estan desglosados del todo (los mas recientes primero)."""
+    """Gestion: gastos agrupados ya cerrados que aun no estan desglosados del todo (los mas recientes primero)."""
     expensesToItemize: [Expense!]!
-    """Personal: descripciones de gastos agrupados mas usadas (con la categoria de la ultima vez), para los atajos."""
+    """Gestion: descripciones de gastos agrupados mas usadas (con la categoria de la ultima vez), para los atajos."""
     groupedExpensePresets: [ExpensePreset!]!
   }
 
   extend type Mutation {
-    """Personal (barra y gestion): registra un gasto."""
+    """Gestion: registra un gasto."""
     createExpense(input: ExpenseInput!): Expense!
     """Gestion: corrige un gasto aun no cerrado."""
     updateExpense(id: ID!, input: ExpenseInput!): Expense!
     """Gestion: borra un gasto aun no cerrado (y la foto de su recibo)."""
     deleteExpense(id: ID!): Boolean!
-    """Personal (barra y gestion): guarda el desglose por articulos de un gasto, tambien si ya esta cerrado.
+    """Gestion: guarda el desglose por articulos de un gasto, tambien si ya esta cerrado.
     Sustituye la lista entera; no cambia el importe del gasto."""
     setExpenseItems(id: ID!, items: [ExpenseItemInput!]!): Expense!
   }

@@ -457,7 +457,7 @@
         <PhotosModeration />
       </section>
 
-      <!-- Cierre de caja (barra y gestion) -->
+      <!-- Cierre de caja (solo gestion) -->
       <section v-else-if="activeTab === 'caja'">
         <CashClosingAdmin />
       </section>
